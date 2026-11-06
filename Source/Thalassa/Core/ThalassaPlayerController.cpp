@@ -1,0 +1,188 @@
+#include "Core/ThalassaPlayerController.h"
+
+#include "Characters/ThalassaCharacter.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "Engine/LocalPlayer.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "InputModifiers.h"
+#include "Vessel/ThalassaVessel.h"
+
+UInputAction* AThalassaPlayerController::MakeAction(const TCHAR* Name, EInputActionValueType ValueType)
+{
+	UInputAction* Action = NewObject<UInputAction>(this, Name);
+	Action->ValueType = ValueType;
+	Actions.Add(Action);
+	return Action;
+}
+
+void AThalassaPlayerController::MapAxisKey(UInputAction* Action, FKey Key, bool bNegate, bool bSwizzle)
+{
+	FEnhancedActionKeyMapping& Mapping = MappingContext->MapKey(Action, Key);
+	if (bSwizzle)
+	{
+		Mapping.Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this));
+	}
+	if (bNegate)
+	{
+		Mapping.Modifiers.Add(NewObject<UInputModifierNegate>(this));
+	}
+}
+
+void AThalassaPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	MappingContext = NewObject<UInputMappingContext>(this, TEXT("SpikeControls"));
+
+	UInputAction* Move = MakeAction(TEXT("Move"), EInputActionValueType::Axis2D);
+	MapAxisKey(Move, EKeys::W, false, true);
+	MapAxisKey(Move, EKeys::S, true, true);
+	MapAxisKey(Move, EKeys::D, false, false);
+	MapAxisKey(Move, EKeys::A, true, false);
+
+	UInputAction* Look = MakeAction(TEXT("Look"), EInputActionValueType::Axis2D);
+	MappingContext->MapKey(Look, EKeys::Mouse2D);
+
+	UInputAction* JumpAction = MakeAction(TEXT("JumpAction"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(JumpAction, EKeys::SpaceBar);
+
+	UInputAction* InteractAction = MakeAction(TEXT("InteractAction"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(InteractAction, EKeys::E);
+
+	UInputAction* StationView = MakeAction(TEXT("StationView"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(StationView, EKeys::Tab);
+
+	UInputAction* StartProfile = MakeAction(TEXT("StartProfile"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(StartProfile, EKeys::P);
+
+	UInputAction* Throttle = MakeAction(TEXT("HelmThrottleAction"), EInputActionValueType::Axis1D);
+	MapAxisKey(Throttle, EKeys::I, false, false);
+	MapAxisKey(Throttle, EKeys::K, true, false);
+
+	UInputAction* Turn = MakeAction(TEXT("HelmTurnAction"), EInputActionValueType::Axis1D);
+	MapAxisKey(Turn, EKeys::L, false, false);
+	MapAxisKey(Turn, EKeys::J, true, false);
+
+	UInputAction* Dive = MakeAction(TEXT("HelmDiveAction"), EInputActionValueType::Axis1D);
+	MapAxisKey(Dive, EKeys::U, false, false);
+	MapAxisKey(Dive, EKeys::O, true, false);
+
+	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
+	Input->BindAction(Move, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnMove);
+	Input->BindAction(Look, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnLook);
+	Input->BindAction(JumpAction, ETriggerEvent::Started, this, &AThalassaPlayerController::OnJumpStart);
+	Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnJumpStop);
+	Input->BindAction(InteractAction, ETriggerEvent::Started, this, &AThalassaPlayerController::OnInteract);
+	Input->BindAction(StationView, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleStationView);
+	Input->BindAction(StartProfile, ETriggerEvent::Started, this, &AThalassaPlayerController::OnStartProfile);
+
+	// Each helm axis reports both changes and release (Completed delivers zero).
+	Input->BindAction(Throttle, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnHelmThrottle);
+	Input->BindAction(Throttle, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnHelmThrottle);
+	Input->BindAction(Turn, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnHelmTurn);
+	Input->BindAction(Turn, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnHelmTurn);
+	Input->BindAction(Dive, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnHelmDive);
+	Input->BindAction(Dive, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnHelmDive);
+}
+
+void AThalassaPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (IsLocalController())
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+		{
+			Subsystem->AddMappingContext(MappingContext, 0);
+		}
+		SetInputMode(FInputModeGameOnly());
+	}
+}
+
+void AThalassaPlayerController::OnMove(const FInputActionValue& Value)
+{
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		const FVector2D Axis = Value.Get<FVector2D>();
+		const FRotator YawOnly(0.f, GetControlRotation().Yaw, 0.f);
+		ControlledPawn->AddMovementInput(YawOnly.RotateVector(FVector::ForwardVector), Axis.Y);
+		ControlledPawn->AddMovementInput(YawOnly.RotateVector(FVector::RightVector), Axis.X);
+	}
+}
+
+void AThalassaPlayerController::OnLook(const FInputActionValue& Value)
+{
+	const FVector2D Axis = Value.Get<FVector2D>();
+	AddYawInput(Axis.X);
+	AddPitchInput(-Axis.Y);
+}
+
+void AThalassaPlayerController::OnJumpStart()
+{
+	if (ACharacter* ControlledCharacter = GetCharacter())
+	{
+		ControlledCharacter->Jump();
+	}
+}
+
+void AThalassaPlayerController::OnJumpStop()
+{
+	if (ACharacter* ControlledCharacter = GetCharacter())
+	{
+		ControlledCharacter->StopJumping();
+	}
+}
+
+void AThalassaPlayerController::OnInteract()
+{
+	if (AThalassaCharacter* Crew = Cast<AThalassaCharacter>(GetPawn()))
+	{
+		Crew->Interact();
+	}
+}
+
+void AThalassaPlayerController::OnToggleStationView()
+{
+	bStationViewExpanded = !bStationViewExpanded;
+}
+
+void AThalassaPlayerController::OnHelmThrottle(const FInputActionValue& Value)
+{
+	HelmThrottle = Value.Get<float>();
+	ServerSetHelm(HelmThrottle, HelmTurn, HelmDive);
+}
+
+void AThalassaPlayerController::OnHelmTurn(const FInputActionValue& Value)
+{
+	HelmTurn = Value.Get<float>();
+	ServerSetHelm(HelmThrottle, HelmTurn, HelmDive);
+}
+
+void AThalassaPlayerController::OnHelmDive(const FInputActionValue& Value)
+{
+	HelmDive = Value.Get<float>();
+	ServerSetHelm(HelmThrottle, HelmTurn, HelmDive);
+}
+
+void AThalassaPlayerController::OnStartProfile()
+{
+	ServerStartProfile();
+}
+
+void AThalassaPlayerController::ServerSetHelm_Implementation(float Throttle, float Turn, float Dive)
+{
+	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
+	{
+		Vessel->SetHelmCommand(Throttle, Turn, Dive);
+	}
+}
+
+void AThalassaPlayerController::ServerStartProfile_Implementation()
+{
+	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
+	{
+		Vessel->StartProfile();
+	}
+}

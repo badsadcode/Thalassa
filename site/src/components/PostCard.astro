@@ -1,0 +1,39 @@
+---
+import StatusBadge from './StatusBadge.astro';
+import { formatDate, logId, withBase, type Post } from '../site';
+
+interface Props {
+  post: Post;
+}
+const { post } = Astro.props;
+---
+
+<article class="card" data-category={post.data.category}>
+  <p class="meta label">
+    <span>{logId(post)}</span>
+    <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+    <span>{post.data.category}</span>
+  </p>
+  <h3><a href={withBase(`/devlog/${post.id}/`)}>{post.data.title}</a></h3>
+  <p class="summary">{post.data.summary}</p>
+  <StatusBadge status={post.data.status} />
+</article>
+
+<style>
+  .card {
+    position: relative;
+    padding: 1.4rem 1.5rem;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-left: 2px solid var(--sonar);
+    transition: border-color 160ms ease;
+  }
+  .card:hover { border-color: var(--sonar); }
+  .meta { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0 0 0.6rem; }
+  h3 { font-size: 1.3rem; margin: 0 0 0.5rem; }
+  h3 a { color: var(--text); text-decoration: none; }
+  /* The whole card is one link target, without nesting the summary inside a link. */
+  h3 a::after { content: ''; position: absolute; inset: 0; }
+  h3 a:hover { color: var(--sonar); }
+  .summary { margin: 0 0 0.9rem; color: var(--muted); }
+</style>

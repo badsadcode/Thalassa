@@ -1,0 +1,186 @@
+---
+import Base from '../layouts/Base.astro';
+import PostCard from '../components/PostCard.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import { formatDate, getPosts, logId, PROJECT_STATUS, REPO_URL, withBase } from '../site';
+
+const posts = await getPosts();
+const [latest, ...older] = posts;
+
+const pillars = [
+  {
+    title: 'The ship is home',
+    text: 'One large submarine you can walk through, with a bridge, engineering, a galley and bunks. No base building. You look after this ship, and it remembers what happened to it.',
+  },
+  {
+    title: 'An ocean with range',
+    text: 'Sunlit reefs and open blue water as well as trenches where the seabed disappears. Some of what lives there is enormous, and most of it is not interested in you.',
+  },
+  {
+    title: 'Instruments and discovery',
+    text: 'Sonar that really maps the terrain, hydrophones that pick up things you cannot see, and a bestiary you fill in yourself with photographs, recordings and samples.',
+  },
+  {
+    title: 'A crew of one to eight',
+    text: 'Play solo with an AI crew or with up to seven friends. No fixed classes: pilot, repair, cook or go outside in a suit, and the AI covers whatever nobody is doing.',
+  },
+];
+---
+
+<Base>
+  <section class="hero">
+    <img
+      src={withBase('/images/concept/hero.jpg')}
+      alt="Concept art: a vast whale-like creature speckled with light drifts through shafts of blue water above glowing stone ruins on the seabed."
+      width="1720"
+      height="968"
+      fetchpriority="high"
+    />
+    <div class="hero-text wrap">
+      <h1>THALASSA</h1>
+      <p class="subtitle"><em>Beep. Bloop.</em></p>
+      <p class="logline">An ocean to discover. A ship to call home.</p>
+      <div class="actions">
+        <a class="button" href={withBase('/devlog/')}>READ THE DEVLOG</a>
+        <a class="button ghost" href={REPO_URL}>VIEW ON GITHUB</a>
+      </div>
+    </div>
+    <p class="art-note label wrap">Concept art, not gameplay</p>
+  </section>
+
+  {
+    latest && (
+      <section class="section wrap latest">
+        <p class="eyebrow">Latest transmission</p>
+        <h2>
+          <a href={withBase(`/devlog/${latest.id}/`)}>{latest.data.title}</a>
+        </h2>
+        <p class="meta label">
+          <span>{logId(latest)}</span>
+          <time datetime={latest.data.date.toISOString()}>{formatDate(latest.data.date)}</time>
+          <span>{latest.data.category}</span>
+          <StatusBadge status={latest.data.status} />
+        </p>
+        <p class="excerpt">{latest.data.summary}</p>
+      </section>
+    )
+  }
+
+  <hr class="contour" />
+
+  <section class="section wrap">
+    <p class="eyebrow">The expedition</p>
+    <h2>What we are trying to build</h2>
+    <p class="intent">This is the design intent. Almost none of it exists yet, and the devlog is where you can check what does.</p>
+    <ol class="pillars">
+      {
+        pillars.map((pillar) => (
+          <li>
+            <h3>{pillar.title}</h3>
+            <p>{pillar.text}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  {
+    older.length > 0 && (
+      <section class="section wrap">
+        <p class="eyebrow">Development log</p>
+        <h2>Earlier entries</h2>
+        <div class="cards">
+          {older.slice(0, 4).map((post) => <PostCard post={post} />)}
+        </div>
+        <p><a href={withBase('/devlog/')}>All entries</a></p>
+      </section>
+    )
+  }
+
+  <hr class="contour" />
+
+  <section class="section wrap status">
+    <div>
+      <p class="eyebrow">Current status</p>
+      <h2>{PROJECT_STATUS.stage}</h2>
+      <p>{PROJECT_STATUS.note}</p>
+    </div>
+    <svg class="sonar" viewBox="0 0 120 120" role="presentation" aria-hidden="true">
+      <circle cx="60" cy="60" r="56" />
+      <circle cx="60" cy="60" r="38" />
+      <circle cx="60" cy="60" r="20" />
+      <path d="M60 4v112M4 60h112" />
+      <g class="sweep"><path d="M60 60 L60 4 A56 56 0 0 1 100 21 Z" /></g>
+    </svg>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    position: relative;
+    display: grid;
+    min-height: min(82vh, 760px);
+    align-items: end;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .hero img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 40% 30%;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, var(--abyss) 4%, rgba(6, 19, 29, 0.55) 42%, rgba(6, 19, 29, 0.05) 75%);
+  }
+  .hero-text { position: relative; z-index: 1; padding-block: 3rem 3.2rem; }
+  h1 {
+    margin: 0;
+    font-size: clamp(2.5rem, 1rem + 8.2vw, 6.5rem);
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    line-height: 1;
+  }
+  .subtitle { margin: 0.6rem 0 0; font-size: clamp(1.15rem, 1rem + 0.8vw, 1.6rem); color: var(--amber); }
+  .logline { margin: 0.3rem 0 1.6rem; font-size: clamp(1.1rem, 1rem + 0.6vw, 1.45rem); }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+  .art-note { position: absolute; z-index: 1; right: 0; left: 0; bottom: 0.7rem; margin-block: 0; text-align: right; }
+
+  .latest h2 a { color: var(--text); text-decoration: none; }
+  .latest h2 a:hover { color: var(--sonar); }
+  .latest h2 { margin-bottom: 0.8rem; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 1rem; margin: 0 0 1rem; }
+  .excerpt { max-width: var(--measure); margin: 0; font-size: 1.15em; }
+
+  .intent { max-width: var(--measure); color: var(--muted); margin: -0.6rem 0 2.2rem; }
+  .pillars {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 2rem 2.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pillars li { border-top: 1px solid var(--sonar); padding-top: 1rem; }
+  .pillars h3 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+  .pillars p { margin: 0; color: var(--muted); font-size: 0.98em; }
+
+  .cards { display: grid; gap: 1rem; margin-bottom: 1.2rem; }
+
+  .status { display: flex; flex-wrap: wrap; gap: 2rem 4rem; align-items: center; justify-content: space-between; }
+  .status > div { flex: 1 1 340px; max-width: var(--measure); }
+  .status h2 { color: var(--amber); margin-bottom: 0.7rem; }
+  .status p:last-child { margin: 0; }
+  .sonar { width: 130px; height: 130px; flex: none; fill: none; stroke: var(--sonar); stroke-opacity: 0.4; stroke-width: 1; }
+  .sweep {
+    transform-origin: 60px 60px;
+    animation: sweep 7s linear infinite;
+  }
+  .sweep path { fill: var(--sonar); fill-opacity: 0.16; stroke: none; }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+</style>

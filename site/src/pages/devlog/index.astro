@@ -1,0 +1,76 @@
+---
+import Base from '../../layouts/Base.astro';
+import PostCard from '../../components/PostCard.astro';
+import { getPosts } from '../../site';
+
+const posts = await getPosts();
+const categories = [...new Set(posts.map((post) => post.data.category))].sort();
+---
+
+<Base title="Devlog" description="Experiments, discoveries, systems and beautiful failures from the development of THALASSA.">
+  <section class="section wrap">
+    <p class="eyebrow">Field notes</p>
+    <h1>Devlog</h1>
+    <p class="intro">
+      Experiments, discoveries, systems, beautiful failures, and the occasional unexplained acoustic event. Every entry
+      carries a status label, so you can tell a measured result from an idea.
+    </p>
+
+    {
+      categories.length > 1 && (
+        <div class="filters" data-filters hidden role="group" aria-label="Filter by category">
+          <button type="button" aria-pressed="true" data-filter="">All</button>
+          {categories.map((category) => (
+            <button type="button" aria-pressed="false" data-filter={category}>
+              {category}
+            </button>
+          ))}
+        </div>
+      )
+    }
+
+    <div class="list">
+      {posts.map((post) => <PostCard post={post} />)}
+      {posts.length === 0 && <p>No entries yet. The hatch is still sealed.</p>}
+    </div>
+  </section>
+</Base>
+
+<script>
+  // Progressive enhancement: without JavaScript every entry is simply listed.
+  const bar = document.querySelector<HTMLElement>('[data-filters]');
+  if (bar) {
+    bar.hidden = false;
+    const buttons = [...bar.querySelectorAll<HTMLButtonElement>('button')];
+    const cards = [...document.querySelectorAll<HTMLElement>('.list [data-category]')];
+    for (const button of buttons) {
+      button.addEventListener('click', () => {
+        for (const other of buttons) other.setAttribute('aria-pressed', String(other === button));
+        for (const card of cards) {
+          card.hidden = !!button.dataset.filter && card.dataset.category !== button.dataset.filter;
+        }
+      });
+    }
+  }
+</script>
+
+<style>
+  h1 { margin: 0 0 1rem; font-size: clamp(2rem, 1.5rem + 2.5vw, 3.2rem); }
+  .intro { max-width: var(--measure); margin: 0 0 2rem; color: var(--muted); }
+  .list { display: grid; gap: 1rem; }
+  .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .filters[hidden] { display: none; }
+  .filters button {
+    min-height: 40px;
+    padding: 0.25rem 0.9rem;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--panel-edge);
+    border-radius: 2px;
+    font-family: var(--display);
+    font-size: 0.92rem;
+    cursor: pointer;
+  }
+  .filters button:hover { color: var(--text); border-color: var(--sonar); }
+  .filters button[aria-pressed='true'] { color: var(--abyss); background: var(--sonar); border-color: var(--sonar); }
+</style>

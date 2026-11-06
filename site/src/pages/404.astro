@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro';
+import { withBase } from '../site';
+---
+
+<Base title="No contact" description="This page could not be found.">
+  <section class="section wrap lost">
+    <p class="eyebrow">404 / No return signal</p>
+    <h1>Nothing at this bearing.</h1>
+    <p>We pinged. Nothing pinged back. The page may have moved, or it may never have been charted.</p>
+    <a class="button" href={withBase('/')}>RETURN TO SHIP</a>
+  </section>
+</Base>
+
+<style>
+  .lost { min-height: 55vh; }
+  h1 { margin: 0 0 1rem; font-size: clamp(2rem, 1.5rem + 2.5vw, 3.2rem); }
+  p:not(.eyebrow) { max-width: var(--measure); margin: 0 0 1.8rem; color: var(--muted); }
+</style>

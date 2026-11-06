@@ -1,0 +1,36 @@
+# Unreal generated output
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Build/
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+
+# IDE / machine-specific
+.vs/
+.vscode/
+.idea/
+*.sln
+*.slnx
+*.suo
+*.user
+*.VC.db
+*.VC.opendb
+
+# Secrets: never commit
+.env
+.env.*
+*.pem
+*.key
+
+# Local Claude Code state
+.claude/settings.local.json
+
+# Devlog site
+site/node_modules/
+site/dist/
+site/.astro/
+
+# Local preview config
+.claude/

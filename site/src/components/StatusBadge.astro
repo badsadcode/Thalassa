@@ -1,0 +1,27 @@
+---
+import { STATUS_LABELS } from '../content.config';
+
+interface Props {
+  status: keyof typeof STATUS_LABELS;
+}
+const { status } = Astro.props;
+---
+
+<span class:list={['badge', status]}>{STATUS_LABELS[status]}</span>
+
+<style>
+  .badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--muted);
+  }
+  .prototype, .in-development { color: var(--amber); }
+  .implemented, .tested { color: var(--sonar); }
+</style>

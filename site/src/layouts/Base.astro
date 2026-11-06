@@ -1,0 +1,164 @@
+---
+// Fonts are self-hosted so that reading the devlog sends nothing to a third party.
+import '@fontsource/saira/400.css';
+import '@fontsource/saira/500.css';
+import '@fontsource/source-serif-4/400.css';
+import '@fontsource/source-serif-4/400-italic.css';
+import '@fontsource/source-serif-4/600.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '../styles/global.css';
+import { REPO_URL, withBase } from '../site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  type?: 'website' | 'article';
+}
+
+const {
+  title,
+  description = 'A development log for THALASSA, a co-op submarine exploration game in development at Bad Ideas Works.',
+  image = '/images/concept/hero.jpg',
+  type = 'website',
+} = Astro.props;
+
+const pageTitle = title ? `${title} | THALASSA` : 'THALASSA: Beep. Bloop.';
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const socialImage = new URL(withBase(image), Astro.site);
+
+const nav = [
+  { href: '/', label: 'Home' },
+  { href: '/devlog/', label: 'Devlog' },
+  { href: '/gallery/', label: 'Gallery' },
+  { href: '/about/', label: 'About' },
+];
+const current = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={withBase('/favicon.svg')} type="image/svg+xml" />
+    <link rel="alternate" type="application/rss+xml" title="THALASSA devlog" href={withBase('/rss.xml')} />
+    <link rel="sitemap" href={withBase('/sitemap-index.xml')} />
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={socialImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap bar">
+        <a class="wordmark" href={withBase('/')}>THALASSA</a>
+        <nav aria-label="Main">
+          <ul>
+            {
+              nav.map((item) => {
+                const href = withBase(item.href);
+                const active = item.href === '/' ? current === href : current.startsWith(href);
+                return (
+                  <li>
+                    <a href={href} aria-current={active ? 'page' : undefined}>{item.label}</a>
+                  </li>
+                );
+              })
+            }
+            <li><a href={REPO_URL}>GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="content">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-grid">
+        <p class="sign-off"><em>Beep. Bloop.</em></p>
+        <p>A game in development by Bad Ideas Works. Nothing here is a promise until it says tested.</p>
+        <ul>
+          <li><a href={REPO_URL}>Source on GitHub</a></li>
+          <li><a href={withBase('/rss.xml')}>RSS</a></li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(6, 19, 29, 0.88);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 1.5rem;
+    padding-block: 0.7rem;
+  }
+  .wordmark {
+    font-family: var(--display);
+    font-size: 1.15rem;
+    font-weight: 500;
+    letter-spacing: 0.34em;
+    color: var(--text);
+    text-decoration: none;
+  }
+  nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.1rem 1.1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  nav a {
+    display: inline-block;
+    padding-block: 0.3rem;
+    font-family: var(--display);
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  nav a:hover { color: var(--text); }
+  nav a[aria-current='page'] { color: var(--text); border-bottom-color: var(--sonar); }
+
+  .site-footer {
+    margin-top: 2rem;
+    padding-block: 2.5rem;
+    border-top: 1px solid var(--panel-edge);
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+  .footer-grid {
+    display: grid;
+    gap: 0.75rem 2.5rem;
+    grid-template-columns: auto 1fr auto;
+    align-items: baseline;
+  }
+  .footer-grid p { margin: 0; }
+  .footer-grid ul { display: flex; gap: 1.2rem; margin: 0; padding: 0; list-style: none; }
+  .sign-off { color: var(--amber); }
+  @media (max-width: 720px) {
+    .footer-grid { grid-template-columns: 1fr; }
+  }
+</style>

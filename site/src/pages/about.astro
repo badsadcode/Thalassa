@@ -1,0 +1,49 @@
+---
+import Base from '../layouts/Base.astro';
+import { REPO_URL } from '../site';
+---
+
+<Base title="About" description="What THALASSA is, what the subtitle means, and who is making it.">
+  <section class="section wrap">
+    <p class="eyebrow">Ship's papers</p>
+    <h1>About THALASSA</h1>
+    <div class="prose">
+      <p>
+        THALASSA is a first-person submarine game in development for one to eight players. You live aboard one large
+        vessel, travel an ocean that is by turns beautiful, useful and frightening, and decide for yourselves what the
+        evening is about: mapping a trench, recording a sound nobody can identify, hauling salvage, patching a leak, or
+        sitting in the observation lounge and watching the water.
+      </p>
+      <p>
+        The plan is a free game with no microtransactions and no paid servers. Co-op is designed in from the start, and a
+        solo player gets an AI crew to run the ship alongside them.
+      </p>
+
+      <h2>Why "Beep. Bloop."?</h2>
+      <p>
+        Beep is the ship: consoles, relays, confirmation chirps, the sound of machinery you have learned to trust. Bloop is
+        the ocean: a name borrowed from a real and very loud underwater sound recorded in 1997, and a good summary of how
+        much of the sea we still have to take on faith.
+      </p>
+
+      <h2>The tone</h2>
+      <p>
+        A serious world with serious stakes, and room for a little dry humour from people who have been at sea too long.
+        The ship's computer may have an optional attitude setting. It will never joke during a hull breach.
+      </p>
+
+      <h2>What exists today</h2>
+      <p>
+        Mostly plans and experiments. The features described on this site are design intent unless a devlog entry says
+        otherwise, and the <a href={REPO_URL}>source repository</a> is the place to check.
+      </p>
+
+      <h2>Bad Ideas Works</h2>
+      <p>THALASSA is made by Bad Ideas Works. The name is a warning and a method.</p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  h1 { margin: 0 0 2rem; font-size: clamp(2rem, 1.5rem + 2.5vw, 3.2rem); }
+</style>

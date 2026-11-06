@@ -1,0 +1,90 @@
+---
+import Base from '../layouts/Base.astro';
+import { withBase } from '../site';
+
+const inEngine = [
+  {
+    src: '/images/devlog/0001-console.jpg',
+    alt: 'In-engine graybox bridge: a plain console in front of a teal wall, with a readout showing beep count, depth, speed and heading.',
+    caption: 'The bridge console. Its readout shows live ship data.',
+  },
+  {
+    src: '/images/devlog/0001-window.jpg',
+    alt: 'In-engine view through the observation window opening in the bridge wall, looking out into blue-green water.',
+    caption: 'The observation window opening, looking out at test fog.',
+  },
+  {
+    src: '/images/devlog/0001-corridor.jpg',
+    alt: 'In-engine view from the bridge through a doorway and down a corridor toward orange-lit steps in engineering.',
+    caption: 'Looking aft from the bridge toward engineering.',
+  },
+];
+
+const concept = [
+  {
+    src: '/images/concept/submarine.jpg',
+    alt: 'Concept art: a riveted, weathered submarine with lit windows, its lamps cutting through dark water above a rocky reef.',
+    caption: 'The submarine as a lived-in home: warm windows against cold water.',
+  },
+  {
+    src: '/images/concept/leviathan.jpg',
+    alt: 'Concept art: a whale-like creature speckled with glowing points, drifting beneath the surface above a school of fish.',
+    caption: 'Scale over threat: something enormous that does not care that you are there.',
+  },
+  {
+    src: '/images/concept/ruins.jpg',
+    alt: 'Concept art: stone arches and stairs on the seabed, lit from within by cyan bioluminescence.',
+    caption: 'Places worth diving to.',
+  },
+];
+---
+
+<Base title="Gallery" description="Concept art and, as they become available, real captures from THALASSA.">
+  <section class="section wrap">
+    <p class="eyebrow">Field imagery</p>
+    <h1>Gallery</h1>
+    <p class="intro">
+      Two kinds of image, labelled so you can tell them apart: what the game really looks like today, and concept art
+      showing the mood we are aiming for.
+    </p>
+
+    <h2><span class="tag label">Prototype</span> In-engine captures</h2>
+    <p class="note">Real frames from the current test build, diagnostic text included. Yes, it is boxes.</p>
+    <div class="grid">
+      {
+        inEngine.map((item) => (
+          <figure>
+            <img src={withBase(item.src)} alt={item.alt} loading="lazy" width="1280" height="720" />
+            <figcaption>{item.caption}</figcaption>
+          </figure>
+        ))
+      }
+    </div>
+
+    <h2 class="second"><span class="tag label">Concept</span> Visual direction</h2>
+    <p class="note">From a title screen mock-up. Not gameplay.</p>
+    <div class="grid">
+      {
+        concept.map((item) => (
+          <figure>
+            <img src={withBase(item.src)} alt={item.alt} loading="lazy" width="1000" height="600" />
+            <figcaption>{item.caption}</figcaption>
+          </figure>
+        ))
+      }
+    </div>
+  </section>
+</Base>
+
+<style>
+  h1 { margin: 0 0 1rem; font-size: clamp(2rem, 1.5rem + 2.5vw, 3.2rem); }
+  .intro { max-width: var(--measure); margin: 0 0 2.5rem; color: var(--muted); }
+  h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; font-size: 1.4rem; margin: 0 0 1.2rem; }
+  .second { margin-top: 3.5rem; }
+  .note { max-width: var(--measure); margin: -0.6rem 0 1.2rem; color: var(--muted); }
+  .tag { padding: 0.1rem 0.5rem; border: 1px solid var(--muted); border-radius: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 2rem 1.5rem; }
+  figure { margin: 0; }
+  img { width: 100%; height: auto; aspect-ratio: 5 / 3; object-fit: cover; border: 1px solid var(--panel-edge); }
+  figcaption { margin-top: 0.6rem; color: var(--muted); font-size: 0.95rem; }
+</style>
