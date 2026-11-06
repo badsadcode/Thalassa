@@ -30,5 +30,6 @@ No Unreal or Blender MCP server is configured. Everything so far runs through or
 
 ## Machine-specific notes
 
+- The project is on `H:`, a slow WD Green hard drive. Heavy writes there stalled the game during tests. Consider moving the project to an SSD (`D:` has space).
 - The Windows registry still lists a UE 5.6 install at `D:\EPIC\UE_5.6`. That folder holds no engine, so ignore it.
 - Very long shell commands can fail outright on Windows, so prefer scripts over one-liners.

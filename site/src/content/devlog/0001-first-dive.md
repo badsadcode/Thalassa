@@ -33,6 +33,8 @@ The fix took a few lines. The test now also compares which way the ship is point
 
 ## What the numbers say now
 
+> **Correction, 7 November:** the correction sizes below, and the two-metre claim, were wrong. The test was stalling the game, and the measurement exaggerated what a player would see. See [the next entry](/Thalassa/devlog/0002-the-bug-was-my-test/). The original text is left as written.
+
 These are single runs, and runs of the same setup vary quite a bit, so please don't read much into small differences.
 
 | Setup | Ping | Corrections | Largest |

@@ -51,7 +51,7 @@ The moving-ship test runs a real listen host and a real client as separate headl
 python Scripts/build/run_motion_test.py --name moving_lan
 ```
 
-Add `--rtt 100 --jitter 10 --loss 1` to simulate a bad connection, or `--clients 3` to add players. Results are written to `Saved/MotionTests/<name>/`. `Scripts/build/run_motion_matrix.py` runs the standard set.
+Add `--rtt 100 --jitter 10 --loss 1` to simulate a bad connection, or `--clients 3` to add players. Results are written to a folder in your system temp directory, and the script prints where. `Scripts/build/run_motion_matrix.py` runs the standard set.
 
 ## Layout
 

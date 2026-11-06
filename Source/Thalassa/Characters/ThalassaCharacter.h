@@ -18,6 +18,7 @@ class THALASSA_API AThalassaCharacter : public ACharacter
 public:
 	AThalassaCharacter(const FObjectInitializer& ObjectInitializer);
 
+	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
 	/** Local player: try to use whatever console is in reach. */

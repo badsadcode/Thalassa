@@ -1,5 +1,6 @@
 #include "Vessel/ThalassaVessel.h"
 
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -7,7 +8,6 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
-#include "GameFramework/GameStateBase.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
@@ -110,7 +110,8 @@ namespace ThalassaVesselLayout
 	const float YawAccelerationDegS2 = 2.f;
 	const float AttitudeRateDegS = 2.f;
 	const float PoseSmoothingRate = 6.f;      // 1/s, decay of client pose corrections
-	const float ClockSmoothingRate = 0.5f;    // 1/s, how quickly the client follows clock updates
+	const float ClockSmoothingRate = 2.f;     // 1/s, how quickly the client follows snapshot timing
+	const double ClockSnapErrorSeconds = 0.25; // Beyond this (a stall), jump rather than drift back
 	const float SnapErrorDistanceCm = 500.f;  // Beyond this, snap rather than visibly slide
 }
 
@@ -142,10 +143,17 @@ AThalassaVessel::AThalassaVessel()
 		Piece->SetMaterial(0, TintableMaterial.Object);
 		Piece->SetRelativeLocation(Box.Center);
 		Piece->SetRelativeScale3D(Box.Size / 100.f); // Engine cube is 100 cm per side.
-		Piece->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+		Piece->SetCollisionEnabled(ECollisionEnabled::NoCollision); // HullCollision does this.
 		Piece->SetVisibility(Box.bVisible);
 		HullPieces.Add(Piece);
 	}
+
+	HullCollision = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("HullCollision"));
+	HullCollision->SetupAttachment(ShipRoot);
+	HullCollision->SetMobility(EComponentMobility::Movable);
+	HullCollision->SetStaticMesh(CubeMesh.Object);
+	HullCollision->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+	HullCollision->SetHiddenInGame(true);
 
 	for (const ThalassaVesselLayout::FInteriorLight& Light : ThalassaVesselLayout::Lights)
 	{
@@ -188,6 +196,20 @@ AThalassaVessel* AThalassaVessel::Find(const UWorld* World)
 		}
 	}
 	return nullptr;
+}
+
+void AThalassaVessel::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	// Runs on server and clients alike, so both see identical collision.
+	if (HullCollision->GetInstanceCount() == 0)
+	{
+		for (const ThalassaVesselLayout::FHullBox& Box : ThalassaVesselLayout::Boxes)
+		{
+			HullCollision->AddInstance(FTransform(FRotator::ZeroRotator, Box.Center, Box.Size / 100.f));
+		}
+	}
 }
 
 void AThalassaVessel::BeginPlay()
@@ -321,8 +343,35 @@ void AThalassaVessel::GetExtrapolatedPose(double Time, FVector& OutPosition, FQu
 	OutRotation = Rotated.Quaternion();
 }
 
+void AThalassaVessel::UpdateClockFromSnapshot()
+{
+	using namespace ThalassaVesselLayout;
+
+	// The clock tracks server time as of each snapshot's arrival, not "true" server time. Everything
+	// replicated reaches this client about equally late, so showing the ship that late keeps it
+	// consistent with what is around it. GameState's GetServerWorldTimeSeconds is not used: it is a
+	// long running average, which takes around 25 seconds to recover from a stall on either machine.
+	const double LocalTime = GetWorld()->GetTimeSeconds();
+	const double MeasuredOffset = Snapshot.ServerTime - LocalTime;
+
+	if (!bHasClockOffset || FMath::Abs(MeasuredOffset - ServerClockOffset) > ClockSnapErrorSeconds)
+	{
+		ServerClockOffset = MeasuredOffset;
+		bHasClockOffset = true;
+	}
+	else
+	{
+		const double Elapsed = FMath::Max(LocalTime - LastClockSampleTime, 0.0);
+		const double Blend = 1.0 - FMath::Exp(-ClockSmoothingRate * Elapsed);
+		ServerClockOffset += (MeasuredOffset - ServerClockOffset) * Blend;
+	}
+	LastClockSampleTime = LocalTime;
+}
+
 void AThalassaVessel::OnRep_Snapshot()
 {
+	UpdateClockFromSnapshot();
+
 	if (!bHasSnapshot)
 	{
 		bHasSnapshot = true;
@@ -348,24 +397,6 @@ void AThalassaVessel::OnRep_Snapshot()
 void AThalassaVessel::TickClient(float DeltaSeconds)
 {
 	using namespace ThalassaVesselLayout;
-
-	const UWorld* World = GetWorld();
-	if (const AGameStateBase* GameState = World->GetGameState())
-	{
-		// GetServerWorldTimeSeconds jumps with each ping-compensated update. Applied directly, each
-		// jump would shake the ship by (speed * jump), so only follow it slowly.
-		const double MeasuredOffset = GameState->GetServerWorldTimeSeconds() - World->GetTimeSeconds();
-		if (!bHasClockOffset)
-		{
-			ServerClockOffset = MeasuredOffset;
-			bHasClockOffset = true;
-		}
-		else
-		{
-			const double Blend = 1.0 - FMath::Exp(-ClockSmoothingRate * DeltaSeconds);
-			ServerClockOffset += (MeasuredOffset - ServerClockOffset) * Blend;
-		}
-	}
 
 	if (!bHasSnapshot)
 	{

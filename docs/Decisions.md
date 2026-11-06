@@ -2,6 +2,16 @@
 
 Concrete decisions as prototypes settle them. Newest first. Anything here can be revisited when evidence changes.
 
+## 2026-11-07
+
+**All hull collision is one component.** A character's movement base must not change as they walk around the ship. Under packet loss, several bases made other players appear 16 m away. A real hull mesh must keep this.
+
+**`p.NetServerMaxMoveDeltaTimeScalar=1`.** The default of 1.75 forces a correction on every frame over 125 ms. Revisit if corrections appear with merged or delayed moves.
+
+**The vessel's client clock comes from its own snapshots**, not `GetServerWorldTimeSeconds`, which takes around 25 seconds to recover from a stall.
+
+**Test results go to the system temp folder, and telemetry flushes rarely.** Frequent writes to a slow disk stalled the game and dominated the results.
+
 ## 2026-11-06
 
 **Engine: Unreal Engine 5.8.** The installed version. 5.8.4 at the time of writing.
@@ -21,5 +31,7 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 **Status labels use the brief's section 6 wording** (`concept`, `prototype`, `in-development`, `implemented`, `tested`) instead of the example frontmatter in section 4, because section 6 is the rule about honest labelling.
 
 ## Still open
+
+Collision between players: see the options in [MOVING_SHIP_SPIKE.md](MOVING_SHIP_SPIKE.md).
 
 From design document section 26: setting, ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.

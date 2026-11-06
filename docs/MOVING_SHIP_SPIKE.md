@@ -1,66 +1,101 @@
 # Moving-ship spike: results so far
 
-**Verdict: promising, not passed.** The Phase 1 gate in the design document is still open.
+**Verdict: walking on a moving ship over a network works well in every test so far. The Phase 1 gate is still open**, because the airlock, packaged builds and a real internet path have not been tested.
 
 ## What was tested
 
 Approach A from design document section 19: a kinematic ship actor really moving through one persistent world, with the server publishing its pose and characters standing on it through `CharacterMovementComponent` based movement.
 
-Each run has a listen host and one client as separate headless processes on one PC (UE 5.8.4, Development editor binaries, uncooked, `t.MaxFPS 60`). Both run a scripted walker that tours bridge, corridor and engineering steps, jumps every 9 seconds, and uses the console. The server drives a 185-second profile: rest, accelerate to 10 m/s, turn both ways at 3 deg/s, pitch and roll to 10 degrees and back, a hard manoeuvre at 25 m/s and 8 deg/s, then brake.
+Each run has a listen host and one or more clients as separate headless processes on one PC (UE 5.8.4, Development editor binaries, uncooked, `t.MaxFPS 60`). Each runs a scripted walker that tours bridge, corridor and engineering steps, jumps every 9 seconds, and uses the console. The server drives a 185-second profile: rest, accelerate to 10 m/s, turn both ways at 3 deg/s, pitch and roll to 10 degrees and back, a hard manoeuvre at 25 m/s and 8 deg/s, then brake.
 
-Run it with `python Scripts/build/run_motion_test.py`. Raw telemetry goes to `Saved/MotionTests/`, which is not committed.
+Run it with `python Scripts/build/run_motion_matrix.py`, which takes about 25 minutes. Results go to the system temp folder.
 
-## Results
+## Current results
 
-Each row is one run of two players on a graybox ship about 40 m long.
+| Run | Players | Ship | Median ping | Corrections | Visible pops (largest) | Largest visible snap |
+|---|---|---|---|---|---|---|
+| `control_static` | 2 | Still | 16 ms | 0 | 0 | none |
+| `moving_lan` | 2 | Moving | 15 ms | 1 | 0 | 35 cm |
+| `moving_rtt100` | 2 | Moving | 134 ms | 6 | 0 | 4 cm |
+| `moving_rtt200` | 2 | Moving | 238 ms | 43 | 3 (71 cm) | 80 cm, 5 over 10 cm |
+| `moving_shipgravity` | 2 | Moving | 15 ms | 1 | 0 | 17 cm |
+| `moving_4players` | 4 | Moving | 20–32 ms | 158 / 1430 / 140 | 70 / 1106 / 6 (49 cm) | 64 cm (first client only) |
+| `moving_4players_nocollide` | 4 | Moving | 15–32 ms | 1 / 0 / 1 | 0 | 39 cm (first client only) |
 
-| Run | Ship | Median ping | Corrections | Largest correction | Pops (largest) | Own pawn disagreement, median / max | Ship position disagreement, p95 / max | Attitude max |
-|---|---|---|---|---|---|---|---|---|
-| `control_static` | Still | 33 ms | 22 | 77 cm | 16 (48 cm) | 18 / 96 cm | 0 / 0 cm | 0 deg |
-| `baseline` | Moving | 27 ms | 29 | 112 cm | 17 (61 cm) | 21 / 113 cm | 1.7 / 8.9 cm | 0.1 deg |
-| `moving_lan` | Moving | 32 ms | 37 | 93 cm | 18 (51 cm) | 20 / 112 cm | 1.7 / 13.9 cm | 0.1 deg |
-| `final_lan` | Moving | 27 ms | 46 | 100 cm | 30 (36 cm) | 26 / 260 cm | 68 / 136 cm | 0.4 deg |
-| `final_lan2` | Moving | 30 ms | 49 | 100 cm | 28 (125 cm) | 21 / 99 cm | 1.9 / 22.9 cm | 0.2 deg |
-| `moving_rtt100` | Moving | 207 ms | 120 | 203 cm | 42 (63 cm) | 88 / 214 cm | 1.3 / 9.4 cm | 0.2 deg |
-| `moving_rtt200` | Moving | 268 ms | 86 | 173 cm | 21 (74 cm) | 111 / 189 cm | 1.8 / 8.8 cm | 0.1 deg |
-| `moving_shipgravity` | Moving | 31 ms | 18 | 36 cm | 11 (22 cm) | 18 / 88 cm | 1.0 / 5.5 cm | 0.3 deg |
+Across these runs: 0 frames outside the hull, base never lost, and ship attitude within 0.1 degrees. Ship position agreed to under 14 cm, and under 5 cm at normal ping. The only stuck waypoints were in `moving_4players`: 1, 3 and 0, on its three clients.
 
-Across all of these runs: 0 frames outside the hull, 0 stuck waypoints, base never lost in any sample, and host and client agreed on the console count (22).
+How to read this:
 
-Notes on reading the table:
+- Each row is a single run. Clean runs have repeated well (0 and 1 corrections on separate runs), but small differences mean nothing.
+- `rtt100` and `rtt200` are requested settings, with 10 ms / 1% and 20 ms / 3% jitter and loss. Use the measured ping.
+- **Corrections** counts server corrections of any size. Most are not visible, because the client replays its moves afterward.
+- **Visible pops** is a frame-to-frame jump in the ship's frame beyond what walking explains.
+- **Visible snap** is position before a correction against position after replay. **It may overstate.** Several runs show a single 16 to 39 cm snap from a correction of a few centimetres, while the pop detector saw nothing. That disagreement is not explained, so treat these single values with suspicion.
 
-- **Use the measured ping, not the scenario name.** `rtt100` and `rtt200` are what was requested (with 10 ms / 1% and 20 ms / 3% jitter and loss). Measured ping came out much higher and not in proportion, and why has not been investigated.
-- `final_lan` and `final_lan2` include interior lights and hull colours, which should not matter with rendering off. `moving_shipgravity` and earlier runs do not.
-- Every row is a single run, and runs of the same setup differ a lot (29 to 49 corrections). Small differences mean nothing.
+## What was wrong, and what fixed it
 
-## What we learned
+### Telemetry writes to a slow disk were stalling the game
 
-**1. The serious bug was ours, and is fixed.** The first runs showed 309 corrections, 125 pops, and the client's ship up to 161 degrees away from the host's. It only happened with negative rotation rates. `FRotator` net serialization wraps each axis into [0, 360), so a rate of -2 deg/s arrived as +358 deg/s and the client extrapolated from that. Rates are now sent as an `FVector`. The original metric only compared ship position, so attitude disagreement is now measured too.
+`H:` is a slow WD Green hard drive. Flushing telemetry to it about 10 times a second from each process caused hundreds of slow frames.
 
-**2. Ship motion is not the main source of remaining corrections, as far as we can tell.** With the ship held still, corrections were 22 against 29 to 49 moving, and they no longer cluster around manoeuvres. The cause has not been found. Untested candidates are the walkers bumping into each other, frame stalls, and jumps (the largest corrections tend to happen mid-jump).
+| Telemetry written to | Frames over 50 ms | Corrections | Pops | Worst frame |
+|---|---|---|---|---|
+| `H:` hard drive | 828 | 100 | 43 | 400 ms |
+| `C:` SSD | 0 | 1 | 0 | 17 ms |
 
-**3. Latency hurts.** At about 200 ms and above, corrections reach about 2 m. That is not acceptable, and it is the main open problem. The rise in own-pawn disagreement is mostly expected, since a client is ahead of the server by roughly its ping times walking speed.
+Results now default to the temp folder, and telemetry flushes about every 10 seconds. **Every result in the first version of this report came from a stalling harness, including `control_static`.** The game may also see some stalls from this drive in normal use, since the project lives on it. Moving the project to an SSD is worth considering.
 
-**4. Frame stalls desynchronise the ship clock for too long.** In `final_lan`, both processes hit 400 ms frames at the same moments, and the ship's client-side time stayed wrong for up to 20 seconds, worth about 1.3 m at 10 m/s. Those stalls were seen in both final runs and are probably from something else on the machine, though that is not confirmed. The bad recovery is ours either way: the clock smoothing in `AThalassaVessel::TickClient` should converge faster after a large step.
+### The client and server limits on a long frame did not match
 
-**5. Ship-relative gravity looks promising, on one run.** It had the fewest corrections and the smallest. It needs repeating, and it has not been tried with a real player: mouse look does not yet account for a tilted gravity direction.
+A client caps a move at 125 ms, while `p.NetServerMaxMoveDeltaTimeScalar` lets the server accept 1.75 times that. Any frame over 125 ms made the server walk further than the client had, which forced a correction. `Config/DefaultEngine.ini` now sets the scalar to 1.
 
-**6. Headless tests cannot tell you the ship is visible.** The first rendered frames showed an almost black interior, because a sealed hull lets no light in. Keep capturing frames (`Scripts/build/capture_screenshots.py`).
+| Stalls present, one run each | Frames over 50 ms | Corrections | Pops |
+|---|---|---|---|
+| Default scalar (1.75) | 828 | 100 | 43 |
+| Scalar 1 | 820 | 2 | 2 |
+
+Real players hitch from loading and shader compiles, so this matters beyond the test. It has been measured with stalls only in that one comparison, before the hull change below. Now that the harness no longer stalls itself, `moving_stalls` does not exercise this any more (worst frame 39 ms), so a deliberate stall test is still needed. Possible downside: Epic chose 1.75 for some reason that has not been established, and a tighter limit could matter when moves are merged or delayed. Without stalls, runs at about 140 ms showed 1 correction with the default and 6 to 8 with scalar 1. That might be noise, but check it.
+
+### Other players could appear 16 metres away
+
+Under packet loss, another player would jump about 16.7 m for a moment, and back. Replicated position is relative to the movement base, and the hull was many separate components, so the base and position could arrive separately and be combined wrongly. All hull collision is now one component (`HullCollision`), so the base never changes, and the jump did not recur in the two lag runs afterward. **Any real hull mesh must keep this property.**
+
+### The ship clock recovered slowly
+
+After a stall, `GetServerWorldTimeSeconds` stays wrong for a long time, because it is a running average of about 250 updates (roughly 25 seconds). The client was about 0.85 s out for around 15 seconds. The vessel now takes its clock from its own snapshots, and snaps if it is more than 0.25 s out. This fix comes from reading the data and the engine code. It has not been measured against a real stall since, beyond ship disagreement falling from p95 68 cm to 16–18 cm on stalling runs.
+
+### Earlier fix: rotation rates
+
+The first runs had 309 corrections and the client's ship up to 161 degrees off. `FRotator` net serialization wraps each axis into [0, 360), so a rate of -2 deg/s arrived as +358 deg/s. Rates are now sent as an `FVector`.
+
+### The original correction size was misleading
+
+The first report's "largest correction" compared the current position with an acknowledgement one round trip old, so it grows with speed times ping even when nothing visibly jumps. The figure of about 2 m at high ping came from this and from the stalls, and it was not a real 2 m snap. Visible pops and visible snaps now measure what a player sees.
+
+## Open: players colliding with each other
+
+Almost all corrections in `moving_4players` were "near other pawn". With pawn collision off, the same test went from 1430 corrections to 0 on the worst client. The test exaggerates this: four walkers share two lanes through 2 m doorways, head-on, for three minutes. But a crowded corridor is a real situation, and collisions with a remote player are hard to predict, because each client sees the others slightly in the past.
+
+Options, for the owner to decide:
+
+1. **No player collision aboard** (the test switch does this): simplest and proven in this test, but players can stand inside each other.
+2. **Soft collision:** players pass through but get gently nudged apart. A common co-op approach. More work, and not tested.
+3. **Keep hard collision:** most physical, and accept corrections when people jostle.
 
 ## Not tested yet
 
-The Phase 1 gate needs all of these:
+The Phase 1 gate still needs:
 
-- Approach B or C. The design document asks for a comparison, and approach A has not failed badly enough to rule them in or out.
-- A person actually playing it. No human has walked this ship yet, so nothing here says how it feels, and it has never been measured with rendering on.
+- Approach B or C. The design document asks for a comparison, though approach A now gives little reason to look further unless something below fails.
 - Packaged builds, two real PCs, or any real internet path. These runs all use loopback.
 - Airlock, swimming, re-entering a moving ship, ladders, doors, seated stations, loose objects.
-- More than two players. Save and load in motion, joining mid-voyage.
+- Eight players. Save and load in motion, joining mid-voyage.
+- Any test with rendering on. The owner has tried it in the editor with two players and it felt good, but that is one informal session with almost no lag.
+
+Ship-relative gravity looked good again on one run, but mouse look does not yet handle a tilted gravity direction.
 
 ## Next steps
 
-1. A person plays it in the editor with two players, to find out how it feels.
-2. Find what causes corrections with the ship still, starting with one walker alone.
-3. Fix clock recovery after a stall.
-4. Repeat the ship-gravity run, and make mouse look work with it.
-5. Airlock and swimming, the next item on the gate.
+1. Decide on player collision.
+2. Airlock and swimming, the next item on the gate.
+3. A packaged build tested on two real PCs.

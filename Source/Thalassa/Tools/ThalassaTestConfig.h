@@ -8,6 +8,12 @@ namespace ThalassaTestConfig
 	/** -ThalassaBot: the local player walks a scripted tour of the ship. */
 	bool IsBot();
 
+	/** -ThalassaNoJump: the scripted walker never jumps. */
+	bool IsBotJumpDisabled();
+
+	/** -ThalassaNoPawnCollision: characters walk through each other. */
+	bool IsPawnCollisionDisabled();
+
 	/** -ThalassaGravity=ship: pull characters toward the deck instead of world down. */
 	bool UseShipGravity();
 

@@ -11,6 +11,18 @@ namespace ThalassaTestConfig
 		return bValue;
 	}
 
+	bool IsBotJumpDisabled()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoJump"));
+		return bValue;
+	}
+
+	bool IsPawnCollisionDisabled()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoPawnCollision"));
+		return bValue;
+	}
+
 	bool UseShipGravity()
 	{
 		static const bool bValue = []

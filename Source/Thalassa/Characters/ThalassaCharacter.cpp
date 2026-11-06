@@ -40,6 +40,16 @@ UThalassaMovementComponent* AThalassaCharacter::GetThalassaMovement() const
 	return Cast<UThalassaMovementComponent>(GetCharacterMovement());
 }
 
+void AThalassaCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (ThalassaTestConfig::IsPawnCollisionDisabled())
+	{
+		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	}
+}
+
 void AThalassaCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -114,6 +124,11 @@ void AThalassaCharacter::TickWalkerBot(float DeltaSeconds)
 
 	const FVector2D Direction = ToTarget.GetSafeNormal();
 	AddMovementInput(ShipTransform.TransformVectorNoScale(FVector(Direction.X, Direction.Y, 0.f)));
+
+	if (ThalassaTestConfig::IsBotJumpDisabled())
+	{
+		return;
+	}
 
 	BotJumpTimer -= DeltaSeconds;
 	if (BotJumpTimer <= 0.f)

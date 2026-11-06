@@ -40,6 +40,7 @@ private:
 	float WorstFrameSeconds = 0.f;
 	int32 OutsideHullFrames = 0;
 	double RowTimer = 0.0;
+	int32 RowsSinceFlush = 0;
 	double ElapsedSeconds = 0.0;
 	double FinishedSeconds = -1.0;
 	bool bExitRequested = false;

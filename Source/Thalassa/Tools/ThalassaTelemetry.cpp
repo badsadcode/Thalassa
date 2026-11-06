@@ -21,6 +21,8 @@ namespace
 	constexpr double ServerLingerSeconds = 5.0;  // Let clients see the end of the test and leave first.
 	constexpr float PopAllowanceFactor = 1.25f;  // Speed margin before a ship-frame step counts as a pop.
 	constexpr float PopThresholdCm = 5.f;
+	constexpr float StallLogSeconds = 0.05f;     // Three missed frames at 60 fps.
+	constexpr int32 RowsPerFlush = 100;          // About every 10 seconds.
 
 	void WriteLine(FArchive& Ar, const FString& Line)
 	{
@@ -183,7 +185,14 @@ void UThalassaTelemetry::WriteRows(float DeltaTime)
 			bLocal ? PopCount : 0, bLocal ? MaxPopCm : 0.f, Movement->UnexpectedAirborneCount, Character->BotStuckCount,
 			bLocal ? OutsideHullFrames : 0, bLocal ? WorstFrameSeconds : 0.f, PlayerState->GetPingInMilliseconds()));
 	}
-	Writer->Flush();
+
+	// Rarely: frequent flushes to a slow disk stall the game and ruin the very thing being measured.
+	++RowsSinceFlush;
+	if (RowsSinceFlush >= RowsPerFlush)
+	{
+		RowsSinceFlush = 0;
+		Writer->Flush();
+	}
 }
 
 void UThalassaTelemetry::Tick(float DeltaTime)
@@ -197,6 +206,13 @@ void UThalassaTelemetry::Tick(float DeltaTime)
 
 	TrackLocalFrameStep(DeltaTime);
 	WriteRows(DeltaTime);
+
+	// Slow frames, to compare across processes and to tell how often they really happen.
+	const AThalassaVessel* FrameVessel = AThalassaVessel::Find(GetWorld());
+	if (DeltaTime >= StallLogSeconds && FrameVessel && FrameVessel->GetProfileState() == EVesselProfileState::Running)
+	{
+		UE_LOG(LogThalassa, Display, TEXT("STALL,%.3f,%.4f"), FrameVessel->GetSyncedTime(), DeltaTime);
+	}
 
 	ElapsedSeconds += DeltaTime;
 	if (ElapsedSeconds > ThalassaTestConfig::TimeoutSeconds())

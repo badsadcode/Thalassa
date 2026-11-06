@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "ThalassaVessel.generated.h"
 
+class UInstancedStaticMeshComponent;
 class UStaticMeshComponent;
 class UTextRenderComponent;
 
@@ -36,8 +37,12 @@ enum class EVesselProfileState : uint8
  * Moving-ship spike, approach A: a genuinely moving kinematic actor in one persistent world.
  *
  * The server integrates a deliberately simple motion model and publishes snapshots. Characters
- * stand on it through CharacterMovementComponent based movement. Hull geometry is a graybox made
- * of default subobjects so every piece has a stable name and can be referenced as a movement base.
+ * stand on it through CharacterMovementComponent based movement.
+ *
+ * All hull collision is deliberately one component, so a character's movement base never changes
+ * as they walk around the ship. Replicated position is relative to the base, and under packet loss
+ * the base and the position can arrive separately: with several bases, that shows a player many
+ * metres from where they really are. Any real hull mesh must keep this property.
  */
 UCLASS()
 class THALASSA_API AThalassaVessel : public AActor
@@ -47,6 +52,7 @@ class THALASSA_API AThalassaVessel : public AActor
 public:
 	AThalassaVessel();
 
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -68,7 +74,7 @@ public:
 	/** True if a world location lies within the hull's ship-frame bounds. */
 	bool IsInsideHull(const FVector& WorldLocation) const;
 
-	/** Server time as seen by this process, low-pass filtered on clients so the ship does not shake. */
+	/** Server time as seen by this process: on clients, as of the latest snapshots, filtered so the ship does not shake. */
 	double GetSyncedTime() const;
 
 	EVesselProfileState GetProfileState() const { return ProfileState; }
@@ -80,6 +86,7 @@ private:
 	void TickServer(float DeltaSeconds);
 	void TickClient(float DeltaSeconds);
 	void UpdateProfileTargets();
+	void UpdateClockFromSnapshot();
 	void GetExtrapolatedPose(double Time, FVector& OutPosition, FQuat& OutRotation) const;
 	void UpdateConsoleText(float DeltaSeconds);
 
@@ -89,8 +96,13 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<USceneComponent> ShipRoot;
 
+	/** Graybox visuals only. */
 	UPROPERTY(VisibleAnywhere)
 	TArray<TObjectPtr<UStaticMeshComponent>> HullPieces;
+
+	/** All hull collision, and the one movement base. Never rendered. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UInstancedStaticMeshComponent> HullCollision;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UTextRenderComponent> ConsoleText;
@@ -118,6 +130,7 @@ private:
 	FVector PoseErrorOffset = FVector::ZeroVector;
 	FQuat PoseErrorRotation = FQuat::Identity;
 	double ServerClockOffset = 0.0;
+	double LastClockSampleTime = 0.0;
 	bool bHasClockOffset = false;
 	bool bHasSnapshot = false;
 
