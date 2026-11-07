@@ -4,6 +4,12 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 ## 2026-11-07
 
+**The ship must not be a cigar with rooms in a row (owner's direction).** No `[BRIDGE][ROOM][AIRLOCK][ROOM]` chain. The hull has a varied silhouette, and each deck is a network: main corridors that loop, side corridors, junctions, and more than one route between places. Rooms vary in size and shape, and sit off corridors rather than opening into each other. Watertight doors are placed at points along corridors, not between every room. The current three-compartment graybox is only a test rig.
+
+**The ship should be easy to get lost in at first (owner's direction).** Asymmetric layouts, so players need time to learn the ship before it feels like home. Stairs and ladders connect places as well as lifts. Floors within a deck are not all level: a few steps up or down between areas, and a bridge with stations on different levels, in the spirit of a starship bridge. Navigation help should stay light so that learning the ship is part of the game, and never block an emergency.
+
+**Working ship direction: about 280 m, about 50 m wide, 6 decks, crew of 40 to 60 (owner's direction, not final).** Between a starship and a submarine, in the spirit of the owner's seaQuest and Enterprise references, without copying them. Not cramped, through wide main corridors, high ceilings and a few grand spaces rather than extra length. The R/V Horizon and R/V Nereis concept sheets are a guide for how to build it, and all of this will change.
+
 **Setting: the ocean world Thalassa, settled by humanity for generations (owner's direction).** This answers the design document's open "alien planet or future Earth" question, and explains the cities, industries, trade networks, and people who find the ocean normal. An initial sketch, public at `site/src/pages/world.astro`, and expected to change.
 
 **The Long Call and the Viator are never objectives (owner's direction).** Players find them organically, perhaps after dozens of hours of ordinary exploration. No quest marker, no "Find the Viator: 0/1". Consequences for systems:
@@ -45,6 +51,17 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 **Devlog: Astro, static, self-hosted fonts, no analytics.** See [site/README.md](../site/README.md).
 
 **Status labels use the brief's section 6 wording** (`concept`, `prototype`, `in-development`, `implemented`, `tested`) instead of the example frontmatter in section 4, because section 6 is the rule about honest labelling.
+
+## Planned, not started
+
+**Helm (owner's direction, for later).** The current keys, which steer from anywhere, are only for testing.
+
+- Steering happens from the helm station, by whoever is sitting there, and depends on ship systems working at least somewhat.
+- Handling is somewhat realistic without being a submarine simulator. You feel the ship's weight and its power, and upgrades can make it feel more powerful.
+- Two control modes:
+  1. **Precise:** hold a button to move, turn and manoeuvre.
+  2. **Set and go:** push the throttle to a setting and the ship keeps going, with the same idea possibly for steering.
+- The controls exist physically at the helm too: a throttle lever that visibly moves, plus a monitor and a heads-up display showing throttle and the other stats. Keys, lever, monitor and HUD all work from the same ship state, so crew nearby can see what the helm is doing.
 
 ## Still open
 

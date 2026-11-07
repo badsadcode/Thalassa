@@ -17,6 +17,12 @@ namespace ThalassaTestConfig
 	/** -ThalassaSpawnAtAirlock: start in the corridor facing the airlock, for screenshots. */
 	bool IsSpawnAtAirlock();
 
+	/**
+	 * -ThalassaHullStretch=N: stretch the hull lengthwise, to test how a longer ship behaves.
+	 * For walkers only: it also stretches the airlock chamber, so its doors no longer fit.
+	 */
+	float HullStretch();
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

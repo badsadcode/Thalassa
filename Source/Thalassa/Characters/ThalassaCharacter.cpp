@@ -224,7 +224,8 @@ void AThalassaCharacter::TickWalkerBot(float DeltaSeconds)
 
 	const FTransform ShipTransform = BoundVessel->GetActorTransform();
 	const FVector Local = ShipTransform.InverseTransformPosition(GetActorLocation());
-	const FVector2D Target = Route[BotWaypoint] + FVector2D(0.f, 45.f * BotSide);
+	const float Stretch = ThalassaTestConfig::HullStretch();
+	const FVector2D Target(Route[BotWaypoint].X * Stretch, Route[BotWaypoint].Y + 45.f * BotSide);
 	const FVector2D ToTarget = Target - FVector2D(Local.X, Local.Y);
 
 	BotSecondsOnWaypoint += DeltaSeconds;
@@ -237,7 +238,7 @@ void AThalassaCharacter::TickWalkerBot(float DeltaSeconds)
 		BotWaypoint = (BotWaypoint + 1) % RouteLength;
 		BotSecondsOnWaypoint = 0.f;
 	}
-	else if (BotSecondsOnWaypoint > 20.f)
+	else if (BotSecondsOnWaypoint > 20.f * Stretch)
 	{
 		// Reported, not hidden: moving on keeps the run going so the rest of it is still measured.
 		++BotStuckCount;

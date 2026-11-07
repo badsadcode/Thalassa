@@ -160,6 +160,20 @@ namespace ThalassaVesselLayout
 	const float SnapErrorDistanceCm = 500.f;  // Beyond this, snap rather than visibly slide
 }
 
+namespace
+{
+	// Layout coordinates to ship coordinates, for the hull length test. See HullStretch.
+	FVector Stretched(const FVector& Layout)
+	{
+		return FVector(Layout.X * ThalassaTestConfig::HullStretch(), Layout.Y, Layout.Z);
+	}
+
+	FBox Stretched(const FBox& Layout)
+	{
+		return FBox(Stretched(Layout.Min), Stretched(Layout.Max));
+	}
+}
+
 AThalassaVessel::AThalassaVessel()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -186,8 +200,8 @@ AThalassaVessel::AThalassaVessel()
 		Piece->SetMobility(EComponentMobility::Movable);
 		Piece->SetStaticMesh(CubeMesh.Object);
 		Piece->SetMaterial(0, TintableMaterial.Object);
-		Piece->SetRelativeLocation(Box.Center);
-		Piece->SetRelativeScale3D(Box.Size / 100.f); // Engine cube is 100 cm per side.
+		Piece->SetRelativeLocation(Stretched(Box.Center));
+		Piece->SetRelativeScale3D(Stretched(Box.Size) / 100.f); // Engine cube is 100 cm per side.
 		Piece->SetCollisionEnabled(ECollisionEnabled::NoCollision); // HullCollision does this.
 		Piece->SetVisibility(Box.bVisible);
 		HullPieces.Add(Piece);
@@ -232,7 +246,7 @@ AThalassaVessel::AThalassaVessel()
 		UPointLightComponent* Lamp = CreateDefaultSubobject<UPointLightComponent>(Light.Name);
 		Lamp->SetupAttachment(ShipRoot);
 		Lamp->SetMobility(EComponentMobility::Movable);
-		Lamp->SetRelativeLocation(Light.Location);
+		Lamp->SetRelativeLocation(Stretched(Light.Location));
 		Lamp->SetLightColor(Light.Color);
 		Lamp->SetIntensity(ThalassaVesselLayout::InteriorLightIntensity);
 		Lamp->SetAttenuationRadius(ThalassaVesselLayout::InteriorLightRadius);
@@ -241,7 +255,7 @@ AThalassaVessel::AThalassaVessel()
 
 	ConsoleText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("ConsoleText"));
 	ConsoleText->SetupAttachment(ShipRoot);
-	ConsoleText->SetRelativeLocation(FVector(1918.f, 0.f, 90.f));
+	ConsoleText->SetRelativeLocation(Stretched(FVector(1918.f, 0.f, 90.f)));
 	ConsoleText->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
 	ConsoleText->SetHorizontalAlignment(EHTA_Center);
 	ConsoleText->SetVerticalAlignment(EVRTA_TextCenter);
@@ -282,7 +296,7 @@ void AThalassaVessel::OnConstruction(const FTransform& Transform)
 	{
 		for (const ThalassaVesselLayout::FHullBox& Box : ThalassaVesselLayout::Boxes)
 		{
-			HullCollision->AddInstance(FTransform(FRotator::ZeroRotator, Box.Center, Box.Size / 100.f));
+			HullCollision->AddInstance(FTransform(FRotator::ZeroRotator, Stretched(Box.Center), Stretched(Box.Size) / 100.f));
 		}
 	}
 }
@@ -515,7 +529,7 @@ FTransform AThalassaVessel::GetSpawnTransform(int32 PlayerIndex) const
 	}
 
 	// Staggered along the bridge so players never spawn overlapping.
-	const FVector Local(1500.f - 100.f * (PlayerIndex % 8), PlayerIndex % 2 == 0 ? -70.f : 70.f, 120.f);
+	const FVector Local = Stretched(FVector(1500.f - 100.f * (PlayerIndex % 8), PlayerIndex % 2 == 0 ? -70.f : 70.f, 120.f));
 	return FTransform(GetActorRotation(), GetActorTransform().TransformPosition(Local));
 }
 
@@ -527,7 +541,7 @@ bool AThalassaVessel::TryPressBeep(const FVector& WorldLocation)
 	}
 
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	if (FVector::DistSquared(Local, ThalassaVesselLayout::ConsoleLocation) > FMath::Square(ThalassaVesselLayout::ConsoleUseRadius))
+	if (FVector::DistSquared(Local, Stretched(ThalassaVesselLayout::ConsoleLocation)) > FMath::Square(ThalassaVesselLayout::ConsoleUseRadius))
 	{
 		return false;
 	}
@@ -539,7 +553,7 @@ bool AThalassaVessel::TryPressBeep(const FVector& WorldLocation)
 bool AThalassaVessel::IsInsideHull(const FVector& WorldLocation) const
 {
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	return FBox(ThalassaVesselLayout::HullBoundsMin, ThalassaVesselLayout::HullBoundsMax).IsInsideOrOn(Local);
+	return Stretched(FBox(ThalassaVesselLayout::HullBoundsMin, ThalassaVesselLayout::HullBoundsMax)).IsInsideOrOn(Local);
 }
 
 UPrimitiveComponent* AThalassaVessel::GetMovementBaseComponent() const
@@ -550,13 +564,13 @@ UPrimitiveComponent* AThalassaVessel::GetMovementBaseComponent() const
 bool AThalassaVessel::IsInCompartment(const FVector& WorldLocation) const
 {
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	if (ThalassaVesselLayout::AirlockChamber.IsInsideOrOn(Local))
+	if (Stretched(ThalassaVesselLayout::AirlockChamber).IsInsideOrOn(Local))
 	{
 		return true;
 	}
 	for (const FBox& Compartment : ThalassaVesselLayout::DryCompartments)
 	{
-		if (Compartment.IsInsideOrOn(Local))
+		if (Stretched(Compartment).IsInsideOrOn(Local))
 		{
 			return true;
 		}
@@ -572,7 +586,7 @@ bool AThalassaVessel::IsWaterAt(const FVector& WorldLocation) const
 	}
 
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	return ThalassaVesselLayout::AirlockChamber.IsInsideOrOn(Local)
+	return Stretched(ThalassaVesselLayout::AirlockChamber).IsInsideOrOn(Local)
 		&& Local.Z < AirlockWaterLevel * ThalassaVesselLayout::AirlockCeilingCm;
 }
 

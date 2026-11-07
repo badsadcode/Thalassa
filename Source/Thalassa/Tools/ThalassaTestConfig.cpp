@@ -29,6 +29,17 @@ namespace ThalassaTestConfig
 		return bValue;
 	}
 
+	float HullStretch()
+	{
+		static const float Value = []
+		{
+			float Stretch = 1.f;
+			FParse::Value(FCommandLine::Get(), TEXT("ThalassaHullStretch="), Stretch);
+			return Stretch;
+		}();
+		return Value;
+	}
+
 	bool IsBotJumpDisabled()
 	{
 		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoJump"));

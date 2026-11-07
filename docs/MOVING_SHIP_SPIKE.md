@@ -115,6 +115,22 @@ Before doors stopped being solid, those first three runs had 55, 164 and 262 cor
 
 **Placeholder:** no suit, oxygen, pressure, buoyancy, currents or water rendering. There is no surface, so a swimmer can rise forever. Above 2 m/s is untested, and a ship faster than the 4 m/s swim speed simply leaves a diver behind, with no rescue yet. Water surface in the chamber shows only from above.
 
+## Hull length
+
+To check the working size of about 280 m, the same test ran with the graybox hull stretched to 280 m (`--hull-stretch 7`). The ship pivots about its centre, so the ends swing about 7 m/s at 3 deg/s, and about 19 m/s at the hard manoeuvre's 8 deg/s.
+
+| Run (one each) | Players | Median ping | Corrections | Pops | Largest visible snap |
+|---|---|---|---|---|---|
+| `long_lan` | 2 | 15 ms | 0 | 0 | none |
+| `long_lag` | 2 | 139 ms | 4 | 0 | 4 cm |
+| `long_four` | 4 | 15 ms | 0 / 0 / 1 | 0 | none (first client only) |
+
+Nothing here argues against the length. Limits of this test:
+
+- Walkers reached about 120 to 129 m from the centre during the turns and roll, but only about 70 to 85 m during the pitch and hard manoeuvre, so those are less tested at the extremes.
+- Walkers never used the console, because their route stops short of the stretched console. The count of 0 is an artifact.
+- It is one long corridor, without stairs, ladders or the real layout.
+
 ## Not tested yet
 
 The Phase 1 gate still needs:
