@@ -11,8 +11,12 @@ PLAYING TOGETHER ON ONE NETWORK
 
 Both PCs need this whole folder. Nothing needs installing.
 
-Playing over the internet is not set up yet. Joining only works on the same home
-network, or over a tool that puts both PCs on one virtual network.
+PLAYING OVER THE INTERNET
+The game cannot yet connect over the internet by itself. Until it can, the host
+can use a tunnelling service such as playit.gg, and nobody else installs anything:
+1. The host creates a UDP tunnel to local port 7777 and runs Host.bat.
+2. Everyone else runs Join.bat and types the tunnel's address and port,
+   for example example.playit.gg:12345.
 
 CONTROLS
   W A S D, mouse    walk and look (in water: swim where you look)
