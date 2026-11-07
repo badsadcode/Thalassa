@@ -20,7 +20,7 @@ All of it is tested headless with a real listen host and clients as separate pro
 - **Sonar:** **N** toggles it, and **Tab** shows the chart. 48 beams, 25 m world-fixed cells, replicated, saved to `Saved/SaveGames/ShipSurvey.sav`. Host and client charts are identical, even with packet loss.
 - **Ladders on a moving ship (fixed):** anyone reaching a ladder while the ship moved was thrown astern, because the switch to climbing counted the ship's velocity twice. It was recorded as a two-player problem, but the ship's motion caused it. After the fix, four players all climbed, sometimes two at once. Deck runs at about 135 ms went from 122 corrections to 6, and no waypoints are stuck. See `INTERIOR_RULES.md` rule 10.
 - **Sonar station on the bridge:** a screen above the starboard middle console shows the same chart as **Tab**, with a ping every 2 s on the server's clock. The ping is synthesised in code, with no sound asset. The owner heard it in the editor on 2026-11-07. Automated runs are silent (`-nosound`).
-- **Packaging:** `Scripts/build/package-windows.ps1` writes to `D:\ThalassaBuilds\Windows`, with `Host.bat`, `Join.bat` and a README. Tested as host plus client on one PC. **That build predates the sonar,** so repackage it.
+- **Packaging:** `Scripts/build/package-windows.ps1` writes to `D:\ThalassaBuilds\Windows`, with `Host.bat`, `Join.bat` and a README. Repackaged on 2026-11-07 with the sonar screen and the ladder fix. Tested as host plus client on one PC: a deck run with the sonar on had identical charts, no corrections and no stuck waypoints, and a frame showed the bridge screen working.
 
 ## Open problems
 
@@ -40,7 +40,7 @@ All of this is recorded in `Decisions.md`.
 
 ## Suggested next steps
 
-Repackaging, then the helm.
+The helm.
 
 ## How to work here
 
