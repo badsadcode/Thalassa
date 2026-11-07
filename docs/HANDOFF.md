@@ -18,15 +18,15 @@ All of it is tested headless with a real listen host and clients as separate pro
 - **Airlock and swimming:** water is decided by ship compartment, and swimming is `MOVE_Flying`. The base is kept in the flooded chamber and dropped past the outer door. Doors stop being solid as soon as they start opening. The scripted diver completes repeated EVAs at up to 238 ms ping.
 - **Grey main deck,** the editor default: about 280 m, with a ring corridor, sunken mess, tiered bridge, engineering hall with stairs (hidden ramp) and a ladder (`MOVE_Flying` climbing zone), and the airlock on the hull. It is deliberately unpolished, because the owner said the art will replace it. `-ThalassaTestRig` gives the old three-room rig, and the motion tests use it by default.
 - **Sonar:** **N** toggles it, and **Tab** shows the chart. 48 beams, 25 m world-fixed cells, replicated, saved to `Saved/SaveGames/ShipSurvey.sav`. Host and client charts are identical, even with packet loss.
+- **Ladders on a moving ship (fixed):** anyone reaching a ladder while the ship moved was thrown astern, because the switch to climbing counted the ship's velocity twice. It was recorded as a two-player problem, but the ship's motion caused it. After the fix, four players all climbed, sometimes two at once. Deck runs at about 135 ms went from 122 corrections to 6, and no waypoints are stuck. See `INTERIOR_RULES.md` rule 10.
 - **Sonar station on the bridge:** a screen above the starboard middle console shows the same chart as **Tab**, with a ping every 2 s on the server's clock. The ping is synthesised in code, with no sound asset. **Nobody has heard it in the game yet**, since every automated run uses `-nosound`.
 - **Packaging:** `Scripts/build/package-windows.ps1` writes to `D:\ThalassaBuilds\Windows`, with `Host.bat`, `Join.bat` and a README. Tested as host plus client on one PC. **That build predates the sonar,** so repackage it.
 
 ## Open problems
 
-1. **Ladder foot with two players:** neither can climb. The nudge is not the cause, since switching it off near ladders did not help. Next: log movement mode and position each frame for both characters at the ladder foot.
-2. **High-ping corrections at the airlock's outer door,** where a character switches between ship frame and world frame. A theory, not confirmed: the client shows the ship slightly late.
-3. **The "visible snap" metric sometimes reads 16 to 40 cm when pops read 0.** Unexplained, so it is probably the metric.
-4. **Never tested on two real PCs.** The owner has no second PC soon, and is behind CGNAT, so cannot host directly.
+1. **High-ping corrections at the airlock's outer door,** where a character switches between ship frame and world frame. A theory, not confirmed: the client shows the ship slightly late. The ladder fix changed the same switch where the water starts: on LAN the largest dive correction fell from 17.5 to 8.7 cm, but at 238 ms the results barely moved (209 corrections, then 194).
+2. **The "visible snap" metric sometimes read 16 to 40 cm when pops read 0.** Recheck it before chasing it: the deck numbers it came from were dominated by the ladder bug, now fixed.
+3. **Never tested on two real PCs.** The owner has no second PC soon, and is behind CGNAT, so cannot host directly.
 
 ## Owner's direction, not yet built
 
@@ -40,7 +40,7 @@ All of this is recorded in `Decisions.md`.
 
 ## Suggested next steps
 
-Listen to the ping in the editor and tune it, the ladder bug, repackaging, then the helm.
+Listen to the ping in the editor and tune it, repackaging, then the helm.
 
 ## How to work here
 

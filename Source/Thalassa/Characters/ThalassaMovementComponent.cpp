@@ -73,11 +73,35 @@ void UThalassaMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaS
 
 	if ((bInWater || bOnLadder) && MovementMode != MOVE_Flying)
 	{
+		// On the hull, Velocity is relative to the ship. Flying lets go of the base without changing it,
+		// and the code below treats a character with no base as moving in the world's frame, so put it
+		// in that frame first. Without this, the ship's velocity was taken away twice, and anyone
+		// reaching a ladder on a moving ship was thrown astern, out of the climbing zone, every time.
+		// The engine's own GetImpartedMovementBaseVelocity() reads zero here: the hull is moved by
+		// setting its pose, so its components report no velocity.
+		if (CharacterOwner->GetMovementBaseObject() == Vessel->GetMovementBaseComponent())
+		{
+			Velocity += Vessel->GetWorldVelocity();
+		}
 		SetMovementMode(MOVE_Flying); // Also clears the base; it is restored below if still aboard.
 	}
 	else if (!bInWater && !bOnLadder && MovementMode == MOVE_Flying)
 	{
 		SetMovementMode(MOVE_Falling); // Drained: drop to the deck, or stepped indoors.
+	}
+
+	FString LadderTracePath;
+	if (Vessel->IsLadderAt(Location, 150.f) && ThalassaTestConfig::GetTelemetryPath(LadderTracePath))
+	{
+		const FVector Local = Vessel->GetActorTransform().InverseTransformPosition(Location);
+		const FVector LocalVelocity = Vessel->GetActorTransform().InverseTransformVectorNoScale(Velocity);
+		const UObject* Base = CharacterOwner->GetMovementBaseObject();
+		UE_LOG(LogThalassa, Display, TEXT("LADDERTRACE,%s,%d,%.3f,%.1f,%.1f,%.1f,%.0f,%.0f,%.0f,%d,%d,%s,%d,%.1f,%s"),
+			*CharacterOwner->GetName(), static_cast<int32>(CharacterOwner->GetLocalRole()), Vessel->GetSyncedTime(),
+			Local.X, Local.Y, Local.Z, LocalVelocity.X, LocalVelocity.Y, LocalVelocity.Z,
+			static_cast<int32>(MovementMode.GetValue()), bOnLadder ? 1 : 0, Base ? *Base->GetName() : TEXT("none"),
+			CurrentFloor.bBlockingHit ? 1 : 0, CurrentFloor.FloorDist,
+			CurrentFloor.HitResult.GetComponent() ? *CurrentFloor.HitResult.GetComponent()->GetName() : TEXT("-"));
 	}
 
 	if (MovementMode == MOVE_Flying)

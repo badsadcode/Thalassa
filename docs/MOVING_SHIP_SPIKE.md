@@ -135,7 +135,7 @@ Nothing here argues against the length. Limits of this test:
 
 A first walkable version of the deck plan, about 280 m long, now the default in the editor. It has a ring corridor around a sunken mess hall, side rooms, a lounge blister with a window, a tiered bridge, a tall engineering hall with stairs and a ladder, and the airlock moved to the hull. Players climb ladders using `MOVE_Flying`, held in place with no input. The original test rig stays available with `-ThalassaTestRig`, and the motion tests use it by default, so older results stay comparable.
 
-Scripted walkers reached every area, including the bottom of engineering by the stairs and the catwalk by the ladder. Rules learned from it are in [INTERIOR_RULES.md](INTERIOR_RULES.md). The numbers are not a fair measure of the deck: walkers bunch together over time, and two of them at the ladder foot push each other away. This was deliberately not polished, because the geometry will be replaced.
+Scripted walkers reached every area, including the bottom of engineering by the stairs and the catwalk by the ladder. Rules learned from it are in [INTERIOR_RULES.md](INTERIOR_RULES.md). The numbers are not a fair measure of the deck: walkers bunch together over time. The deck runs also had a walker stuck at the ladder foot, which was later found to be a bug that threw anyone reaching a ladder on a moving ship astern (see `INTERIOR_RULES.md` rule 10). Fixed, a deck run at about 135 ms has 6 corrections instead of 122. This was deliberately not polished, because the geometry will be replaced.
 
 ## Not tested yet
 
