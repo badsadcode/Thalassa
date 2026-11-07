@@ -11,7 +11,7 @@
 #include "HAL/PlatformMisc.h"
 #include "Tools/ThalassaTestConfig.h"
 #include "UnrealClient.h"
-#include "Vessel/ThalassaSonarComponent.h"
+#include "Vessel/ThalassaSonarDisplay.h"
 #include "Vessel/ThalassaVessel.h"
 
 void AThalassaHUD::DrawLines(const TArray<FString>& Lines, float X, float Y, const FLinearColor& Color, float Scale)
@@ -57,36 +57,9 @@ void AThalassaHUD::TickScreenshotRequest()
 
 void AThalassaHUD::DrawSonarChart(const AThalassaVessel* Vessel)
 {
-	UThalassaSonarComponent* Sonar = Vessel->GetSonar();
-	UTexture2D* Chart = Sonar ? Sonar->GetChartTexture() : nullptr;
-	if (!Chart)
-	{
-		return;
-	}
-
-	// The full chart is 6.4 km across; show the 1.6 km around the ship, so cells are big enough to read.
-	constexpr float ViewFraction = 0.25f;
+	// The same picture as the screen on the bridge.
 	const float Size = FMath::Min(Canvas->ClipX, Canvas->ClipY) * 0.6f;
-	const float Left = Canvas->ClipX - Size - 40.f;
-	const float Top = (Canvas->ClipY - Size) * 0.5f;
-	const FVector2D Ship = Sonar->WorldToChart(Vessel->GetActorLocation());
-	const FVector2D Corner = Ship - FVector2D(ViewFraction * 0.5f);
-
-	// The texture already has world +X up and world +Y to the right, so this is a plain crop.
-	DrawTexture(Chart, Left, Top, Size, Size, Corner.Y, 1.f - (Corner.X + ViewFraction), ViewFraction, ViewFraction);
-	DrawRect(FLinearColor(0.35f, 0.84f, 0.83f, 0.6f), Left, Top, Size, 1.f);
-	DrawRect(FLinearColor(0.35f, 0.84f, 0.83f, 0.6f), Left, Top + Size, Size, 1.f);
-	DrawRect(FLinearColor(0.35f, 0.84f, 0.83f, 0.6f), Left, Top, 1.f, Size);
-	DrawRect(FLinearColor(0.35f, 0.84f, 0.83f, 0.6f), Left + Size, Top, 1.f, Size);
-
-	// The ship sits in the middle, with a line showing its heading.
-	const FVector2D Middle(Left + Size * 0.5f, Top + Size * 0.5f);
-	const FVector Heading = Vessel->GetActorForwardVector();
-	DrawLine(Middle.X, Middle.Y, Middle.X + Heading.Y * 24.f, Middle.Y - Heading.X * 24.f, FLinearColor(0.91f, 0.73f, 0.45f), 2.f);
-	DrawRect(FLinearColor(0.91f, 0.73f, 0.45f), Middle.X - 3.f, Middle.Y - 3.f, 6.f, 6.f);
-
-	DrawText(FString::Printf(TEXT("SONAR %s   %d cells surveyed   1.6 km"), Sonar->IsSurveying() ? TEXT("ACTIVE") : TEXT("off (N)"),
-		Sonar->GetSurveyedCellCount()), FLinearColor(0.35f, 0.84f, 0.83f), Left, Top + Size + 8.f, GEngine->GetSmallFont(), 1.4f);
+	ThalassaSonarDisplay::Draw(Canvas, FVector2D(Canvas->ClipX - Size - 40.f, (Canvas->ClipY - Size) * 0.5f), Size, *Vessel);
 }
 
 void AThalassaHUD::DrawHUD()

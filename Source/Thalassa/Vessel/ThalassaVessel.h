@@ -8,6 +8,8 @@ class UInstancedStaticMeshComponent;
 class UStaticMeshComponent;
 class UTextRenderComponent;
 class UThalassaSonarComponent;
+class UThalassaSonarScreenComponent;
+class UThalassaSonarPingComponent;
 
 /** Authoritative vessel pose, published by the server and dead-reckoned by clients. */
 USTRUCT()
@@ -147,6 +149,13 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UThalassaSonarComponent> Sonar;
+
+	/** The chart on the bridge, and the ping heard from it. Absent on ships without a sonar station. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaSonarScreenComponent> SonarScreen;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaSonarPingComponent> SonarPing;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> AirlockInnerDoor;

@@ -40,6 +40,11 @@ struct FVesselLayout
 	FVector ConsoleLocation = FVector::ZeroVector;
 	FVector ConsoleTextLocation = FVector::ZeroVector;
 
+	/** The sonar chart's screen: its centre, the way it faces, and its width. A width of zero means no screen. */
+	FVector SonarScreenLocation = FVector::ZeroVector;
+	FVector SonarScreenFacing = FVector::BackwardVector;
+	float SonarScreenSizeCm = 0.f;
+
 	/** Added to the airlock's own coordinates, which assume a corridor along Y = 0 and the sea to starboard. */
 	FVector AirlockOffset = FVector::ZeroVector;
 

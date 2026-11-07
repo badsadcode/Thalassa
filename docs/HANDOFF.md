@@ -1,4 +1,4 @@
-# Handoff: THALASSA, end of session 2026-11-07
+# Handoff: THALASSA, updated 2026-11-07
 
 Read this first in a new session. Then read `README.md`, `docs/Decisions.md`, `docs/MOVING_SHIP_SPIKE.md`, `docs/INTERIOR_RULES.md` and `docs/SONAR.md`.
 
@@ -18,6 +18,7 @@ All of it is tested headless with a real listen host and clients as separate pro
 - **Airlock and swimming:** water is decided by ship compartment, and swimming is `MOVE_Flying`. The base is kept in the flooded chamber and dropped past the outer door. Doors stop being solid as soon as they start opening. The scripted diver completes repeated EVAs at up to 238 ms ping.
 - **Grey main deck,** the editor default: about 280 m, with a ring corridor, sunken mess, tiered bridge, engineering hall with stairs (hidden ramp) and a ladder (`MOVE_Flying` climbing zone), and the airlock on the hull. It is deliberately unpolished, because the owner said the art will replace it. `-ThalassaTestRig` gives the old three-room rig, and the motion tests use it by default.
 - **Sonar:** **N** toggles it, and **Tab** shows the chart. 48 beams, 25 m world-fixed cells, replicated, saved to `Saved/SaveGames/ShipSurvey.sav`. Host and client charts are identical, even with packet loss.
+- **Sonar station on the bridge:** a screen above the starboard middle console shows the same chart as **Tab**, with a ping every 2 s on the server's clock. The ping is synthesised in code, with no sound asset. **Nobody has heard it in the game yet**, since every automated run uses `-nosound`.
 - **Packaging:** `Scripts/build/package-windows.ps1` writes to `D:\ThalassaBuilds\Windows`, with `Host.bat`, `Join.bat` and a README. Tested as host plus client on one PC. **That build predates the sonar,** so repackage it.
 
 ## Open problems
@@ -39,13 +40,13 @@ All of this is recorded in `Decisions.md`.
 
 ## Suggested next steps
 
-The sonar on a physical bridge console, a ping sound, the ladder bug, repackaging, then the helm.
+Listen to the ping in the editor and tune it, the ladder bug, repackaging, then the helm.
 
 ## How to work here
 
 - **Build:** `powershell -NoProfile -File Scripts/build/build-editor.ps1`. **The Unreal editor must be closed**, or the build fails. Ask the owner to close it.
 - **Tests:** `python Scripts/build/run_motion_test.py --name X [--deck] [--eva] [--sonar] [--rtt 100 --jitter 10 --loss 1] [--clients 3] [--exe <packaged exe>]`. The full set is `run_motion_matrix.py`. Results go to `%TEMP%\ThalassaMotionTests`, never the slow `H:` drive, because writing there stalls the game. Read **visible pops**, not raw correction size, which grows with ping.
-- **See it:** `python Scripts/build/capture_screenshots.py <folder> name=yaw@x,y,z`, in ship coordinates. Always look at frames: headless tests missed a black interior and a hole in the hull.
+- **See it:** `python Scripts/build/capture_screenshots.py <folder> name=yaw@x,y,z`, in ship coordinates. A name starting `sonar` opens the **Tab** view with the sonar on. A name starting `screen` switches the sonar on and leaves the view clear: `screen=90@11200,450,120` looks at the bridge screen. Always look at frames: headless tests missed a black interior and a hole in the hull.
 - **Map:** `Scripts/unreal/create_test_map.py` rebuilds `Content/TestMaps/L_ShipMotion` in place.
 - **Opening the project:** the owner uses the THALASSA desktop shortcut, which points straight at the 5.8 editor. Double-clicking the `.uproject` fails, because the registry has no 5.8 entry.
 - **Shell:** Git Bash rewrites `/Game/...` arguments, so launch Unreal from Python. Very long single commands fail, so put scripts in files. Files are LF in the working tree.

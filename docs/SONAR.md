@@ -26,10 +26,22 @@ The host saves the chart every 30 seconds and when the game closes, and loads it
 
 Tests never touch that file: with telemetry on, nothing is saved unless a test names its own slot. `python Scripts/build/test_survey_persistence.py` checks the whole loop. A game surveyed 36 cells and quit. A new game, with the sonar off, loaded the same 36 cells, and a client who joined afterwards received an identical chart.
 
+## The bridge screen and the ping
+
+The chart is also on a screen at the sonar station: the middle console on the bridge's starboard side, facing the room. It shows the same picture as the **Tab** view, because both are drawn by one function, `ThalassaSonarDisplay::Draw`. That picture is north up, 1.6 km across, with range rings every 200 m and the ship's heading in amber.
+
+- Each process draws its own copy into a 512 px render target, from the replicated survey. Nothing new is replicated. The screen only redraws, at 30 frames a second, while it is on someone's screen.
+- The material is the engine's own `Widget3DPassThrough_Opaque_OneSided`, used for 3D widgets. It is unlit, so the screen is turned down to 12% or the dark bridge's exposure makes it glow white.
+- While the sonar is on, it pings every 2 seconds, on the beat of the server's clock, so everyone aboard hears the same ping. A ring spreads from the ship on the chart at the speed of sound in water, 1,500 m/s, and fades out at the edge of the view in about half a second.
+- The ping is synthesised as it plays (`UThalassaSonarPingComponent`), so there is no sound asset: a 1,650 Hz tone falling slightly, a 0.3 s decay, and damped repeats 0.37 s apart. It is heard from the screen and fades out within about 30 m. It is a placeholder, like the grey deck.
+- The audible ping and the survey are separate. The survey still sweeps every 0.1 s.
+
+Tested on the deck with the sonar on: the chart matched between host and client at about 15 ms, at 149 ms with 1% loss, and at 238 ms with 3% loss. Walking matched the earlier deck runs at similar ping. Frames confirmed that the screen is the right way up and matches the **Tab** view. **The ping has not been heard in the game yet**: every automated run is silent (`-nosound`).
+
 ## Not done yet
 
-- **A physical console screen.** The chart is only on the HUD. The design document wants the same data on a console in the world.
+- **The look.** The screen is the debug chart on a flat panel. The design direction is a polished, high-tech display.
 - **Scale.** The array of cells replicates as it grows. A few thousand cells is fine; a whole ocean would need tiles sent on request.
 - **Imperfection.** Returns are exact. Real sonar has noise, shadows behind obstacles, and resolution that falls with range.
-- **Sound.** No ping, no hydrophones yet.
+- **Hydrophones.** Only the ping exists. There is no listening yet.
 - **Something worth mapping.** The test map is a flat seabed with square pillars. Real terrain will make the chart interesting.

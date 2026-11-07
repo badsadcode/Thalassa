@@ -1,6 +1,8 @@
 #include "Vessel/ThalassaVessel.h"
 
 #include "Vessel/ThalassaSonarComponent.h"
+#include "Vessel/ThalassaSonarDisplay.h"
+#include "Vessel/ThalassaSonarPingComponent.h"
 #include "Vessel/ThalassaVesselLayout.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
@@ -292,6 +294,22 @@ AThalassaVessel::AThalassaVessel()
 	}
 
 	Sonar = CreateDefaultSubobject<UThalassaSonarComponent>(TEXT("Sonar"));
+
+	if (Layout.SonarScreenSizeCm > 0.f)
+	{
+		// The engine's plane is 100 cm square and faces +Z, its texture running along +X and +Y. Turn it to
+		// face the room with the picture's top edge up: +X to the viewer's right, +Y downward.
+		SonarScreen = CreateDefaultSubobject<UThalassaSonarScreenComponent>(TEXT("SonarScreen"));
+		SonarScreen->SetupAttachment(ShipRoot);
+		SonarScreen->SetRelativeLocation(Layout.SonarScreenLocation);
+		SonarScreen->SetRelativeRotation(FRotationMatrix::MakeFromXZ(Layout.SonarScreenFacing ^ FVector::UpVector, Layout.SonarScreenFacing).Rotator());
+		SonarScreen->SetRelativeScale3D(FVector(Layout.SonarScreenSizeCm / 100.f));
+
+		SonarPing = CreateDefaultSubobject<UThalassaSonarPingComponent>(TEXT("SonarPing"));
+		SonarPing->SetupAttachment(ShipRoot);
+		SonarPing->SetRelativeLocation(Layout.SonarScreenLocation);
+		SonarScreen->PingSound = SonarPing;
+	}
 
 	ConsoleText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("ConsoleText"));
 	ConsoleText->SetupAttachment(ShipRoot);

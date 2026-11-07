@@ -291,6 +291,12 @@ FVesselLayout BuildMainDeckLayout()
 	{
 		B.Box(FVector(Station.X - 250.f, Station.Y - 50.f, 0.f), FVector(Station.X + 250.f, Station.Y + 50.f, 110.f), ConsoleColor);
 	}
+	// The sonar station: the starboard console in the middle, with the chart on a screen above it, facing the bridge.
+	B.Box(FVector(11110.f, 1036.f, 110.f), FVector(11290.f, 1050.f, 290.f), ConsoleColor, true, false);
+	Layout.SonarScreenLocation = FVector(11200.f, 1034.f, 200.f);
+	Layout.SonarScreenFacing = FVector(0.f, -1.f, 0.f);
+	Layout.SonarScreenSizeCm = 160.f;
+
 	B.Box(FVector(11900.f, -60.f, -60.f), FVector(12020.f, 60.f, 40.f), MachineColor);
 	B.Box(FVector(13400.f, -400.f, 0.f), FVector(13560.f, 400.f, 120.f), ConsoleColor);
 	Layout.ConsoleLocation = FVector(13300.f, 0.f, 60.f);
