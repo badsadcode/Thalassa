@@ -1,6 +1,7 @@
 #include "Core/ThalassaPlayerController.h"
 
 #include "Characters/ThalassaCharacter.h"
+#include "Characters/ThalassaMovementComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
@@ -48,6 +49,10 @@ void AThalassaPlayerController::SetupInputComponent()
 	UInputAction* JumpAction = MakeAction(TEXT("JumpAction"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(JumpAction, EKeys::SpaceBar);
 
+	UInputAction* SwimVertical = MakeAction(TEXT("SwimVertical"), EInputActionValueType::Axis1D);
+	MapAxisKey(SwimVertical, EKeys::SpaceBar, false, false);
+	MapAxisKey(SwimVertical, EKeys::C, true, false);
+
 	UInputAction* InteractAction = MakeAction(TEXT("InteractAction"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(InteractAction, EKeys::E);
 
@@ -72,6 +77,7 @@ void AThalassaPlayerController::SetupInputComponent()
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(Move, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnMove);
 	Input->BindAction(Look, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnLook);
+	Input->BindAction(SwimVertical, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnSwimVertical);
 	Input->BindAction(JumpAction, ETriggerEvent::Started, this, &AThalassaPlayerController::OnJumpStart);
 	Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnJumpStop);
 	Input->BindAction(InteractAction, ETriggerEvent::Started, this, &AThalassaPlayerController::OnInteract);
@@ -106,9 +112,13 @@ void AThalassaPlayerController::OnMove(const FInputActionValue& Value)
 	if (APawn* ControlledPawn = GetPawn())
 	{
 		const FVector2D Axis = Value.Get<FVector2D>();
-		const FRotator YawOnly(0.f, GetControlRotation().Yaw, 0.f);
-		ControlledPawn->AddMovementInput(YawOnly.RotateVector(FVector::ForwardVector), Axis.Y);
-		ControlledPawn->AddMovementInput(YawOnly.RotateVector(FVector::RightVector), Axis.X);
+
+		// On foot you walk where you face on the deck. In the water you swim where you look.
+		const AThalassaCharacter* Crew = Cast<AThalassaCharacter>(ControlledPawn);
+		const bool bSwimming = Crew && Crew->GetThalassaMovement()->IsSwimmingInSea();
+		const FRotator Facing = bSwimming ? GetControlRotation() : FRotator(0.f, GetControlRotation().Yaw, 0.f);
+		ControlledPawn->AddMovementInput(Facing.RotateVector(FVector::ForwardVector), Axis.Y);
+		ControlledPawn->AddMovementInput(Facing.RotateVector(FVector::RightVector), Axis.X);
 	}
 }
 
@@ -117,6 +127,15 @@ void AThalassaPlayerController::OnLook(const FInputActionValue& Value)
 	const FVector2D Axis = Value.Get<FVector2D>();
 	AddYawInput(Axis.X);
 	AddPitchInput(-Axis.Y);
+}
+
+void AThalassaPlayerController::OnSwimVertical(const FInputActionValue& Value)
+{
+	const AThalassaCharacter* Crew = Cast<AThalassaCharacter>(GetPawn());
+	if (Crew && Crew->GetThalassaMovement()->IsSwimmingInSea())
+	{
+		GetPawn()->AddMovementInput(FVector::UpVector, Value.Get<float>());
+	}
 }
 
 void AThalassaPlayerController::OnJumpStart()

@@ -74,6 +74,15 @@ void AThalassaHUD::DrawHUD()
 	const APlayerState* State = Crew->GetPlayerState();
 	const UObject* Base = Crew->GetMovementBaseObject();
 
+	const bool bSwimming = Movement->IsSwimmingInSea();
+	if (bSwimming)
+	{
+		// A cue that you are under water, until there is real underwater rendering.
+		DrawRect(FLinearColor(0.f, 0.22f, 0.32f, 0.3f), 0.f, 0.f, Canvas->ClipX, Canvas->ClipY);
+	}
+
+	static const TCHAR* const AirlockNames[] = { TEXT("inner door open"), TEXT("flooding"), TEXT("outer door open"), TEXT("draining") };
+
 	const TArray<FString> Diagnostics =
 	{
 		FString::Printf(TEXT("%.0f fps   ping %.0f ms   net %s"), 1.f / FMath::Max(GetWorld()->GetDeltaSeconds(), 0.001f),
@@ -84,7 +93,10 @@ void AThalassaHUD::DrawHUD()
 		FString::Printf(TEXT("crew  ship-frame %.0f %.0f %.0f cm"), Local.X, Local.Y, Local.Z),
 		FString::Printf(TEXT("base  %s   mode %d"), Base ? *Base->GetName() : TEXT("none"), static_cast<int32>(Movement->MovementMode.GetValue())),
 		FString::Printf(TEXT("corrections %d  max %.1f cm  last %.1f cm"), Movement->CorrectionCount, Movement->MaxCorrectionCm, Movement->LastCorrectionCm),
-		TEXT("WASD/mouse walk   SPACE jump   E use console   TAB station view"),
+		FString::Printf(TEXT("%s   airlock %s, water %.0f%%%s"), bSwimming ? TEXT("SWIMMING") : TEXT("on foot"),
+			AirlockNames[static_cast<int32>(Vessel->GetAirlockState())], Vessel->GetAirlockWaterLevel() * 100.f,
+			Vessel->IsAirlockDoorwayBlocked() ? TEXT("   DOORWAY BLOCKED") : TEXT("")),
+		TEXT("WASD/mouse move   SPACE jump/up   C down   E use console or airlock   TAB station view"),
 		TEXT("I/K throttle   J/L turn   U/O dive   P run motion test"),
 	};
 	DrawLines(Diagnostics, 16.f, 16.f, FLinearColor(0.35f, 0.84f, 0.83f), 1.f);

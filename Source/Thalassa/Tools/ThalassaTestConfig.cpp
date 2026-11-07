@@ -11,6 +11,24 @@ namespace ThalassaTestConfig
 		return bValue;
 	}
 
+	bool IsDiverBot()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaDiver"));
+		return bValue;
+	}
+
+	bool IsEvaProfile()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaEvaProfile"));
+		return bValue;
+	}
+
+	bool IsSpawnAtAirlock()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaSpawnAtAirlock"));
+		return bValue;
+	}
+
 	bool IsBotJumpDisabled()
 	{
 		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoJump"));

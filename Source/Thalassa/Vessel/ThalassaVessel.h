@@ -25,6 +25,16 @@ struct FVesselSnapshot
 	UPROPERTY() double ServerTime = 0.0;
 };
 
+/** The airlock's cycle. The inner and outer doors are never open at the same time. */
+UENUM()
+enum class EAirlockState : uint8
+{
+	InnerOpen,  // Dry, open to the ship.
+	Flooding,   // Both doors shut, filling.
+	OuterOpen,  // Flooded, open to the sea.
+	Draining    // Both doors shut, emptying.
+};
+
 UENUM()
 enum class EVesselProfileState : uint8
 {
@@ -74,6 +84,23 @@ public:
 	/** True if a world location lies within the hull's ship-frame bounds. */
 	bool IsInsideHull(const FVector& WorldLocation) const;
 
+	/** Server: if a character at this world location can reach the panel, start the next airlock cycle. */
+	bool TryCycleAirlock(const FVector& WorldLocation);
+
+	/** True if this world location is under water: the open sea, or a flooded compartment. */
+	bool IsWaterAt(const FVector& WorldLocation) const;
+
+	/** True if this world location is in a ship compartment, so anyone there moves with the ship. */
+	bool IsInCompartment(const FVector& WorldLocation) const;
+
+	/** The hull's one movement base. See the class comment. */
+	UPrimitiveComponent* GetMovementBaseComponent() const;
+
+	FVector GetWorldVelocity() const { return Snapshot.Velocity; }
+	EAirlockState GetAirlockState() const { return AirlockState; }
+	float GetAirlockWaterLevel() const { return AirlockWaterLevel; }
+	bool IsAirlockDoorwayBlocked() const { return bAirlockDoorwayBlocked; }
+
 	/** Server time as seen by this process: on clients, as of the latest snapshots, filtered so the ship does not shake. */
 	double GetSyncedTime() const;
 
@@ -89,6 +116,9 @@ private:
 	void UpdateClockFromSnapshot();
 	void GetExtrapolatedPose(double Time, FVector& OutPosition, FQuat& OutRotation) const;
 	void UpdateConsoleText(float DeltaSeconds);
+	void TickAirlockServer(float DeltaSeconds);
+	void TickAirlockVisuals(float DeltaSeconds);
+	bool IsDoorwayOccupied(float DoorY) const;
 
 	UFUNCTION()
 	void OnRep_Snapshot();
@@ -106,6 +136,28 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UTextRenderComponent> ConsoleText;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> AirlockInnerDoor;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> AirlockOuterDoor;
+
+	/** The visible surface of the water in the chamber. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> AirlockWater;
+
+	UPROPERTY(Replicated)
+	EAirlockState AirlockState = EAirlockState::InnerOpen;
+
+	UPROPERTY(Replicated)
+	float AirlockWaterLevel = 0.f;
+
+	UPROPERTY(Replicated)
+	bool bAirlockDoorwayBlocked = false;
+
+	float AirlockInnerDoorOpen = 1.f;
+	float AirlockOuterDoorOpen = 0.f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Snapshot)
 	FVesselSnapshot Snapshot;

@@ -61,7 +61,11 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 
 	if (IsLocallyControlled())
 	{
-		if (ThalassaTestConfig::IsBot())
+		if (ThalassaTestConfig::IsDiverBot())
+		{
+			TickDiverBot(DeltaSeconds);
+		}
+		else if (ThalassaTestConfig::IsBot())
 		{
 			TickWalkerBot(DeltaSeconds);
 		}
@@ -118,7 +122,87 @@ void AThalassaCharacter::ServerInteract_Implementation()
 {
 	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
 	{
-		Vessel->TryPressBeep(GetActorLocation());
+		if (!Vessel->TryPressBeep(GetActorLocation()))
+		{
+			Vessel->TryCycleAirlock(GetActorLocation());
+		}
+	}
+}
+
+void AThalassaCharacter::TickDiverBot(float DeltaSeconds)
+{
+	if (!BoundVessel || BoundVessel->GetProfileState() != EVesselProfileState::Running)
+	{
+		return;
+	}
+
+	// A full EVA in ship coordinates: into the airlock, out to sea, wait, catch the ship, come home.
+	// Each step: where to go, how close counts, and the airlock state it needs before moving on.
+	struct FDiveStep { FVector Target; float Radius; int32 NeedState; };
+	const int32 AnyState = -1;
+	const int32 Inner = static_cast<int32>(EAirlockState::InnerOpen);
+	const int32 Outer = static_cast<int32>(EAirlockState::OuterOpen);
+	const FDiveStep Steps[] =
+	{
+		{ FVector(0, 100, 90),   100.f, Inner },    // 0: Wait in the corridor for the inner door
+		{ FVector(0, 340, 90),   40.f,  Inner },    // 1: Into the chamber
+		{ FVector(0, 340, 90),   40.f,  Outer },    // 2: Cycle, wait to flood
+		{ FVector(0, 650, 100),  120.f, Outer },    // 3: Out through the outer door
+		{ FVector(0, 2000, 200), 150.f, AnyState }, // 4: Swim away from the ship
+		{ FVector(0, 2000, 200), -1.f,  AnyState }, // 5: Tread water; the ship carries on
+		{ FVector(0, 650, 100),  120.f, Outer },    // 6: Catch the ship, back to the outer door
+		{ FVector(0, 340, 100),  40.f,  Outer },    // 7: Into the chamber
+		{ FVector(0, 340, 90),   40.f,  Inner },    // 8: Cycle, wait to drain
+		{ FVector(0, 0, 90),     100.f, Inner },    // 9: Back into the corridor
+	};
+	const int32 StepCount = UE_ARRAY_COUNT(Steps);
+	const FDiveStep& Step = Steps[BotDiveStep];
+
+	const FTransform ShipTransform = BoundVessel->GetActorTransform();
+	const FVector ToTarget = ShipTransform.TransformPosition(Step.Target) - GetActorLocation();
+	const bool bReached = Step.Radius > 0.f && ToTarget.SizeSquared() < FMath::Square(Step.Radius);
+	const int32 State = static_cast<int32>(BoundVessel->GetAirlockState());
+	const bool bStateReady = Step.NeedState == AnyState || State == Step.NeedState;
+
+	BotDiveStepSeconds += DeltaSeconds;
+	BotPressCooldown -= DeltaSeconds;
+
+	bool bAdvance = bReached && bStateReady;
+	if (Step.Radius < 0.f)
+	{
+		bAdvance = BotDiveStepSeconds > 8.f; // Stopped swimming for a while.
+	}
+	else if (!bStateReady && BotPressCooldown <= 0.f && (State == Inner || State == Outer))
+	{
+		// The airlock is the wrong way round for this step: ask for a cycle, like a player would.
+		BotPressCooldown = 3.f;
+		Interact();
+	}
+
+	if (bAdvance)
+	{
+		if (BotDiveStep == StepCount - 1)
+		{
+			++BotEvaCount;
+		}
+		BotDiveStep = (BotDiveStep + 1) % StepCount;
+		BotDiveStepSeconds = 0.f;
+		BotPressCooldown = 0.f;
+		return;
+	}
+
+	if (BotDiveStepSeconds > 90.f)
+	{
+		// Reported, not hidden. Keep trying the same step: a diver cannot skip getting back aboard.
+		++BotStuckCount;
+		BotDiveStepSeconds = 0.f;
+		UE_LOG(LogTemp, Display, TEXT("DIVERSTUCK step %d local %s airlock %d"), BotDiveStep,
+			*ShipTransform.InverseTransformPosition(GetActorLocation()).ToString(), State);
+	}
+
+	if (Step.Radius > 0.f && !bReached)
+	{
+		AddMovementInput(ToTarget.GetSafeNormal());
 	}
 }
 

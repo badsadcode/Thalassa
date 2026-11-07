@@ -16,6 +16,10 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 **Crew use soft collision (owner's choice).** Crew do not block each other, and are nudged apart through ordinary movement input. Hard collision caused up to 1430 corrections per client with four players; this caused at most 1. The nudge strength is untuned.
 
+**Water is decided by ship compartment, and swimming uses `MOVE_Flying`.** It needs no water volume, moves with the ship, and is predicted like any other move. A real swimming mode can replace it behind the same rule.
+
+**A door stops being solid as soon as it starts opening.** Clients always see a door lower than the server does. The cost is that someone can clip through a door that is still rising.
+
 **All hull collision is one component.** A character's movement base must not change as they walk around the ship. Under packet loss, several bases made other players appear 16 m away. A real hull mesh must keep this.
 
 **`p.NetServerMaxMoveDeltaTimeScalar=1`.** The default of 1.75 forces a correction on every frame over 125 ms. Revisit if corrections appear with merged or delayed moves.

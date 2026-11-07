@@ -1,6 +1,6 @@
 # Moving-ship spike: results so far
 
-**Verdict: walking on a moving ship over a network works well in every test so far. The Phase 1 gate is still open**, because the airlock, packaged builds and a real internet path have not been tested.
+**Verdict: walking on a moving ship, and leaving and re-entering it through an airlock, work in every test so far. The Phase 1 gate is still open**, because everything has run on one PC, in editor builds, mostly with scripted players.
 
 ## What was tested
 
@@ -90,13 +90,39 @@ Two players spawned on the same spot, with nobody walking, ended about 90 cm apa
 
 The 8.8% is partly the test: four walkers keep meeting in 2 m doorways, where there is little room to separate. How the nudge feels has not been tried by a person, and nobody has tested it with more than four players.
 
+## Airlock and swimming
+
+A server-run airlock off the corridor, and a scripted diver who repeatedly floods it, swims 15 m out, stops for 8 seconds while the ship carries on, catches the ship, returns through the outer door, drains and walks back. Run with `run_motion_test.py --eva` or `--eva-all`. These use a slow profile: up to 2 m/s, with gentle turns, 3 degrees of pitch and roll.
+
+How it works:
+
+- **Water is by compartment, in ship coordinates.** Everything outside a list of boxes is sea. The chamber is water up to its replicated flood level. There is no water volume or fluid simulation.
+- **Swimming is `MOVE_Flying`**, chosen in `UpdateCharacterStateBeforeMovement`, which runs in every move on client, server and replay.
+- **The base follows the location.** In the flooded chamber you stay on the hull, and past the outer door you leave it, keeping world-frame velocity across the change.
+- **The interlock is on the server.** Both doors are never open together, and a door will not close on someone in the doorway.
+- **A door stops being solid as soon as it starts opening**, because a client's door is always lower than the server's. Walking through one that is still rising clips visually.
+
+| Run (one each) | Divers | Median ping | Complete trips | Stuck | Corrections | Pops (largest) | Largest visible snap |
+|---|---|---|---|---|---|---|---|
+| `door_eva` | 1 | 16 ms | 8 | 0 | 18 | 0 | 11 cm |
+| `door_lag` | 1 | 134 ms | 8 | 0 | 114 | 28 (35 cm) | 39 cm |
+| `door_lag_worse` | 1 | 238 ms | 8 | 0 | 211 | 33 (50 cm) | 62 cm |
+| `door_four` | 4 | 15 ms | 7 each | 0 | 37 / 48 / 32 | 2 / 5 / 2 (34 cm) | 15 cm (first client only) |
+
+Before doors stopped being solid, those first three runs had 55, 164 and 262 corrections. A walkers-only run afterward had 1 correction and no pops, so walking aboard did not regress. In `door_four`, the closest pair ending at 57 cm is expected: the divers finish crowded together.
+
+**Open: corrections at high ping.** They cluster at the outer door and in the chamber, swimming on both sides, where a character changes between the ship's frame and the world's. The likely cause is that a client shows the ship slightly late, so it crosses that threshold at a slightly different place from the server. That has not been confirmed. Part of the correction count is the known metric inflation. Visible pops are the better guide.
+
+**Placeholder:** no suit, oxygen, pressure, buoyancy, currents or water rendering. There is no surface, so a swimmer can rise forever. Above 2 m/s is untested, and a ship faster than the 4 m/s swim speed simply leaves a diver behind, with no rescue yet. Water surface in the chamber shows only from above.
+
 ## Not tested yet
 
 The Phase 1 gate still needs:
 
 - Approach B or C. The design document asks for a comparison, though approach A now gives little reason to look further unless something below fails.
 - Packaged builds, two real PCs, or any real internet path. These runs all use loopback.
-- Airlock, swimming, re-entering a moving ship, ladders, doors, seated stations, loose objects.
+- A person using the airlock or swimming. So far that is only scripted divers, and a single rendered frame of the chamber with its doors at rest.
+- Ladders, seated stations, loose objects.
 - Eight players. Save and load in motion, joining mid-voyage.
 - Any test with rendering on. The owner has tried it in the editor with two players and it felt good, but that is one informal session with almost no lag.
 
@@ -104,6 +130,6 @@ Ship-relative gravity looked good again on one run, but mouse look does not yet 
 
 ## Next steps
 
-1. The owner tries soft collision in the editor.
-2. Airlock and swimming, the next item on the gate.
-3. A packaged build tested on two real PCs.
+1. The owner tries soft collision, the airlock and swimming in the editor.
+2. A packaged build tested on two real PCs, the largest remaining unknown.
+3. High-ping corrections at the outer door.

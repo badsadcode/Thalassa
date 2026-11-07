@@ -8,6 +8,15 @@ namespace ThalassaTestConfig
 	/** -ThalassaBot: the local player walks a scripted tour of the ship. */
 	bool IsBot();
 
+	/** -ThalassaDiver: the local player repeatedly goes out through the airlock and back. */
+	bool IsDiverBot();
+
+	/** -ThalassaEvaProfile: server drives the ship slowly enough for a swimmer to catch. */
+	bool IsEvaProfile();
+
+	/** -ThalassaSpawnAtAirlock: start in the corridor facing the airlock, for screenshots. */
+	bool IsSpawnAtAirlock();
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

@@ -35,8 +35,9 @@ Open `Thalassa.uproject` in the editor and press Play. Set **Number of Players**
 
 | Keys | Action |
 |---|---|
-| WASD, mouse, Space | Walk, look, jump |
-| E | Use the console (near the front of the bridge) |
+| WASD, mouse, Space | Walk, look, jump (in water: swim where you look) |
+| Space / C | In water: up / down |
+| E | Use the console (front of the bridge) or cycle the airlock (off the corridor, to starboard) |
 | Tab | Toggle the expanded station view |
 | I / K | Helm: forward / reverse |
 | J / L | Helm: turn port / starboard |

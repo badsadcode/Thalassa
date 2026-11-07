@@ -16,6 +16,9 @@ UThalassaMovementComponent::UThalassaMovementComponent()
 	bImpartBaseVelocityY = true;
 	bImpartBaseVelocityZ = true;
 	bImpartBaseAngularVelocity = true;
+
+	MaxFlySpeed = 400.f;                // Swimming speed.
+	BrakingDecelerationFlying = 600.f;  // Water stops you quickly when you stop swimming.
 }
 
 void UThalassaMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -47,6 +50,51 @@ void UThalassaMovementComponent::OnMovementModeChanged(EMovementMode PreviousMov
 	if (MovementMode == MOVE_Falling && CharacterOwner && CharacterOwner->JumpCurrentCount == 0 && !CharacterOwner->bPressedJump)
 	{
 		++UnexpectedAirborneCount;
+	}
+}
+
+void UThalassaMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
+{
+	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
+
+	// Runs inside every move, on the client, on the server, and in replays, which makes these
+	// transitions predicted: they should need no correction beyond small differences in the ship's pose.
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	if (!Vessel || !CharacterOwner || !UpdatedComponent)
+	{
+		return;
+	}
+
+	const FVector Location = UpdatedComponent->GetComponentLocation();
+	const bool bInWater = Vessel->IsWaterAt(Location);
+	if (bInWater && MovementMode != MOVE_Flying)
+	{
+		SetMovementMode(MOVE_Flying); // Also clears the base; it is restored below if still aboard.
+	}
+	else if (!bInWater && MovementMode == MOVE_Flying)
+	{
+		SetMovementMode(MOVE_Falling); // Drained: drop to the deck, or stepped indoors.
+	}
+
+	if (MovementMode == MOVE_Flying)
+	{
+		// In a flooded compartment you move with the ship, and the sea does not. Velocity is kept in
+		// the world's frame across the change, so crossing the threshold is not a sudden kick.
+		UPrimitiveComponent* Hull = Vessel->GetMovementBaseComponent();
+		const bool bOnHull = CharacterOwner->GetMovementBaseObject() == Hull;
+		const bool bInCompartment = Vessel->IsInCompartment(Location);
+		if (bInCompartment && !bOnHull)
+		{
+			Velocity -= Vessel->GetWorldVelocity();
+			FMovementBaseInterfaceData HullBase(Hull);
+			SetBase(&HullBase);
+		}
+		else if (!bInCompartment && bOnHull)
+		{
+			Velocity += Vessel->GetWorldVelocity();
+			FMovementBaseInterfaceData NoBase;
+			SetBase(&NoBase);
+		}
 	}
 }
 

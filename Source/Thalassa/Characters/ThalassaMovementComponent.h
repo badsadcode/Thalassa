@@ -18,6 +18,10 @@ public:
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual bool ClientUpdatePositionAfterServerUpdate() override;
+	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
+
+	/** Swimming is MOVE_Flying: no gravity, full 3D input, and it needs no water volume to exist. */
+	bool IsSwimmingInSea() const { return MovementMode == MOVE_Flying; }
 
 	using UCharacterMovementComponent::OnClientCorrectionReceived;
 	virtual void OnClientCorrectionReceived(FNetworkPredictionData_Client_Character& ClientData, float TimeStamp, FVector NewLocation, FVector NewVelocity, FMovementBaseInterfaceData* NewMovementBaseInterfaceData, FName NewBaseBoneName, bool bHasBase, bool bBaseRelativePosition, uint8 ServerMovementMode, FVector ServerGravityDirection) override;

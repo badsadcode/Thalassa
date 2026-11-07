@@ -30,6 +30,7 @@ private:
 
 	void OnMove(const FInputActionValue& Value);
 	void OnLook(const FInputActionValue& Value);
+	void OnSwimVertical(const FInputActionValue& Value);
 	void OnJumpStart();
 	void OnJumpStop();
 	void OnInteract();

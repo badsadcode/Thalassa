@@ -63,7 +63,7 @@ void UThalassaTelemetry::OpenWriter()
 	Writer.Reset(IFileManager::Get().CreateFileWriter(*Path));
 	if (Writer)
 	{
-		WriteLine(*Writer, TEXT("t,player,local_role,lx,ly,lz,wx,wy,wz,mode,based,ship_x,ship_y,ship_z,ship_yaw,ship_pitch,ship_roll,ship_speed,profile,beeps,corr,corr_max,corr_last,pops,pop_max,airborne,stuck,outside,worst_frame,ping"));
+		WriteLine(*Writer, TEXT("t,player,local_role,lx,ly,lz,wx,wy,wz,mode,based,ship_x,ship_y,ship_z,ship_yaw,ship_pitch,ship_roll,ship_speed,profile,beeps,corr,corr_max,corr_last,pops,pop_max,airborne,stuck,outside,worst_frame,ping,eva"));
 	}
 	else
 	{
@@ -126,7 +126,8 @@ void UThalassaTelemetry::TrackLocalFrameStep(float DeltaTime)
 	LastLocalPosition = Local;
 	bHasLastLocalPosition = true;
 
-	if (!Vessel->IsInsideHull(Character->GetActorLocation()))
+	// Being outside the hull only counts as a fault if you are not meant to be: swimmers are.
+	if (!Character->GetThalassaMovement()->IsSwimmingInSea() && !Vessel->IsInsideHull(Character->GetActorLocation()))
 	{
 		++OutsideHullFrames;
 	}
@@ -175,7 +176,7 @@ void UThalassaTelemetry::WriteRows(float DeltaTime)
 		const bool bLocal = Character->IsLocallyControlled();
 
 		WriteLine(*Writer, FString::Printf(
-			TEXT("%.3f,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.2f,%d,%d,%d,%.2f,%.2f,%d,%.2f,%d,%d,%d,%.4f,%.1f"),
+			TEXT("%.3f,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.2f,%d,%d,%d,%.2f,%.2f,%d,%.2f,%d,%d,%d,%.4f,%.1f,%d"),
 			Vessel->GetSyncedTime(), PlayerState->GetPlayerId(), static_cast<int32>(Character->GetLocalRole()),
 			Local.X, Local.Y, Local.Z, WorldPos.X, WorldPos.Y, WorldPos.Z,
 			static_cast<int32>(Movement->MovementMode.GetValue()), Character->GetMovementBaseObject() != nullptr ? 1 : 0,
@@ -183,7 +184,7 @@ void UThalassaTelemetry::WriteRows(float DeltaTime)
 			Vessel->GetSpeedMetersPerSecond(), static_cast<int32>(Vessel->GetProfileState()), Vessel->GetBeepCount(),
 			Movement->CorrectionCount, Movement->MaxCorrectionCm, Movement->LastCorrectionCm,
 			bLocal ? PopCount : 0, bLocal ? MaxPopCm : 0.f, Movement->UnexpectedAirborneCount, Character->BotStuckCount,
-			bLocal ? OutsideHullFrames : 0, bLocal ? WorstFrameSeconds : 0.f, PlayerState->GetPingInMilliseconds()));
+			bLocal ? OutsideHullFrames : 0, bLocal ? WorstFrameSeconds : 0.f, PlayerState->GetPingInMilliseconds(), Character->BotEvaCount));
 	}
 
 	// Rarely: frequent flushes to a slow disk stall the game and ruin the very thing being measured.

@@ -28,11 +28,15 @@ public:
 	/** Waypoints the test walker failed to reach in time. Reported by telemetry. */
 	int32 BotStuckCount = 0;
 
+	/** Complete trips out through the airlock and back aboard, by the test diver. */
+	int32 BotEvaCount = 0;
+
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerInteract();
 
 	void TickWalkerBot(float DeltaSeconds);
+	void TickDiverBot(float DeltaSeconds);
 	void ApplyCrewNudge();
 
 	/** Crew closer than this, centre to centre, are nudged apart. Capsules touch at 68 cm. */
@@ -51,6 +55,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AThalassaVessel> BoundVessel;
+
+	int32 BotDiveStep = 0;
+	float BotDiveStepSeconds = 0.f;
+	float BotPressCooldown = 0.f;
 
 	int32 BotWaypoint = 0;
 	float BotJumpTimer = 6.f;

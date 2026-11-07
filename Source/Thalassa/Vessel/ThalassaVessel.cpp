@@ -7,6 +7,7 @@
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Characters/ThalassaCharacter.h"
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -30,6 +31,7 @@ namespace ThalassaVesselLayout
 	const FLinearColor Bridge(0.08f, 0.22f, 0.30f);
 	const FLinearColor Corridor(0.28f, 0.25f, 0.20f);
 	const FLinearColor Engineering(0.35f, 0.18f, 0.10f);
+	const FLinearColor AirlockColor(0.45f, 0.36f, 0.08f);
 	const FLinearColor Console(0.03f, 0.04f, 0.05f); // Dark, or the readout's text washes out.
 
 	// Ship frame: +X forward, +Z up, deck surface at Z = 0, centimetres.
@@ -51,7 +53,16 @@ namespace ThalassaVesselLayout
 
 		// Corridor walls and the two doorway bulkheads (doorway 200 wide, 250 high).
 		{ TEXT("CorridorPort"),    FVector(0, -225, 175),     FVector(2000, 50, 350),  Corridor, true },
-		{ TEXT("CorridorStbd"),    FVector(0, 225, 175),      FVector(2000, 50, 350),  Corridor, true },
+		{ TEXT("CorridorStbdFwd"), FVector(550, 225, 175),    FVector(900, 50, 350),   Corridor, true },
+		{ TEXT("CorridorStbdAft"), FVector(-550, 225, 175),   FVector(900, 50, 350),   Corridor, true },
+
+		// Airlock, off the corridor to starboard: inner doorway in the corridor wall, outer to the sea.
+		{ TEXT("AirlockInnerHead"), FVector(0, 225, 300),     FVector(200, 50, 100),   AirlockColor, true },
+		{ TEXT("AirlockFwd"),      FVector(225, 350, 175),    FVector(50, 250, 350),   AirlockColor, true },
+		{ TEXT("AirlockAft"),      FVector(-225, 350, 175),   FVector(50, 250, 350),   AirlockColor, true },
+		{ TEXT("AirlockOuterFwd"), FVector(175, 450, 175),    FVector(150, 50, 350),   AirlockColor, true },
+		{ TEXT("AirlockOuterAft"), FVector(-175, 450, 175),   FVector(150, 50, 350),   AirlockColor, true },
+		{ TEXT("AirlockOuterHead"), FVector(0, 450, 300),     FVector(200, 50, 100),   AirlockColor, true },
 		{ TEXT("BulkFwdPort"),     FVector(1000, -275, 175),  FVector(50, 350, 350),   Corridor, true },
 		{ TEXT("BulkFwdStbd"),     FVector(1000, 275, 175),   FVector(50, 350, 350),   Corridor, true },
 		{ TEXT("BulkFwdHead"),     FVector(1000, 0, 300),     FVector(50, 200, 100),   Corridor, true },
@@ -78,9 +89,32 @@ namespace ThalassaVesselLayout
 		{ TEXT("LightCorridorFwd"), FVector(500, 0, 310),   FColor(255, 224, 190) },
 		{ TEXT("LightCorridorAft"), FVector(-500, 0, 310),  FColor(255, 224, 190) },
 		{ TEXT("LightEngineering"), FVector(-1500, 0, 310), FColor(255, 170, 120) },
+		{ TEXT("LightAirlock"),     FVector(0, 340, 310),   FColor(255, 240, 200) },
 	};
 	const float InteriorLightIntensity = 12000.f;
 	const float InteriorLightRadius = 1400.f;
+
+	// Everything outside these ship-frame boxes is sea. Inner and outer door thickness belongs to the
+	// compartment on the ship's side of it, so stepping through the outer door is what leaves the ship.
+	const FBox DryCompartments[] =
+	{
+		FBox(FVector(1000, -425, -50), FVector(2000, 425, 400)),   // Bridge
+		FBox(FVector(-1000, -200, -50), FVector(1000, 200, 400)),  // Corridor
+		FBox(FVector(-100, 200, -50), FVector(100, 250, 400)),     // Inner doorway
+		FBox(FVector(-2000, -425, -50), FVector(-1000, 425, 400)), // Engineering
+	};
+	const FBox AirlockChamber(FVector(-200, 250, -50), FVector(200, 425, 400));
+	const float AirlockCeilingCm = 350.f;
+
+	const FVector AirlockPanelLocation(0.f, 340.f, 100.f);
+	const float AirlockPanelRadius = 420.f;
+	const float AirlockFloodSeconds = 6.f;
+	const float DoorSeconds = 1.f;
+	const float DoorInnerY = 225.f;
+	const float DoorOuterY = 450.f;
+	const float DoorClearanceCm = 55.f;       // Capsule radius, half the door, and a little margin.
+	const FVector DoorSize(200.f, 30.f, 250.f);
+	const float DoorOpenRaiseCm = 245.f;      // Slides up into the bulkhead above the doorway.
 
 	const FVector ConsoleLocation(1920.f, 0.f, 60.f);
 	const float ConsoleUseRadius = 300.f;
@@ -104,6 +138,17 @@ namespace ThalassaVesselLayout
 		{ 15.f, 10.f,  0.f,  0.f,  0.f }, // level out
 		{ 20.f, 25.f,  8.f,  5.f,  5.f }, // hard manoeuvre
 		{ 20.f,  0.f,  0.f,  0.f,  0.f }, // brake
+	};
+
+	// Slow enough for a swimmer to catch: EVA runs through the same kinds of motion at low speed.
+	const FSegment EvaProfile[] =
+	{
+		{ 10.f, 0.f,  0.f, 0.f, 0.f },
+		{ 70.f, 1.f,  0.f, 0.f, 0.f },
+		{ 70.f, 1.5f, 1.f, 0.f, 0.f },
+		{ 70.f, 2.f, -1.f, 3.f, 0.f },
+		{ 70.f, 2.f,  0.f, 0.f, 3.f },
+		{ 30.f, 0.f,  0.f, 0.f, 0.f },
 	};
 
 	const float AccelerationCmS2 = 200.f;
@@ -148,6 +193,33 @@ AThalassaVessel::AThalassaVessel()
 		HullPieces.Add(Piece);
 	}
 
+	const auto MakeDoor = [&](const TCHAR* Name, float DoorY)
+	{
+		UStaticMeshComponent* Door = CreateDefaultSubobject<UStaticMeshComponent>(Name);
+		Door->SetupAttachment(ShipRoot);
+		Door->SetMobility(EComponentMobility::Movable);
+		Door->SetStaticMesh(CubeMesh.Object);
+		Door->SetMaterial(0, TintableMaterial.Object);
+		Door->SetRelativeLocation(FVector(0.f, DoorY, 125.f));
+		Door->SetRelativeScale3D(ThalassaVesselLayout::DoorSize / 100.f);
+		Door->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+		return Door;
+	};
+	AirlockInnerDoor = MakeDoor(TEXT("AirlockInnerDoor"), ThalassaVesselLayout::DoorInnerY);
+	AirlockOuterDoor = MakeDoor(TEXT("AirlockOuterDoor"), ThalassaVesselLayout::DoorOuterY);
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaneMesh(TEXT("/Engine/BasicShapes/Plane.Plane"));
+	AirlockWater = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AirlockWater"));
+	AirlockWater->SetupAttachment(ShipRoot);
+	AirlockWater->SetMobility(EComponentMobility::Movable);
+	AirlockWater->SetStaticMesh(PlaneMesh.Object);
+	AirlockWater->SetMaterial(0, TintableMaterial.Object);
+	AirlockWater->SetRelativeLocation(FVector(0.f, 337.f, 0.f));
+	AirlockWater->SetRelativeScale3D(FVector(4.f, 1.75f, 1.f));
+	AirlockWater->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	AirlockWater->SetCastShadow(false);
+	AirlockWater->SetVisibility(false);
+
 	HullCollision = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("HullCollision"));
 	HullCollision->SetupAttachment(ShipRoot);
 	HullCollision->SetMobility(EComponentMobility::Movable);
@@ -184,6 +256,9 @@ void AThalassaVessel::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AThalassaVessel, Snapshot);
 	DOREPLIFETIME(AThalassaVessel, ProfileState);
 	DOREPLIFETIME(AThalassaVessel, BeepCount);
+	DOREPLIFETIME(AThalassaVessel, AirlockState);
+	DOREPLIFETIME(AThalassaVessel, AirlockWaterLevel);
+	DOREPLIFETIME(AThalassaVessel, bAirlockDoorwayBlocked);
 }
 
 AThalassaVessel* AThalassaVessel::Find(const UWorld* World)
@@ -230,6 +305,19 @@ void AThalassaVessel::BeginPlay()
 			}
 			++Index;
 		}
+
+		const FLinearColor DoorColor(0.75f, 0.42f, 0.05f);
+		for (UStaticMeshComponent* Door : { AirlockInnerDoor.Get(), AirlockOuterDoor.Get() })
+		{
+			if (UMaterialInstanceDynamic* Material = Door->CreateAndSetMaterialInstanceDynamic(0))
+			{
+				Material->SetVectorParameterValue(TEXT("Color"), DoorColor);
+			}
+		}
+		if (UMaterialInstanceDynamic* Material = AirlockWater->CreateAndSetMaterialInstanceDynamic(0))
+		{
+			Material->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.02f, 0.25f, 0.33f));
+		}
 	}
 }
 
@@ -240,12 +328,14 @@ void AThalassaVessel::Tick(float DeltaSeconds)
 	if (HasAuthority())
 	{
 		TickServer(DeltaSeconds);
+		TickAirlockServer(DeltaSeconds);
 	}
 	else
 	{
 		TickClient(DeltaSeconds);
 	}
 
+	TickAirlockVisuals(DeltaSeconds);
 	UpdateConsoleText(DeltaSeconds);
 }
 
@@ -273,7 +363,10 @@ void AThalassaVessel::SetHelmCommand(float Throttle, float Turn, float Dive)
 void AThalassaVessel::UpdateProfileTargets()
 {
 	float Elapsed = static_cast<float>(GetWorld()->GetTimeSeconds() - ProfileStartTime);
-	for (const ThalassaVesselLayout::FSegment& Segment : ThalassaVesselLayout::Profile)
+	const TArrayView<const ThalassaVesselLayout::FSegment> Segments = ThalassaTestConfig::IsEvaProfile()
+		? TArrayView<const ThalassaVesselLayout::FSegment>(ThalassaVesselLayout::EvaProfile)
+		: TArrayView<const ThalassaVesselLayout::FSegment>(ThalassaVesselLayout::Profile);
+	for (const ThalassaVesselLayout::FSegment& Segment : Segments)
 	{
 		if (Elapsed < Segment.Duration)
 		{
@@ -416,6 +509,11 @@ void AThalassaVessel::TickClient(float DeltaSeconds)
 
 FTransform AThalassaVessel::GetSpawnTransform(int32 PlayerIndex) const
 {
+	if (ThalassaTestConfig::IsSpawnAtAirlock())
+	{
+		return FTransform(GetActorRotation(), GetActorTransform().TransformPosition(FVector(0.f, -100.f, 120.f)));
+	}
+
 	// Staggered along the bridge so players never spawn overlapping.
 	const FVector Local(1500.f - 100.f * (PlayerIndex % 8), PlayerIndex % 2 == 0 ? -70.f : 70.f, 120.f);
 	return FTransform(GetActorRotation(), GetActorTransform().TransformPosition(Local));
@@ -442,6 +540,148 @@ bool AThalassaVessel::IsInsideHull(const FVector& WorldLocation) const
 {
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
 	return FBox(ThalassaVesselLayout::HullBoundsMin, ThalassaVesselLayout::HullBoundsMax).IsInsideOrOn(Local);
+}
+
+UPrimitiveComponent* AThalassaVessel::GetMovementBaseComponent() const
+{
+	return HullCollision;
+}
+
+bool AThalassaVessel::IsInCompartment(const FVector& WorldLocation) const
+{
+	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
+	if (ThalassaVesselLayout::AirlockChamber.IsInsideOrOn(Local))
+	{
+		return true;
+	}
+	for (const FBox& Compartment : ThalassaVesselLayout::DryCompartments)
+	{
+		if (Compartment.IsInsideOrOn(Local))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool AThalassaVessel::IsWaterAt(const FVector& WorldLocation) const
+{
+	if (!IsInCompartment(WorldLocation))
+	{
+		return true;
+	}
+
+	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
+	return ThalassaVesselLayout::AirlockChamber.IsInsideOrOn(Local)
+		&& Local.Z < AirlockWaterLevel * ThalassaVesselLayout::AirlockCeilingCm;
+}
+
+bool AThalassaVessel::IsDoorwayOccupied(float DoorY) const
+{
+	for (TActorIterator<AThalassaCharacter> It(GetWorld()); It; ++It)
+	{
+		const FVector Local = GetActorTransform().InverseTransformPosition(It->GetActorLocation());
+		if (FMath::Abs(Local.Y - DoorY) < ThalassaVesselLayout::DoorClearanceCm && FMath::Abs(Local.X) < 130.f)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool AThalassaVessel::TryCycleAirlock(const FVector& WorldLocation)
+{
+	using namespace ThalassaVesselLayout;
+
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
+	if (FVector::DistSquared(Local, AirlockPanelLocation) > FMath::Square(AirlockPanelRadius))
+	{
+		return false;
+	}
+
+	// The interlock: a cycle only starts from a fully open state, and never shuts a door on someone.
+	if (AirlockState == EAirlockState::InnerOpen)
+	{
+		bAirlockDoorwayBlocked = IsDoorwayOccupied(DoorInnerY);
+		if (!bAirlockDoorwayBlocked)
+		{
+			AirlockState = EAirlockState::Flooding;
+			return true;
+		}
+	}
+	else if (AirlockState == EAirlockState::OuterOpen)
+	{
+		bAirlockDoorwayBlocked = IsDoorwayOccupied(DoorOuterY);
+		if (!bAirlockDoorwayBlocked)
+		{
+			AirlockState = EAirlockState::Draining;
+			return true;
+		}
+	}
+	return false;
+}
+
+void AThalassaVessel::TickAirlockServer(float DeltaSeconds)
+{
+	using namespace ThalassaVesselLayout;
+
+	// A refused press only explains itself while it is still true.
+	if (bAirlockDoorwayBlocked)
+	{
+		const float DoorY = AirlockState == EAirlockState::InnerOpen ? DoorInnerY : DoorOuterY;
+		bAirlockDoorwayBlocked = IsDoorwayOccupied(DoorY);
+	}
+
+	// The water only moves once the door that was open has fully closed.
+	const float WaterStep = DeltaSeconds / AirlockFloodSeconds;
+	if (AirlockState == EAirlockState::Flooding && AirlockInnerDoorOpen <= 0.f)
+	{
+		AirlockWaterLevel = FMath::Min(AirlockWaterLevel + WaterStep, 1.f);
+		if (AirlockWaterLevel >= 1.f)
+		{
+			AirlockState = EAirlockState::OuterOpen;
+		}
+	}
+	else if (AirlockState == EAirlockState::Draining && AirlockOuterDoorOpen <= 0.f)
+	{
+		AirlockWaterLevel = FMath::Max(AirlockWaterLevel - WaterStep, 0.f);
+		if (AirlockWaterLevel <= 0.f)
+		{
+			AirlockState = EAirlockState::InnerOpen;
+		}
+	}
+}
+
+void AThalassaVessel::TickAirlockVisuals(float DeltaSeconds)
+{
+	using namespace ThalassaVesselLayout;
+
+	// Doors animate locally from the replicated state, with collision, on server and clients alike.
+	const float DoorStep = DeltaSeconds / DoorSeconds;
+	const auto MoveDoor = [DoorStep](UStaticMeshComponent* Door, float& Open, bool bWantOpen, float DoorY)
+	{
+		const float Target = bWantOpen ? 1.f : 0.f;
+		if (Open != Target)
+		{
+			Open = FMath::FInterpConstantTo(Open, Target, 1.f, DoorStep);
+		}
+		Door->SetRelativeLocation(FVector(0.f, DoorY, 125.f + Open * DoorOpenRaiseCm));
+
+		// A door stops being solid as soon as it starts opening. Clients hear about it late, so their
+		// door is always lower than the server's. If it were solid, they would bump into a door the
+		// server says is not there, and be corrected. A door that shuts is solid again immediately.
+		Door->SetCollisionEnabled(bWantOpen ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+	};
+	MoveDoor(AirlockInnerDoor, AirlockInnerDoorOpen, AirlockState == EAirlockState::InnerOpen, DoorInnerY);
+	MoveDoor(AirlockOuterDoor, AirlockOuterDoorOpen, AirlockState == EAirlockState::OuterOpen, DoorOuterY);
+
+	AirlockWater->SetVisibility(AirlockWaterLevel > 0.f);
+	AirlockWater->SetRelativeLocation(FVector(0.f, 337.f, AirlockWaterLevel * AirlockCeilingCm));
 }
 
 void AThalassaVessel::UpdateConsoleText(float DeltaSeconds)
