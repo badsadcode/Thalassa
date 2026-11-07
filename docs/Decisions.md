@@ -56,6 +56,11 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 ## Planned, not started
 
+**Internet play (owner's direction).** Friends must not have to install anything to join. The owner is behind CGNAT, with no public address, so hosting needs NAT traversal or a relay.
+
+- **Now, for testing:** the host runs a UDP tunnel such as playit.gg to port 7777, and friends type its address and port into Join.bat. Not yet tried.
+- **For the real game:** Epic Online Services peer-to-peer, with its free relays as fallback. This needs the owner's free Epic developer account and a product in the Developer Portal. Whether it works from behind CGNAT must be proven by someone outside the network joining.
+
 **Helm (owner's direction, for later).** The current keys, which steer from anywhere, are only for testing.
 
 - Steering happens from the helm station, by whoever is sitting there, and depends on ship systems working at least somewhat.
