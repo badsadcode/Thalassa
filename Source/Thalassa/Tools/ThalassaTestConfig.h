@@ -38,6 +38,12 @@ namespace ThalassaTestConfig
 	/** -ThalassaSurveySlot=name: save and load the sonar chart in this slot during a test. */
 	bool GetSurveySaveSlot(FString& OutSlot);
 
+	/** -ThalassaHelmTest: the timed test runs with the ship under helm control instead of the script. */
+	bool IsHelmTest();
+
+	/** -ThalassaHelmBot: the local player walks to the helm, sits, and drives a scripted course. */
+	bool IsHelmBot();
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

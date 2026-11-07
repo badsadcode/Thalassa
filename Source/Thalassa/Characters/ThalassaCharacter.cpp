@@ -11,6 +11,8 @@
 #include "GameFramework/PlayerState.h"
 #include "Tools/ThalassaTestConfig.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Core/ThalassaPlayerController.h"
+#include "Vessel/ThalassaHelmComponent.h"
 #include "Vessel/ThalassaVessel.h"
 
 AThalassaCharacter::AThalassaCharacter(const FObjectInitializer& ObjectInitializer)
@@ -87,7 +89,11 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 
 	if (IsLocallyControlled())
 	{
-		if (ThalassaTestConfig::IsDiverBot())
+		if (ThalassaTestConfig::IsHelmBot())
+		{
+			TickHelmBot(DeltaSeconds);
+		}
+		else if (ThalassaTestConfig::IsDiverBot())
 		{
 			TickDiverBot(DeltaSeconds);
 		}
@@ -95,10 +101,153 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 		{
 			TickWalkerBot(DeltaSeconds);
 		}
-		if (!ThalassaTestConfig::IsCrewNudgeDisabled())
+		if (IsAtHelm())
+		{
+			HoldHelmPosition();
+		}
+		else if (!ThalassaTestConfig::IsCrewNudgeDisabled())
 		{
 			ApplyCrewNudge();
 		}
+	}
+}
+
+bool AThalassaCharacter::IsAtHelm() const
+{
+	return BoundVessel && BoundVessel->GetHelm() && BoundVessel->GetHelm()->IsSeated(this);
+}
+
+void AThalassaCharacter::HoldHelmPosition()
+{
+	// Walked there, like any other move, so it is predicted and needs no correction. A real seat and
+	// a sitting animation can replace this later.
+	const FVector Offset = BoundVessel->GetHelm()->GetSeatWorldLocation() - GetActorLocation();
+	const FVector Flat = FVector::VectorPlaneProject(Offset, BoundVessel->GetActorUpVector());
+	const float Distance = static_cast<float>(Flat.Size());
+	if (Distance > 8.f)
+	{
+		AddMovementInput(Flat / Distance, FMath::Clamp(Distance / 60.f, 0.2f, 1.f));
+	}
+}
+
+void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
+{
+	if (!BoundVessel || !BoundVessel->GetHelm() || BoundVessel->GetProfileState() != EVesselProfileState::Running)
+	{
+		return;
+	}
+	AThalassaPlayerController* Helmsman = Cast<AThalassaPlayerController>(GetController());
+	if (!Helmsman)
+	{
+		return;
+	}
+
+	const FTransform Ship = BoundVessel->GetActorTransform();
+	const UThalassaHelmComponent* Helm = BoundVessel->GetHelm();
+
+	if (BotHelmSeconds < 0.f)
+	{
+		// Walk forward along the corridors to the bridge, then up to the helm.
+		static const FVector Route[] =
+		{
+			FVector(-1000.f, -1500.f, 90.f), FVector(2000.f, -1500.f, 90.f), FVector(2800.f, -1500.f, 90.f), FVector(2800.f, -300.f, 90.f),
+			FVector(4500.f, -300.f, 90.f), FVector(9000.f, -300.f, 90.f), FVector(10300.f, -300.f, 90.f), FVector(12000.f, -300.f, 40.f),
+			FVector(13000.f, 0.f, 90.f), BoundVessel->GetHelmSeatLocal(),
+		};
+		const int32 RouteLength = UE_ARRAY_COUNT(Route);
+		const FVector Here = Ship.InverseTransformPosition(GetActorLocation());
+
+		if (Helm->IsSeated(this))
+		{
+			BotHelmSeconds = 0.f;
+			UE_LOG(LogTemp, Display, TEXT("HELMBOT seated at %s"), *Here.ToString());
+			return;
+		}
+
+		if (BotWaypoint >= RouteLength)
+		{
+			BotPressCooldown -= DeltaSeconds;
+			if (BotPressCooldown <= 0.f)
+			{
+				BotPressCooldown = 2.f;
+				Interact();
+			}
+			return;
+		}
+
+		const FVector Offset = Route[BotWaypoint] - Here;
+		if (FVector2D(Offset.X, Offset.Y).SizeSquared() < FMath::Square(BotWaypoint == RouteLength - 1 ? 40.f : 80.f))
+		{
+			++BotWaypoint;
+			BotSecondsOnWaypoint = 0.f;
+			return;
+		}
+		BotSecondsOnWaypoint += DeltaSeconds;
+		if (BotSecondsOnWaypoint > 40.f)
+		{
+			++BotStuckCount;
+			UE_LOG(LogTemp, Display, TEXT("WALKERSTUCK helm route %d at %s"), BotWaypoint, *Here.ToString());
+			++BotWaypoint;
+			BotSecondsOnWaypoint = 0.f;
+		}
+		AddMovementInput(Ship.TransformVectorNoScale(FVector(Offset.X, Offset.Y, 0.f).GetSafeNormal()));
+		return;
+	}
+
+	// At the helm: a scripted course through both modes. Seconds after sitting down.
+	enum class EPress : uint8 { None, Mode, AllStop, Stand };
+	struct FCue { float At; float Throttle; float Turn; float Dive; EPress Press; };
+	static const FCue Cues[] =
+	{
+		{ 2.f,   0.f,  0.f,  0.f, EPress::Mode },    // To set-and-go.
+		{ 3.f,   1.f,  0.f,  0.f, EPress::None },    // Push the throttle up...
+		{ 5.5f,  0.f,  0.f,  0.f, EPress::None },    // ...to full, and leave it.
+		{ 25.f,  0.f,  1.f,  0.f, EPress::None },    // Turn to starboard.
+		{ 37.f,  0.f,  0.f,  0.f, EPress::None },
+		{ 40.f,  0.f,  0.f, -1.f, EPress::None },    // Planes to dive...
+		{ 42.f,  0.f,  0.f,  0.f, EPress::None },
+		{ 50.f,  0.f,  0.f,  1.f, EPress::None },    // ...and back to level.
+		{ 52.f,  0.f,  0.f,  0.f, EPress::None },
+		{ 55.f,  0.f, -1.f,  0.f, EPress::None },    // Turn to port.
+		{ 65.f,  0.f,  0.f,  0.f, EPress::None },
+		{ 70.f,  0.f,  0.f,  0.f, EPress::AllStop },
+		{ 78.f,  0.f,  0.f,  0.f, EPress::Mode },    // To precise.
+		{ 80.f,  1.f,  1.f,  0.f, EPress::None },    // Hold ahead and starboard...
+		{ 95.f,  0.f,  0.f,  0.f, EPress::None },    // ...and let go.
+		{ 100.f, 0.f,  0.f,  0.f, EPress::Stand },
+	};
+	const int32 CueCount = UE_ARRAY_COUNT(Cues);
+
+	BotHelmSeconds += DeltaSeconds;
+	while (BotHelmCue < CueCount && BotHelmSeconds >= Cues[BotHelmCue].At)
+	{
+		const FCue& Cue = Cues[BotHelmCue++];
+		Helmsman->SetHelmInput(Cue.Throttle, Cue.Turn, Cue.Dive);
+		if (Cue.Press == EPress::Mode)
+		{
+			Helmsman->RequestHelmMode();
+		}
+		else if (Cue.Press == EPress::AllStop)
+		{
+			Helmsman->RequestHelmAllStop();
+		}
+		else if (Cue.Press == EPress::Stand)
+		{
+			Interact();
+		}
+		UE_LOG(LogTemp, Display, TEXT("HELMBOT cue %d at %.1f s"), BotHelmCue - 1, BotHelmSeconds);
+	}
+
+	// What this client sees of the helm and the ship, once a second, to compare with the host.
+	BotHelmLogTimer -= DeltaSeconds;
+	if (BotHelmLogTimer <= 0.f)
+	{
+		BotHelmLogTimer = 1.f;
+		const FHelmLevers& Levers = Helm->GetLevers();
+		UE_LOG(LogTemp, Display, TEXT("HELMBOT t %.1f seated %d mode %d throttle %.2f rudder %.2f planes %.2f speed %.2f heading %.1f pitch %.1f depth %.1f"),
+			BotHelmSeconds, Helm->IsSeated(this) ? 1 : 0, static_cast<int32>(Helm->GetMode()), Levers.Throttle, Levers.Rudder, Levers.Planes,
+			BoundVessel->GetForwardSpeedMetersPerSecond(), FRotator::ClampAxis(BoundVessel->GetActorRotation().Yaw),
+			BoundVessel->GetActorRotation().Pitch, BoundVessel->GetDepthMeters());
 	}
 }
 
@@ -156,6 +305,10 @@ void AThalassaCharacter::ServerInteract_Implementation()
 {
 	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
 	{
+		if (Vessel->GetHelm() && Vessel->GetHelm()->TrySitOrStand(this))
+		{
+			return;
+		}
 		if (!Vessel->TryPressBeep(GetActorLocation()))
 		{
 			Vessel->TryCycleAirlock(GetActorLocation());

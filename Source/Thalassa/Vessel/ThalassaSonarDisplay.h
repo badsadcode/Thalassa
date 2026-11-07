@@ -1,13 +1,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/StaticMeshComponent.h"
+#include "Vessel/ThalassaConsoleScreen.h"
 #include "ThalassaSonarDisplay.generated.h"
 
 class AThalassaVessel;
 class UCanvas;
-class UCanvasRenderTarget2D;
-class UMaterialInstanceDynamic;
 class UThalassaSonarPingComponent;
 
 /**
@@ -29,35 +27,22 @@ namespace ThalassaSonarDisplay
 	void Draw(UCanvas* Canvas, const FVector2D& TopLeft, float Size, const AThalassaVessel& Vessel);
 }
 
-/**
- * The sonar chart on a screen in the world. Each process draws its own copy into a render target from
- * the replicated survey, and plays the ping from the screen. Nothing here is replicated.
- */
+/** The sonar chart on a screen in the world, and the ping heard from it. */
 UCLASS()
-class THALASSA_API UThalassaSonarScreenComponent : public UStaticMeshComponent
+class THALASSA_API UThalassaSonarScreenComponent : public UThalassaConsoleScreenComponent
 {
 	GENERATED_BODY()
 
 public:
-	UThalassaSonarScreenComponent();
-
-	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	/** Where the ping is heard from. Set by the vessel when it builds the screen. */
 	UPROPERTY()
 	TObjectPtr<UThalassaSonarPingComponent> PingSound;
 
+protected:
+	virtual void DrawContent(UCanvas* Canvas, float Size, const AThalassaVessel& Vessel) override;
+
 private:
-	UFUNCTION()
-	void DrawScreen(UCanvas* Canvas, int32 Width, int32 Height);
-
-	UPROPERTY(Transient)
-	TObjectPtr<UCanvasRenderTarget2D> RenderTarget;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> ScreenMaterial;
-
 	int64 LastPingNumber = -1;
-	float RedrawTimer = 0.f;
 };

@@ -2,17 +2,11 @@
 
 #include "CanvasItem.h"
 #include "Engine/Canvas.h"
-#include "Engine/CanvasRenderTarget2D.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
-#include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
-#include "Materials/MaterialInstanceDynamic.h"
-#include "Materials/MaterialInterface.h"
-#include "Misc/App.h"
 #include "TextureResource.h"
-#include "UObject/ConstructorHelpers.h"
 #include "Vessel/ThalassaSonarComponent.h"
 #include "Vessel/ThalassaSonarPingComponent.h"
 #include "Vessel/ThalassaVessel.h"
@@ -26,47 +20,7 @@ namespace ThalassaSonarDisplay
 	// The ping's ring spreads at the speed of sound in sea water, so it crosses the view in about half a second.
 	constexpr float SoundSpeedMS = 1500.f;
 
-	const FLinearColor Cyan(0.35f, 0.84f, 0.83f);
-	const FLinearColor Amber(0.91f, 0.73f, 0.45f);
-
-	/** Canvas lines ignore alpha, so faint lines are drawn in a darker colour instead. */
-	FLinearColor Dim(const FLinearColor& Color, float Strength)
-	{
-		return FLinearColor(Color.R * Strength, Color.G * Strength, Color.B * Strength, 1.f);
-	}
-
-	void Line(UCanvas* Canvas, const FVector2D& A, const FVector2D& B, const FLinearColor& Color, float Thickness)
-	{
-		FCanvasLineItem Item(A, B);
-		Item.SetColor(Color);
-		Item.LineThickness = Thickness;
-		Canvas->DrawItem(Item);
-	}
-
-	/** A circle, leaving out any segment that would stray outside the chart's square. */
-	void Ring(UCanvas* Canvas, const FVector2D& Center, float Radius, const FBox2D& Clip, const FLinearColor& Color, float Thickness)
-	{
-		constexpr int32 Segments = 96;
-		FVector2D Previous = Center + FVector2D(Radius, 0.f);
-		for (int32 Index = 1; Index <= Segments; ++Index)
-		{
-			const float Angle = 2.f * PI * Index / Segments;
-			const FVector2D Next = Center + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Radius;
-			if (Clip.IsInside(Previous) && Clip.IsInside(Next))
-			{
-				Line(Canvas, Previous, Next, Color, Thickness);
-			}
-			Previous = Next;
-		}
-	}
-
-	void Text(UCanvas* Canvas, const FString& String, const FVector2D& Position, const FLinearColor& Color, float Scale)
-	{
-		FCanvasTextItem Item(Position, FText::FromString(String), GEngine->GetSmallFont(), Color);
-		Item.Scale = FVector2D(Scale);
-		Item.EnableShadow(FLinearColor::Black);
-		Canvas->DrawItem(Item);
-	}
+	using namespace ThalassaScreenDraw;
 
 	float GetPingAge(const AThalassaVessel& Vessel)
 	{
@@ -145,64 +99,12 @@ namespace ThalassaSonarDisplay
 	}
 }
 
-UThalassaSonarScreenComponent::UThalassaSonarScreenComponent()
-{
-	PrimaryComponentTick.bCanEverTick = true;
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaneMesh(TEXT("/Engine/BasicShapes/Plane.Plane"));
-	// An unlit material with a texture parameter, shipped with the engine for 3D widgets. It is enough for a screen.
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> ScreenBase(TEXT("/Engine/EngineMaterials/Widget3DPassThrough_Opaque_OneSided.Widget3DPassThrough_Opaque_OneSided"));
-
-	SetMobility(EComponentMobility::Movable);
-	SetStaticMesh(PlaneMesh.Object);
-	SetMaterial(0, ScreenBase.Object);
-	SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	SetCastShadow(false);
-}
-
-void UThalassaSonarScreenComponent::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (GetNetMode() == NM_DedicatedServer)
-	{
-		SetComponentTickEnabled(false);
-		return;
-	}
-
-	// Tests run without a renderer; they still get the ping, but there is nothing to draw on.
-	if (!FApp::CanEverRender())
-	{
-		return;
-	}
-
-	constexpr int32 Resolution = 512;
-	constexpr float ScreenBrightness = 0.12f;
-	RenderTarget = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(this, UCanvasRenderTarget2D::StaticClass(), Resolution, Resolution);
-	if (!RenderTarget)
-	{
-		return;
-	}
-	RenderTarget->ClearColor = FLinearColor(0.01f, 0.02f, 0.03f);
-	RenderTarget->OnCanvasRenderTargetUpdate.AddDynamic(this, &UThalassaSonarScreenComponent::DrawScreen);
-
-	ScreenMaterial = CreateAndSetMaterialInstanceDynamic(0);
-	if (ScreenMaterial)
-	{
-		ScreenMaterial->SetTextureParameterValue(TEXT("SlateUI"), RenderTarget);
-		// The material is unlit, and the dimly lit bridge makes the camera's exposure rise, so a screen at
-		// full strength glows white. This keeps it a lit display rather than a lamp.
-		ScreenMaterial->SetVectorParameterValue(TEXT("TintColorAndOpacity"), FLinearColor(ScreenBrightness, ScreenBrightness, ScreenBrightness, 1.f));
-	}
-	RenderTarget->UpdateResource();
-}
-
 void UThalassaSonarScreenComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	const AThalassaVessel* Vessel = Cast<AThalassaVessel>(GetOwner());
-	if (!Vessel)
+	const AThalassaVessel* Vessel = GetVessel();
+	if (!Vessel || GetNetMode() == NM_DedicatedServer)
 	{
 		return;
 	}
@@ -218,20 +120,9 @@ void UThalassaSonarScreenComponent::TickComponent(float DeltaTime, ELevelTick Ti
 			PingSound->Ping();
 		}
 	}
-
-	// Redraw only while someone can see the screen. 30 times a second keeps the ping's ring smooth.
-	RedrawTimer -= DeltaTime;
-	if (RenderTarget && RedrawTimer <= 0.f && WasRecentlyRendered(0.5f))
-	{
-		RedrawTimer = 1.f / 30.f;
-		RenderTarget->UpdateResource();
-	}
 }
 
-void UThalassaSonarScreenComponent::DrawScreen(UCanvas* Canvas, int32 Width, int32 Height)
+void UThalassaSonarScreenComponent::DrawContent(UCanvas* Canvas, float Size, const AThalassaVessel& Vessel)
 {
-	if (const AThalassaVessel* Vessel = Cast<AThalassaVessel>(GetOwner()))
-	{
-		ThalassaSonarDisplay::Draw(Canvas, FVector2D::ZeroVector, static_cast<float>(FMath::Min(Width, Height)), *Vessel);
-	}
+	ThalassaSonarDisplay::Draw(Canvas, FVector2D::ZeroVector, Size, Vessel);
 }

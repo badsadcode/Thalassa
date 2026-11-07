@@ -1,6 +1,6 @@
 # Handoff: THALASSA, updated 2026-11-07
 
-Read this first in a new session. Then read `README.md`, `docs/Decisions.md`, `docs/MOVING_SHIP_SPIKE.md`, `docs/INTERIOR_RULES.md` and `docs/SONAR.md`.
+Read this first in a new session. Then read `README.md`, `docs/Decisions.md`, `docs/MOVING_SHIP_SPIKE.md`, `docs/INTERIOR_RULES.md`, `docs/SONAR.md` and `docs/HELM.md`.
 
 ## The project
 
@@ -19,6 +19,7 @@ All of it is tested headless with a real listen host and clients as separate pro
 - **Grey main deck,** the editor default: about 280 m, with a ring corridor, sunken mess, tiered bridge, engineering hall with stairs (hidden ramp) and a ladder (`MOVE_Flying` climbing zone), and the airlock on the hull. It is deliberately unpolished, because the owner said the art will replace it. `-ThalassaTestRig` gives the old three-room rig, and the motion tests use it by default.
 - **Sonar:** **N** toggles it, and **Tab** shows the chart. 48 beams, 25 m world-fixed cells, replicated, saved to `Saved/SaveGames/ShipSurvey.sav`. Host and client charts are identical, even with packet loss.
 - **Ladders on a moving ship (fixed):** anyone reaching a ladder while the ship moved was thrown astern, because the switch to climbing counted the ship's velocity twice. It was recorded as a two-player problem, but the ship's motion caused it. After the fix, four players all climbed, sometimes two at once. Deck runs at about 135 ms went from 122 corrections to 6, and no waypoints are stuck. See `INTERIOR_RULES.md` rule 10.
+- **Helm (first version):** E at the console by the bridge's forward window takes the helm. WASD, Space and C drive the ship, R switches between precise and set-and-go, and X is all stop. The throttle lever, the helm screen and the HUD all show the same replicated levers. The ship is heavy: about 30 seconds to near full speed, and a long coast. The old test keys (I/K, J/L, U/O) are gone. Tested with a scripted helmsman at about 26 ms and 240 ms. See `HELM.md`.
 - **Sonar station on the bridge:** a screen above the starboard middle console shows the same chart as **Tab**, with a ping every 2 s on the server's clock. The ping is synthesised in code, with no sound asset. The owner heard it in the editor on 2026-11-07. Automated runs are silent (`-nosound`).
 - **Packaging:** `Scripts/build/package-windows.ps1` writes to `D:\ThalassaBuilds\Windows`, with `Host.bat`, `Join.bat` and a README. Repackaged on 2026-11-07 with the sonar screen and the ladder fix. Tested as host plus client on one PC: a deck run with the sonar on had identical charts, no corrections and no stuck waypoints, and a frame showed the bridge screen working.
 
@@ -33,19 +34,19 @@ All of it is tested headless with a real listen host and clients as separate pro
 All of this is recorded in `Decisions.md`.
 
 - **Internet play:** playit.gg UDP tunnel to port 7777 for testing (untested), Epic Online Services peer-to-peer for the real game. Friends must never install anything. EOS needs the owner's Epic developer account first.
-- **Helm:** steering only from the helm seat, depending on ship systems, with a feel of weight and power. A precise hold-to-move mode, a set-and-go throttle mode, and a physical lever, monitor and HUD all showing the same state.
+- **Helm, the rest of it:** steering that depends on ship systems, a real seat, a visible rudder and planes, and tuning by someone actually playing. The first version is built: see `HELM.md`.
 - **Layout:** not a cigar. Looping corridors, asymmetry, so you get lost at first, stairs, ladders, and floors at different levels.
 - **Sonar look:** high-tech and polished: a visible sweep, contours, a hologram, fine point clouds. The current chart is a debug view. The data layer needs finer local resolution, maybe 1 to 2 m.
 - **Mysteries:** the Long Call and the Viator are never objectives. Rare sounds need a stable signature identity in the hydrophone archive.
 
 ## Suggested next steps
 
-The helm.
+Have the owner try the helm and tune how it feels. Then a seat, the surface and seabed limits, or internet play with playit.gg.
 
 ## How to work here
 
 - **Build:** `powershell -NoProfile -File Scripts/build/build-editor.ps1`. **The Unreal editor must be closed**, or the build fails. Ask the owner to close it.
-- **Tests:** `python Scripts/build/run_motion_test.py --name X [--deck] [--eva] [--sonar] [--rtt 100 --jitter 10 --loss 1] [--clients 3] [--exe <packaged exe>]`. The full set is `run_motion_matrix.py`. Results go to `%TEMP%\ThalassaMotionTests`, never the slow `H:` drive, because writing there stalls the game. Read **visible pops**, not raw correction size, which grows with ping.
+- **Tests:** `python Scripts/build/run_motion_test.py --name X [--deck] [--eva] [--sonar] [--rtt 100 --jitter 10 --loss 1] [--clients 3] [--helm] [--exe <packaged exe>]`. The full set is `run_motion_matrix.py`. Results go to `%TEMP%\ThalassaMotionTests`, never the slow `H:` drive, because writing there stalls the game. Read **visible pops**, not raw correction size, which grows with ping.
 - **See it:** `python Scripts/build/capture_screenshots.py <folder> name=yaw@x,y,z`, in ship coordinates. A name starting `sonar` opens the **Tab** view with the sonar on. A name starting `screen` switches the sonar on and leaves the view clear: `screen=90@11200,450,120` looks at the bridge screen. Always look at frames: headless tests missed a black interior and a hole in the hull.
 - **Map:** `Scripts/unreal/create_test_map.py` rebuilds `Content/TestMaps/L_ShipMotion` in place.
 - **Opening the project:** the owner uses the THALASSA desktop shortcut, which points straight at the 5.8 editor. Double-clicking the `.uproject` fails, because the registry has no 5.8 entry.

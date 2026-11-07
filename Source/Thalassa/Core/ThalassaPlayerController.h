@@ -20,6 +20,14 @@ class THALASSA_API AThalassaPlayerController : public APlayerController
 public:
 	bool IsStationViewExpanded() const { return bStationViewExpanded; }
 
+	/** True while this player's character is at the helm. */
+	bool IsAtHelm() const;
+
+	/** What the helmsman is pressing, each from -1 to 1. Sent to the server only when it changes. */
+	void SetHelmInput(float Throttle, float Turn, float Dive);
+	void RequestHelmMode();
+	void RequestHelmAllStop();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -35,9 +43,6 @@ private:
 	void OnJumpStop();
 	void OnInteract();
 	void OnToggleStationView();
-	void OnHelmThrottle(const FInputActionValue& Value);
-	void OnHelmTurn(const FInputActionValue& Value);
-	void OnHelmDive(const FInputActionValue& Value);
 	void OnStartProfile();
 	void OnToggleSonar();
 
@@ -45,7 +50,15 @@ private:
 	void ServerToggleSonar();
 
 	UFUNCTION(Server, Reliable)
-	void ServerSetHelm(float Throttle, float Turn, float Dive);
+	void ServerSetHelmInput(float Throttle, float Turn, float Dive);
+
+	UFUNCTION(Server, Reliable)
+	void ServerHelmMode();
+
+	UFUNCTION(Server, Reliable)
+	void ServerHelmAllStop();
+
+	virtual void PlayerTick(float DeltaTime) override;
 
 	UFUNCTION(Server, Reliable)
 	void ServerStartProfile();
@@ -56,8 +69,10 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UInputAction>> Actions;
 
-	float HelmThrottle = 0.f;
-	float HelmTurn = 0.f;
-	float HelmDive = 0.f;
+	// At the helm, the movement keys drive the ship instead of the character.
+	FVector2D MoveAxis = FVector2D::ZeroVector;
+	float VerticalAxis = 0.f;
+	FVector SentHelmInput = FVector::ZeroVector;
+	bool bWasAtHelm = false;
 	bool bStationViewExpanded = false;
 };

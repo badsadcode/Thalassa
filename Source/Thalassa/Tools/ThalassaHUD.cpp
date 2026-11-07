@@ -11,6 +11,7 @@
 #include "HAL/PlatformMisc.h"
 #include "Tools/ThalassaTestConfig.h"
 #include "UnrealClient.h"
+#include "Vessel/ThalassaHelmDisplay.h"
 #include "Vessel/ThalassaSonarDisplay.h"
 #include "Vessel/ThalassaVessel.h"
 
@@ -104,10 +105,20 @@ void AThalassaHUD::DrawHUD()
 		FString::Printf(TEXT("%s   airlock %s, water %.0f%%%s"), bSwimming ? TEXT("SWIMMING") : Movement->IsClimbingLadder() ? TEXT("ON LADDER") : TEXT("on foot"),
 			AirlockNames[static_cast<int32>(Vessel->GetAirlockState())], Vessel->GetAirlockWaterLevel() * 100.f,
 			Vessel->IsAirlockDoorwayBlocked() ? TEXT("   DOORWAY BLOCKED") : TEXT("")),
-		TEXT("WASD/mouse move   SPACE jump/up   C down   E use console or airlock   TAB station view"),
-		TEXT("I/K throttle   J/L turn   U/O dive   N sonar   P run motion test"),
+		TEXT("WASD/mouse move   SPACE jump/up   C down   E use helm, console or airlock   TAB station view"),
+		TEXT("N sonar   P run motion test"),
 	};
 	DrawLines(Diagnostics, 16.f, 16.f, FLinearColor(0.35f, 0.84f, 0.83f), 1.f);
+
+	if (Controller->IsAtHelm())
+	{
+		// The same picture as the helm's screen, and what the keys do while you are here.
+		const float Size = FMath::Min(Canvas->ClipX, Canvas->ClipY) * 0.42f;
+		const FVector2D TopLeft(40.f, Canvas->ClipY - Size - 70.f);
+		ThalassaHelmDisplay::Draw(Canvas, TopLeft, Size, *Vessel);
+		DrawText(TEXT("AT THE HELM   W/S throttle   A/D rudder   SPACE/C planes   R precise or set-and-go   X all stop   E stand up"),
+			FLinearColor(0.91f, 0.73f, 0.45f), TopLeft.X, TopLeft.Y + Size + 12.f, GEngine->GetSmallFont(), 1.3f);
+	}
 
 	if (Controller->IsStationViewExpanded())
 	{

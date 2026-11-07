@@ -299,6 +299,16 @@ FVesselLayout BuildMainDeckLayout()
 
 	B.Box(FVector(11900.f, -60.f, -60.f), FVector(12020.f, 60.f, 40.f), MachineColor);
 	B.Box(FVector(13400.f, -400.f, 0.f), FVector(13560.f, 400.f, 120.f), ConsoleColor);
+
+	// The helm: you stand at the middle of the console by the window. Its screen is to port, so the
+	// view ahead stays clear, and its throttle lever to starboard.
+	Layout.bHasHelm = true;
+	Layout.HelmSeatLocation = FVector(13330.f, 0.f, 90.f);
+	B.Box(FVector(13486.f, -330.f, 120.f), FVector(13500.f, -170.f, 260.f), ConsoleColor, true, false);
+	Layout.HelmScreenLocation = FVector(13484.f, -250.f, 190.f);
+	Layout.HelmScreenFacing = FVector(-1.f, 0.f, 0.f);
+	Layout.HelmScreenSizeCm = 130.f;
+	Layout.HelmLeverLocation = FVector(13450.f, 160.f, 120.f);
 	Layout.ConsoleLocation = FVector(13300.f, 0.f, 60.f);
 	Layout.ConsoleTextLocation = FVector(13396.f, 0.f, 90.f);
 
@@ -320,7 +330,7 @@ FVesselLayout BuildMainDeckLayout()
 	{
 		B.Light(Lamp, Amber);
 	}
-	for (const FVector& Lamp : TArray<FVector>{ FVector(10300.f, -300.f, 320.f), FVector(12000.f, 0.f, 320.f) })
+	for (const FVector& Lamp : TArray<FVector>{ FVector(10300.f, -300.f, 320.f), FVector(12000.f, 0.f, 320.f), FVector(13300.f, 0.f, 320.f) })
 	{
 		B.Light(Lamp, Cool);
 	}

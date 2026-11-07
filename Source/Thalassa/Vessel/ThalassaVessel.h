@@ -10,6 +10,8 @@ class UTextRenderComponent;
 class UThalassaSonarComponent;
 class UThalassaSonarScreenComponent;
 class UThalassaSonarPingComponent;
+class UThalassaHelmComponent;
+class UThalassaHelmScreenComponent;
 
 /** Authoritative vessel pose, published by the server and dead-reckoned by clients. */
 USTRUCT()
@@ -78,8 +80,12 @@ public:
 	/** Server: begin the scripted motion test. */
 	void StartProfile();
 
-	/** Server: apply manual helm input, each axis in [-1, 1]. Ignored during the scripted test. */
-	void SetHelmCommand(float Throttle, float Turn, float Dive);
+	/** The helm station: who is steering, and its levers. Null on ships without one. */
+	UThalassaHelmComponent* GetHelm() const { return Helm; }
+	bool HasHelm() const;
+
+	/** Where the helmsman stands, in ship coordinates. */
+	FVector GetHelmSeatLocal() const;
 
 	/** Server: if a character at this world location can reach the console, increment the counter. */
 	bool TryPressBeep(const FVector& WorldLocation);
@@ -117,12 +123,17 @@ public:
 	EVesselProfileState GetProfileState() const { return ProfileState; }
 	int32 GetBeepCount() const { return BeepCount; }
 	float GetSpeedMetersPerSecond() const { return static_cast<float>(Snapshot.Velocity.Size()) / 100.f; }
+
+	/** Speed along the ship's heading: negative when going astern. */
+	float GetForwardSpeedMetersPerSecond() const { return static_cast<float>(FVector::DotProduct(Snapshot.Velocity, GetActorForwardVector())) / 100.f; }
 	float GetDepthMeters() const { return static_cast<float>(-GetActorLocation().Z) / 100.f; }
 
 private:
 	void TickServer(float DeltaSeconds);
 	void TickClient(float DeltaSeconds);
 	void UpdateProfileTargets();
+	void TickHelmMotion(float DeltaSeconds);
+	void TickHelmVisuals(float DeltaSeconds);
 	void UpdateClockFromSnapshot();
 	void GetExtrapolatedPose(double Time, FVector& OutPosition, FQuat& OutRotation) const;
 	void UpdateConsoleText(float DeltaSeconds);
@@ -156,6 +167,22 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UThalassaSonarPingComponent> SonarPing;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaHelmComponent> Helm;
+
+	/** The helm's screen, and its throttle lever, which pivots at its foot. Absent on ships without a helm. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaHelmScreenComponent> HelmScreen;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<USceneComponent> HelmLeverPivot;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> HelmLever;
+
+	/** The lever as drawn, eased toward the replicated setting so it moves smoothly between updates. */
+	float ShownThrottle = 0.f;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> AirlockInnerDoor;

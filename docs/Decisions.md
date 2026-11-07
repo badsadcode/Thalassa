@@ -63,7 +63,7 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 - **Now, for testing:** the host runs a UDP tunnel such as playit.gg to port 7777, and friends type its address and port into Join.bat. Not yet tried.
 - **For the real game:** Epic Online Services peer-to-peer, with its free relays as fallback. This needs the owner's free Epic developer account and a product in the Developer Portal. Whether it works from behind CGNAT must be proven by someone outside the network joining.
 
-**Helm (owner's direction, for later).** The current keys, which steer from anywhere, are only for testing.
+**Helm (owner's direction).** A first version is built, following this: see `HELM.md`. The old test keys that steered from anywhere are gone.
 
 - Steering happens from the helm station, by whoever is sitting there, and depends on ship systems working at least somewhat.
 - Handling is somewhat realistic without being a submarine simulator. You feel the ship's weight and its power, and upgrades can make it feel more powerful.

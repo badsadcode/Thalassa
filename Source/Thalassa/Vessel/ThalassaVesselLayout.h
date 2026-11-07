@@ -45,6 +45,14 @@ struct FVesselLayout
 	FVector SonarScreenFacing = FVector::BackwardVector;
 	float SonarScreenSizeCm = 0.f;
 
+	/** The helm: where the helmsman stands, its screen, and the foot of its throttle lever. No seat means no helm. */
+	bool bHasHelm = false;
+	FVector HelmSeatLocation = FVector::ZeroVector;
+	FVector HelmScreenLocation = FVector::ZeroVector;
+	FVector HelmScreenFacing = FVector::BackwardVector;
+	float HelmScreenSizeCm = 0.f;
+	FVector HelmLeverLocation = FVector::ZeroVector;
+
 	/** Added to the airlock's own coordinates, which assume a corridor along Y = 0 and the sea to starboard. */
 	FVector AirlockOffset = FVector::ZeroVector;
 

@@ -3,6 +3,8 @@
 #include "Vessel/ThalassaSonarComponent.h"
 #include "Vessel/ThalassaSonarDisplay.h"
 #include "Vessel/ThalassaSonarPingComponent.h"
+#include "Vessel/ThalassaHelmComponent.h"
+#include "Vessel/ThalassaHelmDisplay.h"
 #include "Vessel/ThalassaVesselLayout.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
@@ -152,6 +154,21 @@ namespace ThalassaVesselLayout
 	const float AccelerationCmS2 = 200.f;
 	const float YawAccelerationDegS2 = 2.f;
 	const float AttitudeRateDegS = 2.f;
+
+	// The helm's motion model. The ship is heavy: thrust against water resistance, so it takes about half
+	// a minute to reach full speed and coasts a long way when the throttle comes off. Upgrades would
+	// change these numbers.
+	const float HelmAheadAccelMS2 = 0.5f;      // Full throttle, from rest.
+	const float HelmAsternAccelMS2 = 0.1f;     // Propellers are weaker going astern.
+	const float HelmLinearDrag = 0.01f;        // Per second: lets the ship come to rest eventually.
+	const float HelmQuadraticDrag = (HelmAheadAccelMS2 - HelmLinearDrag * 15.f) / (15.f * 15.f); // Top speed 15 m/s.
+	const float HelmMaxYawRateDegS = 4.f;
+	const float HelmYawAccelDegS2 = 1.f;
+	const float HelmFullSteerageMS = 6.f;      // The rudder needs water flowing past it to bite,
+	const float HelmMinSteerage = 0.15f;       // but a little turning is possible at rest.
+	const float HelmMaxPitchDeg = 12.f;
+	const float HelmLeverSwingDeg = 35.f;
+	const float HelmTestSeconds = 160.f;
 	const float PoseSmoothingRate = 6.f;      // 1/s, decay of client pose corrections
 	const float ClockSmoothingRate = 2.f;     // 1/s, how quickly the client follows snapshot timing
 	const double ClockSnapErrorSeconds = 0.25; // Beyond this (a stall), jump rather than drift back
@@ -294,15 +311,37 @@ AThalassaVessel::AThalassaVessel()
 	}
 
 	Sonar = CreateDefaultSubobject<UThalassaSonarComponent>(TEXT("Sonar"));
+	Helm = CreateDefaultSubobject<UThalassaHelmComponent>(TEXT("Helm"));
+
+	if (Layout.bHasHelm)
+	{
+		HelmScreen = CreateDefaultSubobject<UThalassaHelmScreenComponent>(TEXT("HelmScreen"));
+		HelmScreen->SetupAttachment(ShipRoot);
+		HelmScreen->SetRelativeLocation(Layout.HelmScreenLocation);
+		HelmScreen->SetRelativeRotation(UThalassaConsoleScreenComponent::FacingRotation(Layout.HelmScreenFacing));
+		HelmScreen->SetRelativeScale3D(FVector(Layout.HelmScreenSizeCm / 100.f));
+
+		HelmLeverPivot = CreateDefaultSubobject<USceneComponent>(TEXT("HelmLeverPivot"));
+		HelmLeverPivot->SetupAttachment(ShipRoot);
+		HelmLeverPivot->SetMobility(EComponentMobility::Movable);
+		HelmLeverPivot->SetRelativeLocation(Layout.HelmLeverLocation);
+
+		HelmLever = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HelmLever"));
+		HelmLever->SetupAttachment(HelmLeverPivot);
+		HelmLever->SetMobility(EComponentMobility::Movable);
+		HelmLever->SetStaticMesh(CubeMesh.Object);
+		HelmLever->SetMaterial(0, TintableMaterial.Object);
+		HelmLever->SetRelativeLocation(FVector(0.f, 0.f, 25.f));
+		HelmLever->SetRelativeScale3D(FVector(0.06f, 0.08f, 0.5f));
+		HelmLever->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 
 	if (Layout.SonarScreenSizeCm > 0.f)
 	{
-		// The engine's plane is 100 cm square and faces +Z, its texture running along +X and +Y. Turn it to
-		// face the room with the picture's top edge up: +X to the viewer's right, +Y downward.
 		SonarScreen = CreateDefaultSubobject<UThalassaSonarScreenComponent>(TEXT("SonarScreen"));
 		SonarScreen->SetupAttachment(ShipRoot);
 		SonarScreen->SetRelativeLocation(Layout.SonarScreenLocation);
-		SonarScreen->SetRelativeRotation(FRotationMatrix::MakeFromXZ(Layout.SonarScreenFacing ^ FVector::UpVector, Layout.SonarScreenFacing).Rotator());
+		SonarScreen->SetRelativeRotation(UThalassaConsoleScreenComponent::FacingRotation(Layout.SonarScreenFacing));
 		SonarScreen->SetRelativeScale3D(FVector(Layout.SonarScreenSizeCm / 100.f));
 
 		SonarPing = CreateDefaultSubobject<UThalassaSonarPingComponent>(TEXT("SonarPing"));
@@ -394,6 +433,13 @@ void AThalassaVessel::BeginPlay()
 				Material->SetVectorParameterValue(TEXT("Color"), DoorColor);
 			}
 		}
+		if (HelmLever)
+		{
+			if (UMaterialInstanceDynamic* Material = HelmLever->CreateAndSetMaterialInstanceDynamic(0))
+			{
+				Material->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.75f, 0.42f, 0.05f));
+			}
+		}
 		if (UMaterialInstanceDynamic* Material = AirlockWater->CreateAndSetMaterialInstanceDynamic(0))
 		{
 			Material->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.02f, 0.25f, 0.33f));
@@ -416,6 +462,7 @@ void AThalassaVessel::Tick(float DeltaSeconds)
 	}
 
 	TickAirlockVisuals(DeltaSeconds);
+	TickHelmVisuals(DeltaSeconds);
 	UpdateConsoleText(DeltaSeconds);
 }
 
@@ -428,16 +475,48 @@ void AThalassaVessel::StartProfile()
 	}
 }
 
-void AThalassaVessel::SetHelmCommand(float Throttle, float Turn, float Dive)
+bool AThalassaVessel::HasHelm() const
 {
-	if (!HasAuthority() || ProfileState == EVesselProfileState::Running)
+	return GetLayout().bHasHelm;
+}
+
+FVector AThalassaVessel::GetHelmSeatLocal() const
+{
+	return GetLayout().HelmSeatLocation;
+}
+
+void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
+{
+	using namespace ThalassaVesselLayout;
+
+	const FHelmLevers& Levers = Helm->GetLevers();
+	float Speed = SpeedCmS / 100.f;
+	const float Thrust = Levers.Throttle * (Levers.Throttle >= 0.f ? HelmAheadAccelMS2 : HelmAsternAccelMS2);
+	const float Drag = HelmQuadraticDrag * Speed * FMath::Abs(Speed) + HelmLinearDrag * Speed;
+	Speed += (Thrust - Drag) * DeltaSeconds;
+	if (Levers.Throttle == 0.f && FMath::Abs(Speed) < 0.02f)
+	{
+		Speed = 0.f;
+	}
+	SpeedCmS = Speed * 100.f;
+
+	// Going astern, the rudder turns the other way, as it does on a real ship.
+	const float Steerage = FMath::Clamp(FMath::Abs(Speed) / HelmFullSteerageMS, HelmMinSteerage, 1.f) * (Speed < -0.05f ? -1.f : 1.f);
+	TargetYawRate = Levers.Rudder * HelmMaxYawRateDegS * Steerage;
+	CurrentRate.Yaw = FMath::FInterpConstantTo(static_cast<float>(CurrentRate.Yaw), TargetYawRate, DeltaSeconds, HelmYawAccelDegS2);
+	TargetPitch = Levers.Planes * HelmMaxPitchDeg;
+	TargetRoll = 0.f;
+}
+
+void AThalassaVessel::TickHelmVisuals(float DeltaSeconds)
+{
+	if (!HelmLeverPivot || GetNetMode() == NM_DedicatedServer)
 	{
 		return;
 	}
-	TargetSpeedCmS = FMath::Clamp(Throttle, -1.f, 1.f) * 2500.f;
-	TargetYawRate = FMath::Clamp(Turn, -1.f, 1.f) * 8.f;
-	TargetPitch = FMath::Clamp(Dive, -1.f, 1.f) * -15.f;
-	TargetRoll = 0.f;
+	// Forward is ahead. A positive pitch would tip the lever's top toward the stern.
+	ShownThrottle = FMath::FInterpTo(ShownThrottle, Helm->GetLevers().Throttle, DeltaSeconds, 12.f);
+	HelmLeverPivot->SetRelativeRotation(FRotator(-ShownThrottle * ThalassaVesselLayout::HelmLeverSwingDeg, 0.f, 0.f));
 }
 
 void AThalassaVessel::UpdateProfileTargets()
@@ -471,13 +550,23 @@ void AThalassaVessel::TickServer(float DeltaSeconds)
 {
 	using namespace ThalassaVesselLayout;
 
-	if (ProfileState == EVesselProfileState::Running)
+	const bool bHelmTest = ThalassaTestConfig::IsHelmTest();
+	if (ProfileState == EVesselProfileState::Running && !bHelmTest)
 	{
+		// The scripted motion test: unchanged, so results stay comparable with earlier runs.
 		UpdateProfileTargets();
+		SpeedCmS = FMath::FInterpConstantTo(SpeedCmS, TargetSpeedCmS, DeltaSeconds, AccelerationCmS2);
+		CurrentRate.Yaw = FMath::FInterpConstantTo(static_cast<float>(CurrentRate.Yaw), TargetYawRate, DeltaSeconds, YawAccelerationDegS2);
 	}
-
-	SpeedCmS = FMath::FInterpConstantTo(SpeedCmS, TargetSpeedCmS, DeltaSeconds, AccelerationCmS2);
-	CurrentRate.Yaw = FMath::FInterpConstantTo(static_cast<float>(CurrentRate.Yaw), TargetYawRate, DeltaSeconds, YawAccelerationDegS2);
+	else
+	{
+		// The helm test is timed like the motion test, but someone at the helm drives the ship.
+		if (bHelmTest && ProfileState == EVesselProfileState::Running && GetWorld()->GetTimeSeconds() - ProfileStartTime > HelmTestSeconds)
+		{
+			ProfileState = EVesselProfileState::Finished;
+		}
+		TickHelmMotion(DeltaSeconds);
+	}
 
 	const float OldPitch = static_cast<float>(PoseRotation.Pitch);
 	const float OldRoll = static_cast<float>(PoseRotation.Roll);

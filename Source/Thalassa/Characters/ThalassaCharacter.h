@@ -37,6 +37,11 @@ private:
 
 	void TickWalkerBot(float DeltaSeconds);
 	void TickDiverBot(float DeltaSeconds);
+	void TickHelmBot(float DeltaSeconds);
+
+	/** At the helm, walk onto the helmsman's spot and stay there. */
+	void HoldHelmPosition();
+	bool IsAtHelm() const;
 	void ApplyCrewNudge();
 
 	/** Crew closer than this, centre to centre, are nudged apart. Capsules touch at 68 cm. */
@@ -64,4 +69,7 @@ private:
 	bool bTourStarted = false;
 	float BotJumpTimer = 6.f;
 	float BotSecondsOnWaypoint = 0.f;
+	float BotHelmSeconds = -1.f;
+	int32 BotHelmCue = 0;
+	float BotHelmLogTimer = 0.f;
 };

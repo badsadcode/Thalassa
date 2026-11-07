@@ -10,6 +10,8 @@
 #include "InputModifiers.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Tools/ThalassaTestConfig.h"
+#include "Vessel/ThalassaHelmComponent.h"
 #include "Vessel/ThalassaSonarComponent.h"
 #include "Vessel/ThalassaVessel.h"
 
@@ -68,36 +70,26 @@ void AThalassaPlayerController::SetupInputComponent()
 	UInputAction* StartProfile = MakeAction(TEXT("StartProfile"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(StartProfile, EKeys::P);
 
-	UInputAction* Throttle = MakeAction(TEXT("HelmThrottleAction"), EInputActionValueType::Axis1D);
-	MapAxisKey(Throttle, EKeys::I, false, false);
-	MapAxisKey(Throttle, EKeys::K, true, false);
+	UInputAction* HelmMode = MakeAction(TEXT("HelmMode"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(HelmMode, EKeys::R);
 
-	UInputAction* Turn = MakeAction(TEXT("HelmTurnAction"), EInputActionValueType::Axis1D);
-	MapAxisKey(Turn, EKeys::L, false, false);
-	MapAxisKey(Turn, EKeys::J, true, false);
-
-	UInputAction* Dive = MakeAction(TEXT("HelmDiveAction"), EInputActionValueType::Axis1D);
-	MapAxisKey(Dive, EKeys::U, false, false);
-	MapAxisKey(Dive, EKeys::O, true, false);
+	UInputAction* HelmAllStop = MakeAction(TEXT("HelmAllStop"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(HelmAllStop, EKeys::X);
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(Move, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnMove);
+	Input->BindAction(Move, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnMove); // Zero: let go.
 	Input->BindAction(Look, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnLook);
 	Input->BindAction(SwimVertical, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnSwimVertical);
+	Input->BindAction(SwimVertical, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnSwimVertical);
 	Input->BindAction(JumpAction, ETriggerEvent::Started, this, &AThalassaPlayerController::OnJumpStart);
 	Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnJumpStop);
 	Input->BindAction(InteractAction, ETriggerEvent::Started, this, &AThalassaPlayerController::OnInteract);
 	Input->BindAction(StationView, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleStationView);
 	Input->BindAction(StartProfile, ETriggerEvent::Started, this, &AThalassaPlayerController::OnStartProfile);
 	Input->BindAction(ToggleSonar, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleSonar);
-
-	// Each helm axis reports both changes and release (Completed delivers zero).
-	Input->BindAction(Throttle, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnHelmThrottle);
-	Input->BindAction(Throttle, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnHelmThrottle);
-	Input->BindAction(Turn, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnHelmTurn);
-	Input->BindAction(Turn, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnHelmTurn);
-	Input->BindAction(Dive, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnHelmDive);
-	Input->BindAction(Dive, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnHelmDive);
+	Input->BindAction(HelmMode, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmMode);
+	Input->BindAction(HelmAllStop, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmAllStop);
 }
 
 void AThalassaPlayerController::BeginPlay()
@@ -117,9 +109,15 @@ void AThalassaPlayerController::BeginPlay()
 
 void AThalassaPlayerController::OnMove(const FInputActionValue& Value)
 {
+	MoveAxis = Value.Get<FVector2D>();
+	if (IsAtHelm())
+	{
+		return; // PlayerTick sends it to the helm.
+	}
+
 	if (APawn* ControlledPawn = GetPawn())
 	{
-		const FVector2D Axis = Value.Get<FVector2D>();
+		const FVector2D Axis = MoveAxis;
 
 		const AThalassaCharacter* Crew = Cast<AThalassaCharacter>(ControlledPawn);
 
@@ -153,6 +151,11 @@ void AThalassaPlayerController::OnLook(const FInputActionValue& Value)
 
 void AThalassaPlayerController::OnSwimVertical(const FInputActionValue& Value)
 {
+	VerticalAxis = Value.Get<float>();
+	if (IsAtHelm())
+	{
+		return; // Space and C work the planes. PlayerTick sends them.
+	}
 	const AThalassaCharacter* Crew = Cast<AThalassaCharacter>(GetPawn());
 	if (Crew && Crew->GetThalassaMovement()->IsSwimmingInSea())
 	{
@@ -162,6 +165,10 @@ void AThalassaPlayerController::OnSwimVertical(const FInputActionValue& Value)
 
 void AThalassaPlayerController::OnJumpStart()
 {
+	if (IsAtHelm())
+	{
+		return;
+	}
 	if (ACharacter* ControlledCharacter = GetCharacter())
 	{
 		ControlledCharacter->Jump();
@@ -189,22 +196,58 @@ void AThalassaPlayerController::OnToggleStationView()
 	bStationViewExpanded = !bStationViewExpanded;
 }
 
-void AThalassaPlayerController::OnHelmThrottle(const FInputActionValue& Value)
+bool AThalassaPlayerController::IsAtHelm() const
 {
-	HelmThrottle = Value.Get<float>();
-	ServerSetHelm(HelmThrottle, HelmTurn, HelmDive);
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	return Vessel && Vessel->GetHelm() && Vessel->GetHelm()->IsSeated(GetPawn());
 }
 
-void AThalassaPlayerController::OnHelmTurn(const FInputActionValue& Value)
+void AThalassaPlayerController::PlayerTick(float DeltaTime)
 {
-	HelmTurn = Value.Get<float>();
-	ServerSetHelm(HelmThrottle, HelmTurn, HelmDive);
+	Super::PlayerTick(DeltaTime);
+
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	// Scripted helmsmen send their own input.
+	const bool bAtHelm = IsAtHelm();
+	if (bAtHelm && !ThalassaTestConfig::IsHelmBot())
+	{
+		SetHelmInput(MoveAxis.Y, MoveAxis.X, VerticalAxis);
+	}
+	else if (!bAtHelm && bWasAtHelm)
+	{
+		SentHelmInput = FVector::ZeroVector; // The server forgets it too when you stand up.
+	}
+	bWasAtHelm = bAtHelm;
 }
 
-void AThalassaPlayerController::OnHelmDive(const FInputActionValue& Value)
+void AThalassaPlayerController::SetHelmInput(float Throttle, float Turn, float Dive)
 {
-	HelmDive = Value.Get<float>();
-	ServerSetHelm(HelmThrottle, HelmTurn, HelmDive);
+	const FVector Wanted(Throttle, Turn, Dive);
+	if (!Wanted.Equals(SentHelmInput, 0.01f))
+	{
+		SentHelmInput = Wanted;
+		ServerSetHelmInput(Throttle, Turn, Dive);
+	}
+}
+
+void AThalassaPlayerController::RequestHelmMode()
+{
+	if (IsAtHelm())
+	{
+		ServerHelmMode();
+	}
+}
+
+void AThalassaPlayerController::RequestHelmAllStop()
+{
+	if (IsAtHelm())
+	{
+		ServerHelmAllStop();
+	}
 }
 
 void AThalassaPlayerController::OnStartProfile()
@@ -225,11 +268,30 @@ void AThalassaPlayerController::ServerToggleSonar_Implementation()
 	}
 }
 
-void AThalassaPlayerController::ServerSetHelm_Implementation(float Throttle, float Turn, float Dive)
+void AThalassaPlayerController::ServerSetHelmInput_Implementation(float Throttle, float Turn, float Dive)
 {
-	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	if (Vessel && Vessel->GetHelm())
 	{
-		Vessel->SetHelmCommand(Throttle, Turn, Dive);
+		Vessel->GetHelm()->SetInput(GetPawn(), Throttle, Turn, Dive);
+	}
+}
+
+void AThalassaPlayerController::ServerHelmMode_Implementation()
+{
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	if (Vessel && Vessel->GetHelm())
+	{
+		Vessel->GetHelm()->ToggleMode(GetPawn());
+	}
+}
+
+void AThalassaPlayerController::ServerHelmAllStop_Implementation()
+{
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	if (Vessel && Vessel->GetHelm())
+	{
+		Vessel->GetHelm()->AllStop(GetPawn());
 	}
 }
 
