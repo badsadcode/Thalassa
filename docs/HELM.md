@@ -12,7 +12,7 @@ Walk to the middle of the console by the bridge's forward window and press **E**
 | A / D | Rudder port / starboard |
 | Space / C | Planes: rise / dive |
 | R | Switch between precise and set-and-go |
-| X | All stop: throttle and planes to neutral |
+| X | Full stop: engines cut, and the ship brakes to a standstill and holds there |
 | E | Stand up |
 
 Mouse look still works. Only one person can be at the helm, and anyone pushed more than 3 m from it, or who disconnects, leaves it.
@@ -21,6 +21,8 @@ Mouse look still works. Only one person can be at the helm, and anyone pushed mo
 - **Set and go:** holding W or S moves the throttle up or down, and it stays where you leave it. Space and C do the same for the planes. The rudder always centres itself when you let go, in both modes.
 
 Switching mode never lurches the ship: the new mode starts from wherever the levers are.
+
+**Full stop** is X at the helm, or the red button at the starboard end of the helm console, which anyone within reach can press with E. Every lever goes to neutral, and the ship brakes at 1 m/s per second, about 15 seconds from top speed. Turning and pitch stop too, and the ship stays where it stopped. The button lights up, and the helm screen says FULL STOP. It lasts until the helmsman touches a control again. In a test at 14.4 m/s, the ship lost exactly 1 m/s each second until the helmsman took the controls back, and it then answered them.
 
 ## What everyone sees
 

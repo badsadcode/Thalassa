@@ -14,6 +14,14 @@ struct FHullBox
 	bool bCollision = true;
 };
 
+/** A camera on the outside of the hull, in ship coordinates. */
+struct FHullCamera
+{
+	FString Label;
+	FVector Location;
+	FRotator Rotation;
+};
+
 struct FInteriorLight
 {
 	FName Name;
@@ -52,6 +60,17 @@ struct FVesselLayout
 	FVector HelmScreenFacing = FVector::BackwardVector;
 	float HelmScreenSizeCm = 0.f;
 	FVector HelmLeverLocation = FVector::ZeroVector;
+	FVector FullStopButtonLocation = FVector::ZeroVector;
+
+	/** The camera station: where its operator stands, its two screens, and the cameras on the hull. */
+	bool bHasCameraStation = false;
+	FVector CameraSeatLocation = FVector::ZeroVector;
+	FVector CameraScreenLocation = FVector::ZeroVector;    // The selected camera, large.
+	FVector CameraGridLocation = FVector::ZeroVector;      // Every camera at once.
+	FVector CameraScreensFacing = FVector::BackwardVector;
+	float CameraScreenSizeCm = 0.f;
+	float CameraGridSizeCm = 0.f;
+	TArray<FHullCamera> HullCameras;
 
 	/** Added to the airlock's own coordinates, which assume a corridor along Y = 0 and the sea to starboard. */
 	FVector AirlockOffset = FVector::ZeroVector;

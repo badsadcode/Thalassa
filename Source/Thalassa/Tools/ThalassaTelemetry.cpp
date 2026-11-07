@@ -116,7 +116,7 @@ void UThalassaTelemetry::TrackLocalFrameStep(float DeltaTime)
 		// In the ship's frame a walker moves at walking speed. Anything well beyond that is a
 		// visible pop for this player, whatever caused it.
 		const UThalassaMovementComponent* Movement = Character->GetThalassaMovement();
-		const float Allowed = FMath::Max(Movement->MaxWalkSpeed, Movement->JumpZVelocity) * PopAllowanceFactor * DeltaTime;
+		const float Allowed = FMath::Max(Movement->GetMaxSpeed(), Movement->JumpZVelocity) * PopAllowanceFactor * DeltaTime; // GetMaxSpeed: sprinting is not a pop.
 		const float Excess = static_cast<float>(FVector::Dist(Local, LastLocalPosition)) - Allowed;
 		if (Excess > PopThresholdCm)
 		{

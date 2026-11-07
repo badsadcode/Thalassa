@@ -12,6 +12,7 @@
 #include "Tools/ThalassaTestConfig.h"
 #include "UnrealClient.h"
 #include "Vessel/ThalassaHelmDisplay.h"
+#include "Vessel/ThalassaCameraStation.h"
 #include "Vessel/ThalassaSonarDisplay.h"
 #include "Vessel/ThalassaVessel.h"
 
@@ -105,7 +106,7 @@ void AThalassaHUD::DrawHUD()
 		FString::Printf(TEXT("%s   airlock %s, water %.0f%%%s"), bSwimming ? TEXT("SWIMMING") : Movement->IsClimbingLadder() ? TEXT("ON LADDER") : TEXT("on foot"),
 			AirlockNames[static_cast<int32>(Vessel->GetAirlockState())], Vessel->GetAirlockWaterLevel() * 100.f,
 			Vessel->IsAirlockDoorwayBlocked() ? TEXT("   DOORWAY BLOCKED") : TEXT("")),
-		TEXT("WASD/mouse move   SPACE jump/up   C down   E use helm, console or airlock   TAB station view"),
+		TEXT("WASD/mouse move   SHIFT sprint   SPACE jump/up   C down   E use helm, console or airlock   TAB station view"),
 		TEXT("N sonar   P run motion test"),
 	};
 	DrawLines(Diagnostics, 16.f, 16.f, FLinearColor(0.35f, 0.84f, 0.83f), 1.f);
@@ -116,8 +117,27 @@ void AThalassaHUD::DrawHUD()
 		const float Size = FMath::Min(Canvas->ClipX, Canvas->ClipY) * 0.42f;
 		const FVector2D TopLeft(40.f, Canvas->ClipY - Size - 70.f);
 		ThalassaHelmDisplay::Draw(Canvas, TopLeft, Size, *Vessel);
-		DrawText(TEXT("AT THE HELM   W/S throttle   A/D rudder   SPACE/C planes   R precise or set-and-go   X all stop   E stand up"),
+		DrawText(TEXT("AT THE HELM   W/S throttle   A/D rudder   SPACE/C planes   R precise or set-and-go   X full stop   E stand up"),
 			FLinearColor(0.91f, 0.73f, 0.45f), TopLeft.X, TopLeft.Y + Size + 12.f, GEngine->GetSmallFont(), 1.3f);
+	}
+
+	UThalassaCameraStationComponent* Cameras = Vessel->GetCameraStation();
+	if (Controller->IsAtCameraStation() && Cameras)
+	{
+		Cameras->RequestFeeds();
+		if (Controller->IsStationViewExpanded())
+		{
+			// Expanded: the chosen camera fills the screen.
+			ThalassaCameraDisplay::DrawFeed(Canvas, FVector2D(0.f, 0.f), FVector2D(Canvas->ClipX, Canvas->ClipY - 40.f), *Cameras, Cameras->GetSelected(), false);
+		}
+		else
+		{
+			const FVector2D Size(Canvas->ClipX * 0.5f, Canvas->ClipY * 0.5f);
+			ThalassaCameraDisplay::DrawGrid(Canvas, FVector2D(Canvas->ClipX - Size.X - 30.f, Canvas->ClipY - Size.Y - 60.f), Size, *Cameras);
+		}
+		DrawText(TEXT("CAMERA STATION   A/D choose camera   TAB full screen   E stand up"),
+			FLinearColor(0.91f, 0.73f, 0.45f), 40.f, Canvas->ClipY - 32.f, GEngine->GetSmallFont(), 1.3f);
+		return;
 	}
 
 	if (Controller->IsStationViewExpanded())

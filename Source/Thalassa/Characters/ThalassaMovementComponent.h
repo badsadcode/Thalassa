@@ -4,6 +4,30 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ThalassaMovementComponent.generated.h"
 
+/** A saved move that remembers whether the player was sprinting, so replays and the server agree. */
+class FSavedMove_Thalassa : public FSavedMove_Character
+{
+public:
+	using Super = FSavedMove_Character;
+
+	virtual void Clear() override;
+	virtual uint8 GetCompressedFlags() const override;
+	virtual bool CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const override;
+	virtual void SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData) override;
+	virtual void PrepMoveFor(ACharacter* C) override;
+
+	bool bSavedWantsToSprint = false;
+};
+
+class FNetworkPredictionData_Client_Thalassa : public FNetworkPredictionData_Client_Character
+{
+public:
+	using Super = FNetworkPredictionData_Client_Character;
+
+	explicit FNetworkPredictionData_Client_Thalassa(const UCharacterMovementComponent& ClientMovement) : Super(ClientMovement) {}
+	virtual FSavedMovePtr AllocateNewMove() override;
+};
+
 /**
  * Character movement for a moving vessel. Stock based movement plus the measurements the
  * moving-ship spike needs, and an optional ship-relative gravity mode to compare against.
@@ -21,6 +45,21 @@ public:
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
 
 	virtual float GetMaxSpeed() const override;
+	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
+
+	/**
+	 * Sprinting. Part of every saved move, so the server runs the same speed the client predicted;
+	 * a sprint set any other way would be corrected on every step.
+	 */
+	void SetWantsToSprint(bool bSprint) { bWantsToSprint = bSprint; }
+	bool IsSprinting() const;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float SprintSpeed = 800.f;
+
+	static constexpr float LadderSpeedCm = 200.f;
+
+	bool bWantsToSprint = false;
 
 	/** Swimming uses MOVE_Flying: no gravity, full 3D input, and it needs no water volume to exist. */
 	bool IsSwimmingInSea() const;
@@ -47,6 +86,7 @@ public:
 
 protected:
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
+	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 
 private:
 	void LogCorrection(const FVector& NewLocation, const FMovementBaseInterfaceData* NewBase, uint8 ServerMovementMode) const;

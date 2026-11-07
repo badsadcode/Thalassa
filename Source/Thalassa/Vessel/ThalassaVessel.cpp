@@ -5,6 +5,8 @@
 #include "Vessel/ThalassaSonarPingComponent.h"
 #include "Vessel/ThalassaHelmComponent.h"
 #include "Vessel/ThalassaHelmDisplay.h"
+#include "Vessel/ThalassaCameraStation.h"
+#include "Components/SceneCaptureComponent2D.h"
 #include "Vessel/ThalassaVesselLayout.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
@@ -170,6 +172,11 @@ namespace ThalassaVesselLayout
 	const float HelmLeverSwingDeg = 35.f;
 	const float HelmTestSeconds = 160.f;
 
+	// Full stop brakes hard, with everything the ship has: about 15 seconds from top speed.
+	const float FullStopDecelMS2 = 1.f;
+	const FLinearColor FullStopIdleColor(0.25f, 0.02f, 0.02f);
+	const FLinearColor FullStopLitColor(1.f, 0.05f, 0.03f);
+
 	// The sea's surface is world Z = 0. Surfaced, the ship floats with its origin this far below it.
 	const float SurfacedDepthCm = 1500.f;
 	const float CollisionPullBackCm = 5.f;
@@ -316,6 +323,45 @@ AThalassaVessel::AThalassaVessel()
 
 	Sonar = CreateDefaultSubobject<UThalassaSonarComponent>(TEXT("Sonar"));
 	Helm = CreateDefaultSubobject<UThalassaHelmComponent>(TEXT("Helm"));
+	Helm->SeatLocal = Layout.HelmSeatLocation;
+	Helm->bAvailable = Layout.bHasHelm;
+
+	if (Layout.bHasCameraStation)
+	{
+		CameraStation = CreateDefaultSubobject<UThalassaCameraStationComponent>(TEXT("CameraStation"));
+		CameraStation->SeatLocal = Layout.CameraSeatLocation;
+		CameraStation->bAvailable = true;
+
+		const auto MakeCameraScreen = [&](const TCHAR* Name, const FVector& Location, float SizeCm, bool bShowsAll)
+		{
+			UThalassaCameraScreenComponent* Screen = CreateDefaultSubobject<UThalassaCameraScreenComponent>(Name);
+			Screen->SetupAttachment(ShipRoot);
+			Screen->SetRelativeLocation(Location);
+			Screen->SetRelativeRotation(UThalassaConsoleScreenComponent::FacingRotation(Layout.CameraScreensFacing));
+			Screen->SetRelativeScale3D(FVector(SizeCm / 100.f));
+			Screen->bShowsAll = bShowsAll;
+			return Screen;
+		};
+		CameraScreen = MakeCameraScreen(TEXT("CameraScreen"), Layout.CameraScreenLocation, Layout.CameraScreenSizeCm, false);
+		CameraGrid = MakeCameraScreen(TEXT("CameraGrid"), Layout.CameraGridLocation, Layout.CameraGridSizeCm, true);
+
+		int32 Index = 0;
+		for (const FHullCamera& Spec : Layout.HullCameras)
+		{
+			USceneCaptureComponent2D* Camera = CreateDefaultSubobject<USceneCaptureComponent2D>(FName(*FString::Printf(TEXT("HullCamera%d"), Index++)));
+			Camera->SetupAttachment(ShipRoot);
+			Camera->SetRelativeLocationAndRotation(Spec.Location, Spec.Rotation);
+			Camera->FOVAngle = 80.f;
+			// Captured on demand by the station, only while someone can see a screen.
+			Camera->bCaptureEveryFrame = false;
+			Camera->bCaptureOnMovement = false;
+			Camera->bAlwaysPersistRenderingState = true; // Lets exposure adapt between captures.
+			Camera->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+			HullCameras.Add(Camera);
+			CameraStation->Cameras.Add(Camera);
+			CameraStation->Labels.Add(Spec.Label);
+		}
+	}
 
 	if (Layout.bHasHelm)
 	{
@@ -338,6 +384,15 @@ AThalassaVessel::AThalassaVessel()
 		HelmLever->SetRelativeLocation(FVector(0.f, 0.f, 25.f));
 		HelmLever->SetRelativeScale3D(FVector(0.06f, 0.08f, 0.5f));
 		HelmLever->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		FullStopButton = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FullStopButton"));
+		FullStopButton->SetupAttachment(ShipRoot);
+		FullStopButton->SetMobility(EComponentMobility::Movable);
+		FullStopButton->SetStaticMesh(CubeMesh.Object);
+		FullStopButton->SetMaterial(0, TintableMaterial.Object);
+		FullStopButton->SetRelativeLocation(Layout.FullStopButtonLocation);
+		FullStopButton->SetRelativeScale3D(FVector(0.18f, 0.18f, 0.06f));
+		FullStopButton->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
 	if (Layout.SonarScreenSizeCm > 0.f)
@@ -439,6 +494,14 @@ void AThalassaVessel::BeginPlay()
 				Material->SetVectorParameterValue(TEXT("Color"), DoorColor);
 			}
 		}
+		if (FullStopButton)
+		{
+			FullStopButtonMaterial = FullStopButton->CreateAndSetMaterialInstanceDynamic(0);
+			if (FullStopButtonMaterial)
+			{
+				FullStopButtonMaterial->SetVectorParameterValue(TEXT("Color"), ThalassaVesselLayout::FullStopIdleColor);
+			}
+		}
 		if (HelmLever)
 		{
 			if (UMaterialInstanceDynamic* Material = HelmLever->CreateAndSetMaterialInstanceDynamic(0))
@@ -491,12 +554,57 @@ FVector AThalassaVessel::GetHelmSeatLocal() const
 	return GetLayout().HelmSeatLocation;
 }
 
+UThalassaStationComponent* AThalassaVessel::FindStationOf(const APawn* Pawn) const
+{
+	for (UThalassaStationComponent* Station : { static_cast<UThalassaStationComponent*>(Helm.Get()), static_cast<UThalassaStationComponent*>(CameraStation.Get()) })
+	{
+		if (Station && Station->IsSeated(Pawn))
+		{
+			return Station;
+		}
+	}
+	return nullptr;
+}
+
+bool AThalassaVessel::TryUseStation(APawn* Who)
+{
+	if (UThalassaStationComponent* Current = FindStationOf(Who))
+	{
+		return Current->TrySitOrStand(Who); // Stand up.
+	}
+	for (UThalassaStationComponent* Station : { static_cast<UThalassaStationComponent*>(Helm.Get()), static_cast<UThalassaStationComponent*>(CameraStation.Get()) })
+	{
+		if (Station && Station->TrySitOrStand(Who))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+FVector AThalassaVessel::GetFullStopButtonLocal() const
+{
+	return GetLayout().FullStopButtonLocation;
+}
+
 void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
 {
 	using namespace ThalassaVesselLayout;
 
 	const FHelmLevers& Levers = Helm->GetLevers();
 	float Speed = SpeedCmS / 100.f;
+
+	if (Helm->IsFullStop())
+	{
+		// Engines astern, rudder and planes against the motion: the ship stops where it is and stays there.
+		SpeedCmS = FMath::FInterpConstantTo(Speed, 0.f, DeltaSeconds, FullStopDecelMS2) * 100.f;
+		TargetYawRate = 0.f;
+		CurrentRate.Yaw = FMath::FInterpConstantTo(static_cast<float>(CurrentRate.Yaw), 0.f, DeltaSeconds, HelmYawAccelDegS2 * 2.f);
+		TargetPitch = 0.f;
+		TargetRoll = 0.f;
+		return;
+	}
+
 	const float Thrust = Levers.Throttle * (Levers.Throttle >= 0.f ? HelmAheadAccelMS2 : HelmAsternAccelMS2);
 	const float Drag = HelmQuadraticDrag * Speed * FMath::Abs(Speed) + HelmLinearDrag * Speed;
 	Speed += (Thrust - Drag) * DeltaSeconds;
@@ -602,6 +710,18 @@ void AThalassaVessel::TickHelmVisuals(float DeltaSeconds)
 	// Forward is ahead. A positive pitch would tip the lever's top toward the stern.
 	ShownThrottle = FMath::FInterpTo(ShownThrottle, Helm->GetLevers().Throttle, DeltaSeconds, 12.f);
 	HelmLeverPivot->SetRelativeRotation(FRotator(-ShownThrottle * ThalassaVesselLayout::HelmLeverSwingDeg, 0.f, 0.f));
+
+	// The full stop button lights up and stays pressed in while the ship is in full stop.
+	const bool bFullStop = Helm->IsFullStop();
+	if (FullStopButton && bFullStop != bShownFullStop)
+	{
+		bShownFullStop = bFullStop;
+		FullStopButton->SetRelativeLocation(GetLayout().FullStopButtonLocation - FVector(0.f, 0.f, bFullStop ? 2.f : 0.f));
+		if (FullStopButtonMaterial)
+		{
+			FullStopButtonMaterial->SetVectorParameterValue(TEXT("Color"), bFullStop ? ThalassaVesselLayout::FullStopLitColor : ThalassaVesselLayout::FullStopIdleColor);
+		}
+	}
 }
 
 void AThalassaVessel::UpdateProfileTargets()

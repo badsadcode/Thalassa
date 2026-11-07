@@ -15,78 +15,76 @@ namespace ThalassaHelm
 	constexpr float SetThrottlePerSecond = 0.4f;
 	constexpr float SetPlanesPerSecond = 0.5f;
 
-	// Pushed this far from the seat, you are no longer sitting at it.
-	constexpr float LeaveSeatCm = 300.f;
+	// How close you must stand to press the full stop button.
+	constexpr float ButtonReachCm = 130.f;
+
+	// Touching a control this firmly takes the ship out of full stop.
+	constexpr float ResumeInput = 0.1f;
 }
 
 UThalassaHelmComponent::UThalassaHelmComponent()
 {
-	PrimaryComponentTick.bCanEverTick = true;
-	SetIsReplicatedByDefault(true);
 }
 
 void UThalassaHelmComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UThalassaHelmComponent, Occupant);
 	DOREPLIFETIME(UThalassaHelmComponent, Mode);
 	DOREPLIFETIME(UThalassaHelmComponent, Levers);
+	DOREPLIFETIME(UThalassaHelmComponent, bFullStop);
 }
 
-AThalassaVessel* UThalassaHelmComponent::GetVessel() const
+void UThalassaHelmComponent::OnOccupantChanged()
 {
-	return Cast<AThalassaVessel>(GetOwner());
-}
-
-FVector UThalassaHelmComponent::GetSeatWorldLocation() const
-{
-	const AThalassaVessel* Vessel = GetVessel();
-	return Vessel ? Vessel->GetActorTransform().TransformPosition(Vessel->GetHelmSeatLocal()) : FVector::ZeroVector;
-}
-
-bool UThalassaHelmComponent::IsHelmsman(const APawn* Pawn) const
-{
-	return GetOwner()->HasAuthority() && Pawn && Occupant == Pawn;
-}
-
-bool UThalassaHelmComponent::TrySitOrStand(APawn* Who)
-{
-	const AThalassaVessel* Vessel = GetVessel();
-	if (!GetOwner()->HasAuthority() || !Who || !Vessel || !Vessel->HasHelm())
-	{
-		return false;
-	}
-
-	if (Occupant == Who)
-	{
-		Occupant = nullptr;
-		Input = FHelmLevers();
-		return true;
-	}
-
-	if (Occupant || FVector::Dist2D(Who->GetActorLocation(), GetSeatWorldLocation()) > SeatReachCm)
-	{
-		return false;
-	}
-
-	Occupant = Who;
+	// A new helmsman starts with their hands off the controls.
 	Input = FHelmLevers();
-	return true;
 }
 
 void UThalassaHelmComponent::SetInput(const APawn* From, float Throttle, float Turn, float Dive)
 {
-	if (IsHelmsman(From))
+	if (IsOccupant(From))
 	{
 		Input.Throttle = FMath::Clamp(Throttle, -1.f, 1.f);
 		Input.Rudder = FMath::Clamp(Turn, -1.f, 1.f);
 		Input.Planes = FMath::Clamp(Dive, -1.f, 1.f);
+
+		// Taking the controls again is what ends a full stop.
+		using namespace ThalassaHelm;
+		if (bFullStop && (FMath::Abs(Input.Throttle) > ResumeInput || FMath::Abs(Input.Rudder) > ResumeInput || FMath::Abs(Input.Planes) > ResumeInput))
+		{
+			bFullStop = false;
+			Commanded = FHelmLevers();
+		}
 	}
+}
+
+FVector UThalassaHelmComponent::GetFullStopButtonWorldLocation() const
+{
+	const AThalassaVessel* Vessel = GetVessel();
+	return Vessel ? Vessel->GetActorTransform().TransformPosition(Vessel->GetFullStopButtonLocal()) : FVector::ZeroVector;
+}
+
+bool UThalassaHelmComponent::TryPressFullStopButton(const APawn* Who)
+{
+	const AThalassaVessel* Vessel = GetVessel();
+	if (!GetOwner()->HasAuthority() || !Who || !Vessel || !bAvailable
+		|| FVector::Dist2D(Who->GetActorLocation(), GetFullStopButtonWorldLocation()) > ThalassaHelm::ButtonReachCm)
+	{
+		return false;
+	}
+	EngageFullStop();
+	return true;
+}
+
+void UThalassaHelmComponent::EngageFullStop()
+{
+	bFullStop = true;
+	Commanded = FHelmLevers();
 }
 
 void UThalassaHelmComponent::ToggleMode(const APawn* From)
 {
-	if (IsHelmsman(From))
+	if (IsOccupant(From))
 	{
 		// Switching never lurches the ship: the new mode starts from wherever the levers are now.
 		Mode = Mode == EHelmMode::Precise ? EHelmMode::SetAndGo : EHelmMode::Precise;
@@ -94,12 +92,11 @@ void UThalassaHelmComponent::ToggleMode(const APawn* From)
 	}
 }
 
-void UThalassaHelmComponent::AllStop(const APawn* From)
+void UThalassaHelmComponent::FullStop(const APawn* From)
 {
-	if (IsHelmsman(From))
+	if (IsOccupant(From))
 	{
-		Commanded.Throttle = 0.f;
-		Commanded.Planes = 0.f;
+		EngageFullStop();
 	}
 }
 
@@ -114,14 +111,12 @@ void UThalassaHelmComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 
 	using namespace ThalassaHelm;
 
-	// Someone who leaves, is pushed away, or disconnects is no longer at the helm.
-	if (Occupant && (!IsValid(Occupant) || FVector::Dist2D(Occupant->GetActorLocation(), GetSeatWorldLocation()) > LeaveSeatCm))
+	if (bFullStop)
 	{
-		Occupant = nullptr;
-		Input = FHelmLevers();
+		// Every control to neutral and held there. The vessel does the braking.
+		Commanded = FHelmLevers();
 	}
-
-	if (Mode == EHelmMode::Precise)
+	else if (Mode == EHelmMode::Precise)
 	{
 		// The ship does what you hold, and nothing once you let go. Nobody at the helm is letting go.
 		Commanded = Input;

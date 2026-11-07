@@ -6,12 +6,17 @@
 
 class UInstancedStaticMeshComponent;
 class UStaticMeshComponent;
+class UMaterialInstanceDynamic;
 class UTextRenderComponent;
 class UThalassaSonarComponent;
 class UThalassaSonarScreenComponent;
 class UThalassaSonarPingComponent;
 class UThalassaHelmComponent;
 class UThalassaHelmScreenComponent;
+class UThalassaCameraStationComponent;
+class UThalassaCameraScreenComponent;
+class UThalassaStationComponent;
+class USceneCaptureComponent2D;
 
 /** Authoritative vessel pose, published by the server and dead-reckoned by clients. */
 USTRUCT()
@@ -82,10 +87,22 @@ public:
 
 	/** The helm station: who is steering, and its levers. Null on ships without one. */
 	UThalassaHelmComponent* GetHelm() const { return Helm; }
+
+	/** The camera station. Null on ships without one. */
+	UThalassaCameraStationComponent* GetCameraStation() const { return CameraStation; }
+
+	/** The station this pawn is at, if any. */
+	UThalassaStationComponent* FindStationOf(const APawn* Pawn) const;
+
+	/** Server: E pressed here. Leave the station you are at, or take one within reach. */
+	bool TryUseStation(APawn* Who);
 	bool HasHelm() const;
 
 	/** Where the helmsman stands, in ship coordinates. */
 	FVector GetHelmSeatLocal() const;
+
+	/** The full stop button on the helm console, in ship coordinates. */
+	FVector GetFullStopButtonLocal() const;
 
 	/** True while the ship is floating at the surface and cannot rise further. */
 	bool IsSurfaced() const;
@@ -193,6 +210,26 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> HelmLever;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> FullStopButton;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaCameraStationComponent> CameraStation;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaCameraScreenComponent> CameraScreen;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaCameraScreenComponent> CameraGrid;
+
+	UPROPERTY(VisibleAnywhere)
+	TArray<TObjectPtr<USceneCaptureComponent2D>> HullCameras;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> FullStopButtonMaterial;
+
+	bool bShownFullStop = false;
 
 	/** The lever as drawn, eased toward the replicated setting so it moves smoothly between updates. */
 	float ShownThrottle = 0.f;

@@ -36,9 +36,11 @@ Open `Thalassa.uproject` in the editor and press Play. You start on the main dec
 | Keys | Action |
 |---|---|
 | WASD, mouse, Space | Walk, look, jump (in water: swim where you look) |
+| Shift | Sprint |
 | Space / C | In water: up / down |
-| E | Take or leave the helm (middle of the console at the bridge's forward window), or cycle the airlock (off the corridor, to starboard) |
-| At the helm | W/S throttle, A/D rudder, Space/C planes, R precise or set-and-go, X all stop. See `docs/HELM.md` |
+| E | Take or leave a station: the helm (middle of the console at the bridge's forward window) or the cameras (starboard console beside the sonar). Also presses the red full stop button, and cycles the airlock (off the corridor, to starboard) |
+| At the helm | W/S throttle, A/D rudder, Space/C planes, R precise or set-and-go, X full stop. See `docs/HELM.md` |
+| At the cameras | A/D choose a camera, Tab full screen. See `docs/STATIONS.md` |
 | Tab | Toggle the expanded station view |
 | N | Sonar on or off; Tab shows its chart |
 | P | Run the scripted motion test |

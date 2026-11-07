@@ -1,6 +1,6 @@
 # Handoff: THALASSA, updated 2026-11-07
 
-Read this first in a new session. Then read `README.md`, `docs/Decisions.md`, `docs/MOVING_SHIP_SPIKE.md`, `docs/INTERIOR_RULES.md`, `docs/SONAR.md` and `docs/HELM.md`.
+Read this first in a new session. Then read `README.md`, `docs/Decisions.md`, `docs/MOVING_SHIP_SPIKE.md`, `docs/INTERIOR_RULES.md`, `docs/SONAR.md`, `docs/HELM.md` and `docs/STATIONS.md`.
 
 ## The project
 
@@ -20,6 +20,9 @@ All of it is tested headless with a real listen host and clients as separate pro
 - **Sonar:** **N** toggles it, and **Tab** shows the chart. 48 beams, 25 m world-fixed cells, replicated, saved to `Saved/SaveGames/ShipSurvey.sav`. Host and client charts are identical, even with packet loss.
 - **Ladders on a moving ship (fixed):** anyone reaching a ladder while the ship moved was thrown astern, because the switch to climbing counted the ship's velocity twice. It was recorded as a two-player problem, but the ship's motion caused it. After the fix, four players all climbed, sometimes two at once. Deck runs at about 135 ms went from 122 corrections to 6, and no waypoints are stuck. See `INTERIOR_RULES.md` rule 10.
 - **Helm (first version):** E at the console by the bridge's forward window takes the helm. WASD, Space and C drive the ship, R switches between precise and set-and-go, and X is all stop. The throttle lever, the helm screen and the HUD all show the same replicated levers. The ship is heavy: about 30 seconds to near full speed, and a long coast. The old test keys (I/K, J/L, U/O) are gone. Tested with a scripted helmsman at about 26 ms and 240 ms. See `HELM.md`.
+- **Full stop:** X at the helm, or the red button on the helm console that anyone can press. The ship brakes to a standstill and holds until the helmsman touches a control. See `HELM.md`.
+- **Sprinting:** Shift, at 8 m/s on foot. It is part of each saved move, so the server agrees with the client. Grabbing a ladder slows you to climbing speed, or a sprinter crossed the climbing zone and bounced off. `--sprint` makes test walkers sprint.
+- **Stations and the camera station:** helm and cameras share one station class (E to take, E to leave, leave if pushed away). Six hull cameras show on a large and a grid screen at the starboard console beside the sonar. Cameras render only while someone can see them. See `STATIONS.md`.
 - **Surface and seabed:** under the helm, the ship floats at 15 m at most and stops dead against the seabed or anything solid, including a pitch or turn that would swing the hull into rock. The helm shows SURFACED and flashes COLLISION. The scripted motion test is not constrained. See `HELM.md`.
 - **Sonar station on the bridge:** a screen above the starboard middle console shows the same chart as **Tab**, with a ping every 2 s on the server's clock. The ping is synthesised in code, with no sound asset. The owner heard it in the editor on 2026-11-07. Automated runs are silent (`-nosound`).
 - **Packaging:** `Scripts/build/package-windows.ps1` writes to `D:\ThalassaBuilds\Windows`, with `Host.bat`, `Join.bat` and a README. Repackaged on 2026-11-07 with the sonar screen and the ladder fix. Tested as host plus client on one PC: a deck run with the sonar on had identical charts, no corrections and no stuck waypoints, and a frame showed the bridge screen working.
@@ -42,7 +45,7 @@ All of this is recorded in `Decisions.md`.
 
 ## Suggested next steps
 
-Have the owner try the helm and tune how it feels. Then something to do when the ship hits the seabed (a bump everyone feels the same, a sound, damage later), a seat, or internet play with playit.gg.
+The owner's direction on movement: smooth and fluid like Titanfall (see `Decisions.md`), so a slide is a natural next move, with the same network testing as walking. Also: something to do when the ship hits the seabed (a bump everyone feels the same, a sound), hull floodlights for the cameras, more monitors, or internet play with playit.gg.
 
 ## How to work here
 

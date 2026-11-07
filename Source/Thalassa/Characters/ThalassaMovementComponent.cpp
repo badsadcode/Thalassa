@@ -71,6 +71,7 @@ void UThalassaMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaS
 	// You take hold of a ladder by moving while next to it, and stay on it until you leave its zone.
 	const bool bOnLadder = Vessel->IsLadderAt(Location) && (MovementMode == MOVE_Flying || !Acceleration.IsNearlyZero());
 
+	const bool bGrabbingLadder = bOnLadder && !bInWater && MovementMode != MOVE_Flying;
 	if ((bInWater || bOnLadder) && MovementMode != MOVE_Flying)
 	{
 		// On the hull, Velocity is relative to the ship. Flying lets go of the base without changing it,
@@ -124,6 +125,13 @@ void UThalassaMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaS
 			SetBase(&NoBase);
 		}
 	}
+
+	if (bGrabbingLadder)
+	{
+		// Taking hold of a ladder stops you. Arriving at a sprint, you would otherwise cross its climbing
+		// zone in a frame or two and bounce off the wall behind it. Velocity is in the ship's frame again here.
+		Velocity = Velocity.GetClampedToMaxSize(LadderSpeedCm);
+	}
 }
 
 bool UThalassaMovementComponent::IsAtLadder() const
@@ -149,8 +157,81 @@ bool UThalassaMovementComponent::IsSwimmingInSea() const
 
 float UThalassaMovementComponent::GetMaxSpeed() const
 {
-	constexpr float LadderSpeed = 200.f;
-	return IsClimbingLadder() ? LadderSpeed : Super::GetMaxSpeed();
+	if (IsClimbingLadder())
+	{
+		return LadderSpeedCm;
+	}
+	return IsSprinting() ? SprintSpeed : Super::GetMaxSpeed();
+}
+
+bool UThalassaMovementComponent::IsSprinting() const
+{
+	// On foot only: not while climbing, swimming or in the air.
+	return bWantsToSprint && MovementMode == MOVE_Walking;
+}
+
+void UThalassaMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
+{
+	Super::UpdateFromCompressedFlags(Flags);
+	bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
+}
+
+FNetworkPredictionData_Client* UThalassaMovementComponent::GetPredictionData_Client() const
+{
+	if (!ClientPredictionData)
+	{
+		UThalassaMovementComponent* Mutable = const_cast<UThalassaMovementComponent*>(this);
+		Mutable->ClientPredictionData = new FNetworkPredictionData_Client_Thalassa(*this);
+	}
+	return ClientPredictionData;
+}
+
+FSavedMovePtr FNetworkPredictionData_Client_Thalassa::AllocateNewMove()
+{
+	return FSavedMovePtr(new FSavedMove_Thalassa());
+}
+
+void FSavedMove_Thalassa::Clear()
+{
+	Super::Clear();
+	bSavedWantsToSprint = false;
+}
+
+uint8 FSavedMove_Thalassa::GetCompressedFlags() const
+{
+	uint8 Flags = Super::GetCompressedFlags();
+	if (bSavedWantsToSprint)
+	{
+		Flags |= FLAG_Custom_0;
+	}
+	return Flags;
+}
+
+bool FSavedMove_Thalassa::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
+{
+	if (bSavedWantsToSprint != static_cast<const FSavedMove_Thalassa*>(NewMove.Get())->bSavedWantsToSprint)
+	{
+		return false;
+	}
+	return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
+}
+
+void FSavedMove_Thalassa::SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData)
+{
+	Super::SetMoveFor(C, InDeltaTime, NewAccel, ClientData);
+	if (const UThalassaMovementComponent* Movement = Cast<UThalassaMovementComponent>(C->GetCharacterMovement()))
+	{
+		bSavedWantsToSprint = Movement->bWantsToSprint;
+	}
+}
+
+void FSavedMove_Thalassa::PrepMoveFor(ACharacter* C)
+{
+	Super::PrepMoveFor(C);
+	if (UThalassaMovementComponent* Movement = Cast<UThalassaMovementComponent>(C->GetCharacterMovement()))
+	{
+		Movement->bWantsToSprint = bSavedWantsToSprint;
+	}
 }
 
 bool UThalassaMovementComponent::ClientUpdatePositionAfterServerUpdate()

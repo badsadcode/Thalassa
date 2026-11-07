@@ -12,6 +12,7 @@
 #include "Misc/Parse.h"
 #include "Tools/ThalassaTestConfig.h"
 #include "Vessel/ThalassaHelmComponent.h"
+#include "Vessel/ThalassaCameraStation.h"
 #include "Vessel/ThalassaSonarComponent.h"
 #include "Vessel/ThalassaVessel.h"
 
@@ -70,11 +71,14 @@ void AThalassaPlayerController::SetupInputComponent()
 	UInputAction* StartProfile = MakeAction(TEXT("StartProfile"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(StartProfile, EKeys::P);
 
+	UInputAction* Sprint = MakeAction(TEXT("Sprint"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(Sprint, EKeys::LeftShift);
+
 	UInputAction* HelmMode = MakeAction(TEXT("HelmMode"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(HelmMode, EKeys::R);
 
-	UInputAction* HelmAllStop = MakeAction(TEXT("HelmAllStop"), EInputActionValueType::Boolean);
-	MappingContext->MapKey(HelmAllStop, EKeys::X);
+	UInputAction* HelmFullStop = MakeAction(TEXT("HelmFullStop"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(HelmFullStop, EKeys::X);
 
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(Move, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnMove);
@@ -88,8 +92,10 @@ void AThalassaPlayerController::SetupInputComponent()
 	Input->BindAction(StationView, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleStationView);
 	Input->BindAction(StartProfile, ETriggerEvent::Started, this, &AThalassaPlayerController::OnStartProfile);
 	Input->BindAction(ToggleSonar, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleSonar);
+	Input->BindAction(Sprint, ETriggerEvent::Started, this, &AThalassaPlayerController::OnSprintStart);
+	Input->BindAction(Sprint, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnSprintStop);
 	Input->BindAction(HelmMode, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmMode);
-	Input->BindAction(HelmAllStop, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmAllStop);
+	Input->BindAction(HelmFullStop, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmFullStop);
 }
 
 void AThalassaPlayerController::BeginPlay()
@@ -113,6 +119,17 @@ void AThalassaPlayerController::OnMove(const FInputActionValue& Value)
 	if (IsAtHelm())
 	{
 		return; // PlayerTick sends it to the helm.
+	}
+	if (IsAtCameraStation())
+	{
+		// A and D step through the cameras, once per press.
+		const int32 Step = MoveAxis.X > 0.5f ? 1 : MoveAxis.X < -0.5f ? -1 : 0;
+		if (Step != 0 && Step != LastCameraStep)
+		{
+			ServerSelectCamera(Step);
+		}
+		LastCameraStep = Step;
+		return;
 	}
 
 	if (APawn* ControlledPawn = GetPawn())
@@ -152,7 +169,7 @@ void AThalassaPlayerController::OnLook(const FInputActionValue& Value)
 void AThalassaPlayerController::OnSwimVertical(const FInputActionValue& Value)
 {
 	VerticalAxis = Value.Get<float>();
-	if (IsAtHelm())
+	if (IsAtHelm() || IsAtCameraStation())
 	{
 		return; // Space and C work the planes. PlayerTick sends them.
 	}
@@ -163,9 +180,25 @@ void AThalassaPlayerController::OnSwimVertical(const FInputActionValue& Value)
 	}
 }
 
+void AThalassaPlayerController::OnSprintStart()
+{
+	if (AThalassaCharacter* Crew = Cast<AThalassaCharacter>(GetPawn()))
+	{
+		Crew->GetThalassaMovement()->SetWantsToSprint(true);
+	}
+}
+
+void AThalassaPlayerController::OnSprintStop()
+{
+	if (AThalassaCharacter* Crew = Cast<AThalassaCharacter>(GetPawn()))
+	{
+		Crew->GetThalassaMovement()->SetWantsToSprint(false);
+	}
+}
+
 void AThalassaPlayerController::OnJumpStart()
 {
-	if (IsAtHelm())
+	if (IsAtHelm() || IsAtCameraStation())
 	{
 		return;
 	}
@@ -200,6 +233,21 @@ bool AThalassaPlayerController::IsAtHelm() const
 {
 	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
 	return Vessel && Vessel->GetHelm() && Vessel->GetHelm()->IsSeated(GetPawn());
+}
+
+bool AThalassaPlayerController::IsAtCameraStation() const
+{
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	return Vessel && Vessel->GetCameraStation() && Vessel->GetCameraStation()->IsSeated(GetPawn());
+}
+
+void AThalassaPlayerController::ServerSelectCamera_Implementation(int32 Step)
+{
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	if (Vessel && Vessel->GetCameraStation())
+	{
+		Vessel->GetCameraStation()->Select(GetPawn(), FMath::Clamp(Step, -1, 1));
+	}
 }
 
 void AThalassaPlayerController::PlayerTick(float DeltaTime)
@@ -242,11 +290,11 @@ void AThalassaPlayerController::RequestHelmMode()
 	}
 }
 
-void AThalassaPlayerController::RequestHelmAllStop()
+void AThalassaPlayerController::RequestHelmFullStop()
 {
 	if (IsAtHelm())
 	{
-		ServerHelmAllStop();
+		ServerHelmFullStop();
 	}
 }
 
@@ -286,12 +334,12 @@ void AThalassaPlayerController::ServerHelmMode_Implementation()
 	}
 }
 
-void AThalassaPlayerController::ServerHelmAllStop_Implementation()
+void AThalassaPlayerController::ServerHelmFullStop_Implementation()
 {
 	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
 	if (Vessel && Vessel->GetHelm())
 	{
-		Vessel->GetHelm()->AllStop(GetPawn());
+		Vessel->GetHelm()->FullStop(GetPawn());
 	}
 }
 

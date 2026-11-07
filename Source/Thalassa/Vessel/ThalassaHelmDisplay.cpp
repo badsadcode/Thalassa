@@ -97,7 +97,8 @@ namespace ThalassaHelmDisplay
 		// Warnings, under the title, where the helmsman looks first.
 		const float SinceCollision = Vessel.GetSecondsSinceCollision();
 		const bool bCollisionWarning = SinceCollision >= 0.f && SinceCollision < 4.f;
-		const FString Warning = bCollisionWarning ? FString(TEXT("COLLISION")) : Vessel.IsSurfaced() ? FString(TEXT("SURFACED")) : FString();
+		const FString Warning = bCollisionWarning ? FString(TEXT("COLLISION")) : Helm->IsFullStop() ? FString(TEXT("FULL STOP"))
+			: Vessel.IsSurfaced() ? FString(TEXT("SURFACED")) : FString();
 		if (!Warning.IsEmpty())
 		{
 			// A collision flashes; surfacing is steady.

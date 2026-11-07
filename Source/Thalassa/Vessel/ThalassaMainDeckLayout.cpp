@@ -309,8 +309,22 @@ FVesselLayout BuildMainDeckLayout()
 	Layout.HelmScreenFacing = FVector(-1.f, 0.f, 0.f);
 	Layout.HelmScreenSizeCm = 130.f;
 	Layout.HelmLeverLocation = FVector(13450.f, 160.f, 120.f);
+
+	// The full stop button, at the starboard end of the console, where anyone on the bridge can reach it.
+	Layout.FullStopButtonLocation = FVector(13450.f, 320.f, 122.f);
 	Layout.ConsoleLocation = FVector(13300.f, 0.f, 60.f);
 	Layout.ConsoleTextLocation = FVector(13396.f, 0.f, 90.f);
+
+	// The camera station: the starboard console beside the sonar. A large screen for the chosen camera,
+	// and a smaller one showing them all.
+	Layout.bHasCameraStation = true;
+	Layout.CameraSeatLocation = FVector(12400.f, 880.f, 90.f);
+	B.Box(FVector(12220.f, 1036.f, 110.f), FVector(12620.f, 1050.f, 290.f), ConsoleColor, true, false);
+	Layout.CameraScreenLocation = FVector(12330.f, 1034.f, 200.f);
+	Layout.CameraGridLocation = FVector(12530.f, 1034.f, 195.f);
+	Layout.CameraScreensFacing = FVector(0.f, -1.f, 0.f);
+	Layout.CameraScreenSizeCm = 160.f;
+	Layout.CameraGridSizeCm = 120.f;
 
 	// ---------------------------------------------- Lights, spawns, and the walker's tour.
 	for (const FVector& Lamp : TArray<FVector>{
@@ -351,6 +365,22 @@ FVesselLayout BuildMainDeckLayout()
 		FVector(-10000.f, 1000.f, -310.f), FVector(-9570.f, 1000.f, -310.f), FVector(-9570.f, 1000.f, 90.f), FVector(-9200.f, 1000.f, 90.f),  // Ladder up.
 		FVector(-9000.f, -300.f, 90.f), FVector(-7000.f, -300.f, 90.f), FVector(-4800.f, -300.f, 90.f), FVector(-4800.f, -1500.f, 90.f),      // Home.
 	};
+
+	// Cameras just outside the hull, one looking each way from it. Placed from the hull's bounds, so they
+	// follow the deck plan when it changes.
+	{
+		const FBox& Hull = Layout.HullBounds;
+		const FVector Mid = Hull.GetCenter();
+		constexpr float Out = 100.f;
+		Layout.HullCameras = {
+			{ TEXT("BOW"),       FVector(Hull.Max.X + Out, Mid.Y, Mid.Z),        FRotator(-5.f, 0.f, 0.f) },
+			{ TEXT("STARBOARD"), FVector(Mid.X, Hull.Max.Y + Out, Mid.Z),        FRotator(-10.f, 90.f, 0.f) },
+			{ TEXT("PORT"),      FVector(Mid.X, Hull.Min.Y - Out, Mid.Z),        FRotator(-10.f, -90.f, 0.f) },
+			{ TEXT("STERN"),     FVector(Hull.Min.X - Out, Mid.Y, Mid.Z),        FRotator(-5.f, 180.f, 0.f) },
+			{ TEXT("KEEL"),      FVector(Mid.X, Mid.Y, Hull.Min.Z - Out),        FRotator(-90.f, 0.f, 0.f) },
+			{ TEXT("DORSAL"),    FVector(Mid.X, Mid.Y, Hull.Max.Z + Out),        FRotator(90.f, 0.f, 0.f) },
+		};
+	}
 
 	return Layout;
 }

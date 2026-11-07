@@ -13,6 +13,8 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Core/ThalassaPlayerController.h"
 #include "Vessel/ThalassaHelmComponent.h"
+#include "Vessel/ThalassaStationComponent.h"
+#include "Vessel/ThalassaCameraStation.h"
 #include "Vessel/ThalassaVessel.h"
 
 AThalassaCharacter::AThalassaCharacter(const FObjectInitializer& ObjectInitializer)
@@ -99,11 +101,12 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 		}
 		else if (ThalassaTestConfig::IsBot())
 		{
+			GetThalassaMovement()->SetWantsToSprint(ThalassaTestConfig::IsBotSprinting());
 			TickWalkerBot(DeltaSeconds);
 		}
-		if (IsAtHelm())
+		if (IsAtStation())
 		{
-			HoldHelmPosition();
+			HoldStationPosition();
 		}
 		else if (!ThalassaTestConfig::IsCrewNudgeDisabled())
 		{
@@ -112,16 +115,21 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 	}
 }
 
-bool AThalassaCharacter::IsAtHelm() const
+bool AThalassaCharacter::IsAtStation() const
 {
-	return BoundVessel && BoundVessel->GetHelm() && BoundVessel->GetHelm()->IsSeated(this);
+	return BoundVessel && BoundVessel->FindStationOf(this);
 }
 
-void AThalassaCharacter::HoldHelmPosition()
+void AThalassaCharacter::HoldStationPosition()
 {
 	// Walked there, like any other move, so it is predicted and needs no correction. A real seat and
 	// a sitting animation can replace this later.
-	const FVector Offset = BoundVessel->GetHelm()->GetSeatWorldLocation() - GetActorLocation();
+	const UThalassaStationComponent* Station = BoundVessel->FindStationOf(this);
+	if (!Station)
+	{
+		return;
+	}
+	const FVector Offset = Station->GetSeatWorldLocation() - GetActorLocation();
 	const FVector Flat = FVector::VectorPlaneProject(Offset, BoundVessel->GetActorUpVector());
 	const float Distance = static_cast<float>(Flat.Size());
 	if (Distance > 8.f)
@@ -145,19 +153,27 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 	const FTransform Ship = BoundVessel->GetActorTransform();
 	const UThalassaHelmComponent* Helm = BoundVessel->GetHelm();
 
+	// The "cameras" course goes to the camera station instead, and steps through the cameras.
+	static const bool bCameraCourse = ThalassaTestConfig::HelmCourse() == TEXT("cameras");
+	const UThalassaStationComponent* Station = bCameraCourse ? static_cast<const UThalassaStationComponent*>(BoundVessel->GetCameraStation()) : Helm;
+	if (!Station)
+	{
+		return;
+	}
+
 	if (BotHelmSeconds < 0.f)
 	{
-		// Walk forward along the corridors to the bridge, then up to the helm.
-		static const FVector Route[] =
+		// Walk forward along the corridors to the bridge, then to the station.
+		const FVector Route[] =
 		{
 			FVector(-1000.f, -1500.f, 90.f), FVector(2000.f, -1500.f, 90.f), FVector(2800.f, -1500.f, 90.f), FVector(2800.f, -300.f, 90.f),
 			FVector(4500.f, -300.f, 90.f), FVector(9000.f, -300.f, 90.f), FVector(10300.f, -300.f, 90.f), FVector(12000.f, -300.f, 40.f),
-			FVector(13000.f, 0.f, 90.f), BoundVessel->GetHelmSeatLocal(),
+			bCameraCourse ? FVector(12400.f, 500.f, 90.f) : FVector(13000.f, 0.f, 90.f), Station->SeatLocal,
 		};
 		const int32 RouteLength = UE_ARRAY_COUNT(Route);
 		const FVector Here = Ship.InverseTransformPosition(GetActorLocation());
 
-		if (Helm->IsSeated(this))
+		if (Station->IsSeated(this))
 		{
 			BotHelmSeconds = 0.f;
 			UE_LOG(LogTemp, Display, TEXT("HELMBOT seated at %s"), *Here.ToString());
@@ -194,8 +210,33 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		return;
 	}
 
+	if (bCameraCourse)
+	{
+		// Step forward through every camera, one every three seconds, then back once, then stand up.
+		BotHelmSeconds += DeltaSeconds;
+		const UThalassaCameraStationComponent* Cameras = BoundVessel->GetCameraStation();
+		const int32 Steps = FMath::FloorToInt(BotHelmSeconds / 3.f);
+		if (Steps > BotHelmCue && BotHelmCue < 8)
+		{
+			++BotHelmCue;
+			Helmsman->RequestCameraStep(BotHelmCue == 8 ? -1 : 1);
+		}
+		else if (BotHelmCue == 8 && BotHelmSeconds > 30.f && Cameras->IsSeated(this))
+		{
+			Interact();
+		}
+		BotHelmLogTimer -= DeltaSeconds;
+		if (BotHelmLogTimer <= 0.f)
+		{
+			BotHelmLogTimer = 1.f;
+			UE_LOG(LogTemp, Display, TEXT("CAMERABOT t %.1f seated %d steps sent %d selected %d (%s)"), BotHelmSeconds, Cameras->IsSeated(this) ? 1 : 0,
+				BotHelmCue, Cameras->GetSelected(), *Cameras->GetLabel(Cameras->GetSelected()));
+		}
+		return;
+	}
+
 	// At the helm: a scripted course through both modes. Seconds after sitting down.
-	enum class EPress : uint8 { None, Mode, AllStop, Stand };
+	enum class EPress : uint8 { None, Mode, FullStop, Stand };
 	struct FCue { float At; float Throttle; float Turn; float Dive; EPress Press; };
 	// Dive: full ahead and full dive into the seabed, then all stop and back away from it.
 	static const FCue DiveCues[] =
@@ -203,11 +244,11 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		{ 2.f,   0.f,  0.f,  0.f, EPress::Mode },
 		{ 3.f,   1.f,  0.f, -1.f, EPress::None },
 		{ 5.5f,  0.f,  0.f,  0.f, EPress::None },
-		{ 45.f,  0.f,  0.f,  0.f, EPress::AllStop },
+		{ 45.f,  0.f,  0.f,  0.f, EPress::FullStop },
 		{ 47.f,  0.f,  0.f,  1.f, EPress::None },    // Planes to rise...
 		{ 48.f, -1.f,  0.f,  0.f, EPress::None },    // ...and astern.
 		{ 50.5f, 0.f,  0.f,  0.f, EPress::None },
-		{ 80.f,  0.f,  0.f,  0.f, EPress::AllStop },
+		{ 80.f,  0.f,  0.f,  0.f, EPress::FullStop },
 		{ 90.f,  0.f,  0.f,  0.f, EPress::Stand },
 	};
 	// Rise: full ahead and full rise until the ship surfaces, then hold it there.
@@ -216,7 +257,7 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		{ 2.f,   0.f,  0.f,  0.f, EPress::Mode },
 		{ 3.f,   1.f,  0.f,  1.f, EPress::None },
 		{ 5.5f,  0.f,  0.f,  0.f, EPress::None },
-		{ 80.f,  0.f,  0.f,  0.f, EPress::AllStop },
+		{ 80.f,  0.f,  0.f,  0.f, EPress::FullStop },
 		{ 90.f,  0.f,  0.f,  0.f, EPress::Stand },
 	};
 	static const FCue TourCues[] =
@@ -232,7 +273,7 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		{ 52.f,  0.f,  0.f,  0.f, EPress::None },
 		{ 55.f,  0.f, -1.f,  0.f, EPress::None },    // Turn to port.
 		{ 65.f,  0.f,  0.f,  0.f, EPress::None },
-		{ 70.f,  0.f,  0.f,  0.f, EPress::AllStop },
+		{ 70.f,  0.f,  0.f,  0.f, EPress::FullStop },
 		{ 78.f,  0.f,  0.f,  0.f, EPress::Mode },    // To precise.
 		{ 80.f,  1.f,  1.f,  0.f, EPress::None },    // Hold ahead and starboard...
 		{ 95.f,  0.f,  0.f,  0.f, EPress::None },    // ...and let go.
@@ -251,9 +292,9 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		{
 			Helmsman->RequestHelmMode();
 		}
-		else if (Cue.Press == EPress::AllStop)
+		else if (Cue.Press == EPress::FullStop)
 		{
-			Helmsman->RequestHelmAllStop();
+			Helmsman->RequestHelmFullStop();
 		}
 		else if (Cue.Press == EPress::Stand)
 		{
@@ -329,7 +370,12 @@ void AThalassaCharacter::ServerInteract_Implementation()
 {
 	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
 	{
-		if (Vessel->GetHelm() && Vessel->GetHelm()->TrySitOrStand(this))
+		// Leaving a station comes first, so E always gets you up again, even beside the full stop button.
+		if (Vessel->FindStationOf(this) && Vessel->TryUseStation(this))
+		{
+			return;
+		}
+		if ((Vessel->GetHelm() && Vessel->GetHelm()->TryPressFullStopButton(this)) || Vessel->TryUseStation(this))
 		{
 			return;
 		}

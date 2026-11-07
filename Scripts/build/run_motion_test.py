@@ -43,11 +43,12 @@ def main():
     parser.add_argument("--exe", help="test a packaged build's Thalassa.exe instead of the editor")
     parser.add_argument("--sonar", action="store_true", help="survey with the sonar during the test")
     parser.add_argument("--helm", action="store_true", help="the deck, driven from the helm by the first client instead of the script")
-    parser.add_argument("--helm-course", choices=["tour", "dive", "rise"], default="tour", help="what the scripted helmsman does")
+    parser.add_argument("--helm-course", choices=["tour", "dive", "rise", "cameras"], default="tour", help="what the scripted helmsman does")
     parser.add_argument("--ship-at", help="start the ship at X,Y,Z world centimetres")
     parser.add_argument("--deck", action="store_true", help="use the real deck instead of the test rig")
     parser.add_argument("--hull-stretch", type=float, help="stretch the hull lengthwise; walkers only")
     parser.add_argument("--no-jump", action="store_true", help="walkers never jump")
+    parser.add_argument("--sprint", action="store_true", help="walkers sprint everywhere")
     parser.add_argument("--out", help="result folder's parent; defaults to the system temp folder")
     parser.add_argument("--server-move-scalar", type=float, help="value for p.NetServerMaxMoveDeltaTimeScalar")
     args = parser.parse_args()
@@ -86,6 +87,8 @@ def main():
         common.append(f"-ThalassaHullStretch={args.hull_stretch}")
     if args.no_jump:
         common.append("-ThalassaNoJump")
+    if args.sprint:
+        common.append("-ThalassaSprint")
     if args.static_ship:
         common.append("-ThalassaStaticShip")
     if args.rtt or args.loss:

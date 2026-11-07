@@ -71,6 +71,14 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
   1. **Precise:** hold a button to move, turn and manoeuvre.
   2. **Set and go:** push the throttle to a setting and the ship keeps going, with the same idea possibly for steering.
 - The controls exist physically at the helm too: a throttle lever that visibly moves, plus a monitor and a heads-up display showing throttle and the other stats. Keys, lever, monitor and HUD all work from the same ship state, so crew nearby can see what the helm is doing.
+- **Full stop (owner's request, built):** one button, or a lever, that stops all the engines and stops the ship in place. Built as **X** at the helm and a red button on the helm console that anyone can press.
+
+**Player movement (owner's direction).** Walking the ship takes too long, so there is sprinting (**Shift**, built). In the final game, movement should be smooth and fluid, like Titanfall: fast, keeping momentum, with moves like a slide. It should still work on a moving ship over the network, so every new move needs the same testing as walking did.
+
+**Stations and their monitors (owner's direction).** Following design document sections 5.6 and 17: each station has physical screens in the world, and a key expands the picture to read it properly.
+
+- **A camera station:** cameras mounted on the hull, showing what is to port, to starboard and around the ship. The station shows them all together and one at a time on a bigger screen, and may later have several monitors. This fits section 6.1: an external camera helps, as long as the player stays a crew member rather than a detached overhead camera.
+- **Other stations** will have monitors for the ship's systems as those systems arrive.
 
 ## Still open
 

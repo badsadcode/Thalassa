@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
+#include "Vessel/ThalassaStationComponent.h"
 #include "ThalassaHelmComponent.generated.h"
 
 class AThalassaVessel;
@@ -32,7 +32,7 @@ struct FHelmLevers
  * The server owns all of it. Clients only send what the helmsman is pressing.
  */
 UCLASS()
-class THALASSA_API UThalassaHelmComponent : public UActorComponent
+class THALASSA_API UThalassaHelmComponent : public UThalassaStationComponent
 {
 	GENERATED_BODY()
 
@@ -42,40 +42,41 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/** Server: sit down if the seat is free and within reach, or stand up if already sitting. */
-	bool TrySitOrStand(APawn* Who);
-
 	/** Server: what the helmsman is pressing, each from -1 to 1. Ignored from anyone else. */
 	void SetInput(const APawn* From, float Throttle, float Turn, float Dive);
 
 	/** Server: switch between precise and set-and-go. */
 	void ToggleMode(const APawn* From);
 
-	/** Server: throttle and planes back to neutral. */
-	void AllStop(const APawn* From);
+	/**
+	 * Server: full stop, from the helmsman. The engines are cut and the ship brakes to a standstill and holds
+	 * there, until the helmsman touches a control again.
+	 */
+	void FullStop(const APawn* From);
 
-	APawn* GetOccupant() const { return Occupant; }
-	bool IsSeated(const APawn* Pawn) const { return Pawn && Occupant == Pawn; }
+	/** Server: the full stop button on the helm console, which anyone within reach can press. */
+	bool TryPressFullStopButton(const APawn* Who);
+
+	bool IsFullStop() const { return bFullStop; }
+	FVector GetFullStopButtonWorldLocation() const;
+
 	EHelmMode GetMode() const { return Mode; }
 	const FHelmLevers& GetLevers() const { return Levers; }
 
-	/** Where the helmsman sits, in world space. */
-	FVector GetSeatWorldLocation() const;
-
-	static constexpr float SeatReachCm = 200.f;
+protected:
+	virtual void OnOccupantChanged() override;
 
 private:
-	AThalassaVessel* GetVessel() const;
-	bool IsHelmsman(const APawn* Pawn) const;
-
-	UPROPERTY(Replicated)
-	TObjectPtr<APawn> Occupant;
-
 	UPROPERTY(Replicated)
 	EHelmMode Mode = EHelmMode::Precise;
 
 	UPROPERTY(Replicated)
 	FHelmLevers Levers;
+
+	UPROPERTY(Replicated)
+	bool bFullStop = false;
+
+	void EngageFullStop();
 
 	// Server only.
 	FHelmLevers Input;

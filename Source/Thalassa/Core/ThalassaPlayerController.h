@@ -23,10 +23,16 @@ public:
 	/** True while this player's character is at the helm. */
 	bool IsAtHelm() const;
 
+	/** True while this player's character is at the camera station. */
+	bool IsAtCameraStation() const;
+
+	/** At the camera station: step to the next camera, or the previous one. */
+	void RequestCameraStep(int32 Step) { ServerSelectCamera(Step); }
+
 	/** What the helmsman is pressing, each from -1 to 1. Sent to the server only when it changes. */
 	void SetHelmInput(float Throttle, float Turn, float Dive);
 	void RequestHelmMode();
-	void RequestHelmAllStop();
+	void RequestHelmFullStop();
 
 protected:
 	virtual void BeginPlay() override;
@@ -40,6 +46,8 @@ private:
 	void OnLook(const FInputActionValue& Value);
 	void OnSwimVertical(const FInputActionValue& Value);
 	void OnJumpStart();
+	void OnSprintStart();
+	void OnSprintStop();
 	void OnJumpStop();
 	void OnInteract();
 	void OnToggleStationView();
@@ -56,7 +64,10 @@ private:
 	void ServerHelmMode();
 
 	UFUNCTION(Server, Reliable)
-	void ServerHelmAllStop();
+	void ServerSelectCamera(int32 Step);
+
+	UFUNCTION(Server, Reliable)
+	void ServerHelmFullStop();
 
 	virtual void PlayerTick(float DeltaTime) override;
 
@@ -74,5 +85,6 @@ private:
 	float VerticalAxis = 0.f;
 	FVector SentHelmInput = FVector::ZeroVector;
 	bool bWasAtHelm = false;
+	int32 LastCameraStep = 0;
 	bool bStationViewExpanded = false;
 };

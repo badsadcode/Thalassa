@@ -39,9 +39,9 @@ private:
 	void TickDiverBot(float DeltaSeconds);
 	void TickHelmBot(float DeltaSeconds);
 
-	/** At the helm, walk onto the helmsman's spot and stay there. */
-	void HoldHelmPosition();
-	bool IsAtHelm() const;
+	/** At a station, walk onto its spot and stay there. */
+	void HoldStationPosition();
+	bool IsAtStation() const;
 	void ApplyCrewNudge();
 
 	/** Crew closer than this, centre to centre, are nudged apart. Capsules touch at 68 cm. */
