@@ -39,6 +39,10 @@ private:
 	void OnHelmTurn(const FInputActionValue& Value);
 	void OnHelmDive(const FInputActionValue& Value);
 	void OnStartProfile();
+	void OnToggleSonar();
+
+	UFUNCTION(Server, Reliable)
+	void ServerToggleSonar();
 
 	UFUNCTION(Server, Reliable)
 	void ServerSetHelm(float Throttle, float Turn, float Dive);

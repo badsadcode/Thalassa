@@ -148,6 +148,8 @@ def report(folder):
             f"{last['outside']:.0f} frames outside hull, no base {ungrounded:.1f}% of samples, "
             f"worst frame {last['worst_frame'] * 1000:.0f} ms, ping median {statistics.median(pings):.0f} ms")
         lines.append(f"    beeps seen at end: {moving[-1]['beeps']:.0f}")
+        if moving[-1].get("sonar_cells"):
+            lines.append(f"    sonar chart at end: {moving[-1]['sonar_cells']:.0f} cells, checksum {moving[-1]['sonar_sum']:.0f}")
         swimming = sum(1 for r in own if r["mode"] == MOVE_FLYING) / len(own) * 100
         if last.get("eva") or swimming:
             lines.append(f"    EVA: {last.get('eva', 0):.0f} complete trips, swimming {swimming:.0f}% of samples")

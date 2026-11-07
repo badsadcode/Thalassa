@@ -1,4 +1,4 @@
-"""Creates /Game/TestMaps/L_ShipMotion: light, fog and a seabed to judge ship motion against.
+"""Creates or rebuilds /Game/TestMaps/L_ShipMotion: light, fog and a seabed to judge ship motion against.
 
 Run with: UnrealEditor-Cmd.exe Thalassa.uproject -ExecutePythonScript=<this file> -unattended
 """
@@ -12,7 +12,13 @@ GRID_RADIUS = 6
 level = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 
-if not level.new_level(MAP_PATH):
+# Rebuild in place if the map exists: it is the editor's startup map, so it cannot simply be deleted.
+if unreal.EditorAssetLibrary.does_asset_exist(MAP_PATH):
+    if not level.load_level(MAP_PATH):
+        raise RuntimeError("could not load " + MAP_PATH)
+    for existing in actors.get_all_level_actors():
+        actors.destroy_actor(existing)
+elif not level.new_level(MAP_PATH):
     raise RuntimeError("could not create " + MAP_PATH)
 
 sun = actors.spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0, 0, 0), unreal.Rotator(0, -60, 30))
@@ -28,6 +34,12 @@ fog.component.set_editor_property("fog_density", 0.002)
 fog.component.set_editor_property("fog_inscattering_luminance", unreal.LinearColor(0.02, 0.18, 0.28, 1.0))
 
 cube = unreal.load_asset("/Engine/BasicShapes/Cube")
+
+# The seabed itself: a flat floor under the landmarks, for the sonar to find.
+seabed = actors.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(0, 0, SEABED_Z - 500.0))
+seabed.static_mesh_component.set_static_mesh(cube)
+seabed.set_actor_scale3d(unreal.Vector(2000.0, 2000.0, 10.0))
+seabed.set_actor_label("Seabed")
 for ix in range(-GRID_RADIUS, GRID_RADIUS + 1):
     for iy in range(-GRID_RADIUS, GRID_RADIUS + 1):
         # A fixed, repeating height pattern: static landmarks, so ship motion is easy to read.

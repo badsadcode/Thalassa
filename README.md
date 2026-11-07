@@ -42,6 +42,7 @@ Open `Thalassa.uproject` in the editor and press Play. You start on the main dec
 | I / K | Helm: forward / reverse |
 | J / L | Helm: turn port / starboard |
 | U / O | Helm: dive / climb |
+| N | Sonar on or off; Tab shows its chart |
 | P | Run the scripted motion test |
 
 ## Test

@@ -7,6 +7,7 @@
 class UInstancedStaticMeshComponent;
 class UStaticMeshComponent;
 class UTextRenderComponent;
+class UThalassaSonarComponent;
 
 /** Authoritative vessel pose, published by the server and dead-reckoned by clients. */
 USTRUCT()
@@ -103,6 +104,7 @@ public:
 	UPrimitiveComponent* GetMovementBaseComponent() const;
 
 	FVector GetWorldVelocity() const { return Snapshot.Velocity; }
+	UThalassaSonarComponent* GetSonar() const { return Sonar; }
 	EAirlockState GetAirlockState() const { return AirlockState; }
 	float GetAirlockWaterLevel() const { return AirlockWaterLevel; }
 	bool IsAirlockDoorwayBlocked() const { return bAirlockDoorwayBlocked; }
@@ -142,6 +144,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UTextRenderComponent> ConsoleText;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaSonarComponent> Sonar;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> AirlockInnerDoor;

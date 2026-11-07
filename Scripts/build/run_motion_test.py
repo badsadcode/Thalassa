@@ -41,6 +41,7 @@ def main():
     parser.add_argument("--eva", action="store_true", help="slow ship; first client is a diver, others walk")
     parser.add_argument("--eva-all", action="store_true", help="slow ship; everyone is a diver, sharing the airlock")
     parser.add_argument("--exe", help="test a packaged build's Thalassa.exe instead of the editor")
+    parser.add_argument("--sonar", action="store_true", help="survey with the sonar during the test")
     parser.add_argument("--deck", action="store_true", help="use the real deck instead of the test rig")
     parser.add_argument("--hull-stretch", type=float, help="stretch the hull lengthwise; walkers only")
     parser.add_argument("--no-jump", action="store_true", help="walkers never jump")
@@ -70,6 +71,8 @@ def main():
         common.append("-ThalassaSpawnTogether")
     if args.eva or args.eva_all:
         common.append("-ThalassaEvaProfile")
+    if args.sonar:
+        common.append("-ThalassaSonar")
     if not args.deck:
         common.append("-ThalassaTestRig")
     if args.hull_stretch:

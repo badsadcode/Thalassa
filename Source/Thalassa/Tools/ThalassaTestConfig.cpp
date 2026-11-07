@@ -64,6 +64,12 @@ namespace ThalassaTestConfig
 		return bValue;
 	}
 
+	bool IsSonarOnForTest()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaSonar"));
+		return bValue;
+	}
+
 	bool IsBotJumpDisabled()
 	{
 		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoJump"));

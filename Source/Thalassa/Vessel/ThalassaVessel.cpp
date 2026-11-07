@@ -1,5 +1,6 @@
 #include "Vessel/ThalassaVessel.h"
 
+#include "Vessel/ThalassaSonarComponent.h"
 #include "Vessel/ThalassaVesselLayout.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
@@ -290,6 +291,8 @@ AThalassaVessel::AThalassaVessel()
 		Lamp->SetCastShadows(false);
 	}
 
+	Sonar = CreateDefaultSubobject<UThalassaSonarComponent>(TEXT("Sonar"));
+
 	ConsoleText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("ConsoleText"));
 	ConsoleText->SetupAttachment(ShipRoot);
 	ConsoleText->SetRelativeLocation(Layout.ConsoleTextLocation);
@@ -346,6 +349,11 @@ void AThalassaVessel::BeginPlay()
 	Super::BeginPlay();
 
 	PoseRotation = GetActorRotation();
+
+	if (HasAuthority() && ThalassaTestConfig::IsSonarOnForTest())
+	{
+		Sonar->SetSurveying(true);
+	}
 
 	// Tint the graybox so compartments are recognisable. No effect on simulation.
 	if (GetNetMode() != NM_DedicatedServer)

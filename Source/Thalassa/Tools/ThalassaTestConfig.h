@@ -32,6 +32,9 @@ namespace ThalassaTestConfig
 	/** -ThalassaWalkStraight: the local player holds forward and logs where they go. */
 	bool IsWalkStraight();
 
+	/** -ThalassaSonar: the motion test runs with the sonar surveying. */
+	bool IsSonarOnForTest();
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

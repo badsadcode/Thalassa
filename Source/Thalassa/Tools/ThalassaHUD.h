@@ -22,5 +22,6 @@ private:
 	float ScreenshotClock = 0.f;
 	bool bScreenshotRequested = false;
 
+	void DrawSonarChart(const class AThalassaVessel* Vessel);
 	void DrawLines(const TArray<FString>& Lines, float X, float Y, const FLinearColor& Color, float Scale);
 };

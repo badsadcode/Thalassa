@@ -8,6 +8,9 @@
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Vessel/ThalassaSonarComponent.h"
 #include "Vessel/ThalassaVessel.h"
 
 UInputAction* AThalassaPlayerController::MakeAction(const TCHAR* Name, EInputActionValueType ValueType)
@@ -59,6 +62,9 @@ void AThalassaPlayerController::SetupInputComponent()
 	UInputAction* StationView = MakeAction(TEXT("StationView"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(StationView, EKeys::Tab);
 
+	UInputAction* ToggleSonar = MakeAction(TEXT("ToggleSonar"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(ToggleSonar, EKeys::N);
+
 	UInputAction* StartProfile = MakeAction(TEXT("StartProfile"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(StartProfile, EKeys::P);
 
@@ -83,6 +89,7 @@ void AThalassaPlayerController::SetupInputComponent()
 	Input->BindAction(InteractAction, ETriggerEvent::Started, this, &AThalassaPlayerController::OnInteract);
 	Input->BindAction(StationView, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleStationView);
 	Input->BindAction(StartProfile, ETriggerEvent::Started, this, &AThalassaPlayerController::OnStartProfile);
+	Input->BindAction(ToggleSonar, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleSonar);
 
 	// Each helm axis reports both changes and release (Completed delivers zero).
 	Input->BindAction(Throttle, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnHelmThrottle);
@@ -104,6 +111,7 @@ void AThalassaPlayerController::BeginPlay()
 			Subsystem->AddMappingContext(MappingContext, 0);
 		}
 		SetInputMode(FInputModeGameOnly());
+		bStationViewExpanded = FParse::Param(FCommandLine::Get(), TEXT("ThalassaStationView"));
 	}
 }
 
@@ -202,6 +210,19 @@ void AThalassaPlayerController::OnHelmDive(const FInputActionValue& Value)
 void AThalassaPlayerController::OnStartProfile()
 {
 	ServerStartProfile();
+}
+
+void AThalassaPlayerController::OnToggleSonar()
+{
+	ServerToggleSonar();
+}
+
+void AThalassaPlayerController::ServerToggleSonar_Implementation()
+{
+	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
+	{
+		Vessel->GetSonar()->SetSurveying(!Vessel->GetSonar()->IsSurveying());
+	}
 }
 
 void AThalassaPlayerController::ServerSetHelm_Implementation(float Throttle, float Turn, float Dive)

@@ -4,6 +4,8 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 ## 2026-11-07
 
+**The sonar chart is fixed to the world, in 25 m cells, and only measured cells exist.** It is replicated as one shared survey, and each client draws its own texture from it. See [SONAR.md](SONAR.md).
+
 **The ship must not be a cigar with rooms in a row (owner's direction).** No `[BRIDGE][ROOM][AIRLOCK][ROOM]` chain. The hull has a varied silhouette, and each deck is a network: main corridors that loop, side corridors, junctions, and more than one route between places. Rooms vary in size and shape, and sit off corridors rather than opening into each other. Watertight doors are placed at points along corridors, not between every room. The current three-compartment graybox is only a test rig.
 
 **The ship should be easy to get lost in at first (owner's direction).** Asymmetric layouts, so players need time to learn the ship before it feels like home. Stairs and ladders connect places as well as lifts. Floors within a deck are not all level: a few steps up or down between areas, and a bridge with stations on different levels, in the spirit of a starship bridge. Navigation help should stay light so that learning the ship is part of the game, and never block an emergency.
