@@ -3,7 +3,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 // The hand-edited project status shown on the home page. Keep it honest; nothing updates it for you.
 export const PROJECT_STATUS = {
   stage: 'Prototype / systems testing',
-  note: 'Proving that a crew can walk around inside a moving submarine over a network. There is no playable build yet.',
+  note: 'A crew can walk, climb, swim and survey aboard a moving grey-box test ship over a network. It is a test, not a game yet, and there is nothing to download.',
 };
 
 export const REPO_URL = 'https://github.com/badsadcode/Thalassa';
