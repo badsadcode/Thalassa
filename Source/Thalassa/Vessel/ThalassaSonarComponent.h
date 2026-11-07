@@ -36,6 +36,8 @@ class THALASSA_API UThalassaSonarComponent : public UActorComponent
 public:
 	UThalassaSonarComponent();
 
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -62,6 +64,11 @@ private:
 	void RecordHit(const FVector& WorldHit);
 	void RebuildTexture();
 
+	/** Server: the save slot to use, or empty for none. Real play uses one; tests only if asked. */
+	FString GetSaveSlot() const;
+	void LoadSurvey();
+	void SaveSurvey();
+
 	UFUNCTION()
 	void OnRep_Cells();
 
@@ -78,5 +85,7 @@ private:
 	TObjectPtr<UTexture2D> ChartTexture;
 
 	bool bTextureDirty = true;
+	bool bUnsavedChanges = false;
+	float SaveTimer = 0.f;
 	float SweepTimer = 0.f;
 };

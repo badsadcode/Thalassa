@@ -20,9 +20,14 @@ The code is `UThalassaSonarComponent`, on the vessel. The survey and how it is d
 
 Both ran the full manoeuvre profile with walkers aboard. Walking was unaffected. A frame from a stationary ship confirms the chart's orientation: the swath lies across the track, just ahead of the bow.
 
+## Saving
+
+The host saves the chart every 30 seconds and when the game closes, and loads it on start, so it reaches everyone who joins afterwards. It lives in `Saved/SaveGames/ShipSurvey.sav` in the project, or in the packaged game's folder. Delete that file to start a fresh chart. The file records its version and grid, and a chart from a different grid is not loaded.
+
+Tests never touch that file: with telemetry on, nothing is saved unless a test names its own slot. `python Scripts/build/test_survey_persistence.py` checks the whole loop. A game surveyed 36 cells and quit. A new game, with the sonar off, loaded the same 36 cells, and a client who joined afterwards received an identical chart.
+
 ## Not done yet
 
-- **Persistence.** The chart is lost when the game closes. Phase 2's gate requires save and reload.
 - **A physical console screen.** The chart is only on the HUD. The design document wants the same data on a console in the world.
 - **Scale.** The array of cells replicates as it grows. A few thousand cells is fine; a whole ocean would need tiles sent on request.
 - **Imperfection.** Returns are exact. Real sonar has noise, shadows behind obstacles, and resolution that falls with range.

@@ -19,7 +19,7 @@ The grey deck is temporary, and the final interiors will replace it. These rules
 ## Ladders
 
 9. **Every ladder has a climbing zone** in front of it: about 25 cm deep, its full width, and from its foot to just above its top. The visible rungs are not collision.
-10. **Known problem:** two people arriving at a ladder foot together push each other away from it with the crew nudge, and neither can climb. The nudge is already off while climbing. It also needs to be off, or weaker, near a ladder foot.
+10. **Known problem, cause not found:** when two walkers reach a ladder foot together, neither manages to climb. They hover at the edge of the climbing zone, switching between climbing and falling many times. Switching the crew nudge off within 1.5 m of a ladder did not help, so the nudge is not the cause. A single walker climbs fine. Start by logging movement mode and position each frame for both characters at the ladder foot.
 
 ## Lights
 

@@ -104,8 +104,10 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 
 void AThalassaCharacter::ApplyCrewNudge()
 {
-	// Never on a ladder: it would push you sideways off it, and you would fall and grab it again.
-	if (GetThalassaMovement()->IsClimbingLadder())
+	// Never on or near a ladder: it would push you sideways off it, or keep two people at its foot
+	// pushing each other away from it, so that neither can climb.
+	constexpr float LadderClearanceCm = 150.f;
+	if (GetThalassaMovement()->IsClimbingLadder() || (BoundVessel && BoundVessel->IsLadderAt(GetActorLocation(), LadderClearanceCm)))
 	{
 		return;
 	}

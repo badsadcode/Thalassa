@@ -636,12 +636,12 @@ bool AThalassaVessel::IsWaterAt(const FVector& WorldLocation) const
 		&& Local.Z < AirlockWaterLevel * ThalassaVesselLayout::AirlockCeilingCm;
 }
 
-bool AThalassaVessel::IsLadderAt(const FVector& WorldLocation) const
+bool AThalassaVessel::IsLadderAt(const FVector& WorldLocation, float MarginCm) const
 {
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
 	for (const FBox& Ladder : GetLayout().LadderZones)
 	{
-		if (Ladder.IsInsideOrOn(Local))
+		if (Ladder.ExpandBy(MarginCm).IsInsideOrOn(Local))
 		{
 			return true;
 		}

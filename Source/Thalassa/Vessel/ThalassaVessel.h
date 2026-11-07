@@ -95,7 +95,7 @@ public:
 	bool IsInCompartment(const FVector& WorldLocation) const;
 
 	/** True if a character here can hold onto a ladder. */
-	bool IsLadderAt(const FVector& WorldLocation) const;
+	bool IsLadderAt(const FVector& WorldLocation, float MarginCm = 0.f) const;
 
 	/** The ship's route for the scripted walker, in ship coordinates. Empty on the test rig. */
 	const TArray<FVector>& GetTourRoute() const;

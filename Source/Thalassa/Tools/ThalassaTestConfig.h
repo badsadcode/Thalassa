@@ -35,6 +35,9 @@ namespace ThalassaTestConfig
 	/** -ThalassaSonar: the motion test runs with the sonar surveying. */
 	bool IsSonarOnForTest();
 
+	/** -ThalassaSurveySlot=name: save and load the sonar chart in this slot during a test. */
+	bool GetSurveySaveSlot(FString& OutSlot);
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

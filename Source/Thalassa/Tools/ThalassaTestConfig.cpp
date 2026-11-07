@@ -70,6 +70,11 @@ namespace ThalassaTestConfig
 		return bValue;
 	}
 
+	bool GetSurveySaveSlot(FString& OutSlot)
+	{
+		return FParse::Value(FCommandLine::Get(), TEXT("ThalassaSurveySlot="), OutSlot);
+	}
+
 	bool IsBotJumpDisabled()
 	{
 		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoJump"));
