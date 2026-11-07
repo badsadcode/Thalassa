@@ -1,6 +1,7 @@
 #include "Vessel/ThalassaVessel.h"
 
 #include "Vessel/ThalassaSonarComponent.h"
+#include "Engine/StaticMeshActor.h"
 #include "Vessel/ThalassaSonarDisplay.h"
 #include "Vessel/ThalassaSonarPingComponent.h"
 #include "Vessel/ThalassaHelmComponent.h"
@@ -449,6 +450,19 @@ void AThalassaVessel::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
+	// The greybox can be hidden to see the art alone. Runs in the Blueprint editor too.
+	int32 PieceIndex = 0;
+	for (const FHullBox& Box : GetLayout().Boxes)
+	{
+		if (HullPieces.IsValidIndex(PieceIndex))
+		{
+			HullPieces[PieceIndex]->SetVisibility(Box.bVisible && bShowGreybox);
+		}
+		++PieceIndex;
+	}
+
+	MakeArtVisualOnly();
+
 	// Runs on server and clients alike, so both see identical collision.
 	if (HullCollision->GetInstanceCount() == 0)
 	{
@@ -467,6 +481,23 @@ void AThalassaVessel::BeginPlay()
 	Super::BeginPlay();
 
 	PoseRotation = GetActorRotation();
+
+	if (ThalassaTestConfig::IsArtProbe())
+	{
+		// A solid crate, as an artist might add one, in the corridor the walkers use. It must not stop them.
+		AStaticMeshActor* Crate = GetWorld()->SpawnActor<AStaticMeshActor>(GetActorTransform().TransformPosition(FVector(500.f, -1500.f, 75.f)), GetActorRotation());
+		if (Crate)
+		{
+			Crate->SetMobility(EComponentMobility::Movable);
+			Crate->GetStaticMeshComponent()->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
+			Crate->GetStaticMeshComponent()->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+			Crate->SetActorScale3D(FVector(1.5f));
+			Crate->AttachToComponent(ShipRoot, FAttachmentTransformRules::KeepWorldTransform);
+		}
+	}
+
+	// Child actors, such as packaged rooms, exist by now. Construction ran before they did.
+	MakeArtVisualOnly();
 
 	if (HasAuthority() && ThalassaTestConfig::IsSonarOnForTest())
 	{
@@ -541,6 +572,69 @@ void AThalassaVessel::StartProfile()
 	{
 		ProfileState = EVesselProfileState::Running;
 		ProfileStartTime = GetWorld()->GetTimeSeconds();
+	}
+}
+
+namespace
+{
+	/** Scenery: no standing on it, no bumping into it. Line traces, such as looking at a console, still work. */
+	void MakeVisualOnly(UPrimitiveComponent* Primitive)
+	{
+		if (Primitive->GetCollisionEnabled() == ECollisionEnabled::NoCollision)
+		{
+			return;
+		}
+		if (Primitive->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Ignore || Primitive->CanCharacterStepUpOn != ECB_No)
+		{
+			UE_LOG(LogTemp, Display, TEXT("THALASSA: %s.%s is scenery on the ship, so players now pass through it. Walkable collision belongs in the ship's one collision component."),
+				*GetNameSafe(Primitive->GetOwner()), *Primitive->GetName());
+		}
+		Primitive->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		Primitive->CanCharacterStepUpOn = ECB_No;
+		Primitive->SetCanEverAffectNavigation(false);
+	}
+}
+
+void AThalassaVessel::MakeArtVisualOnly()
+{
+	// Components added in the Blueprint. The ship's own, made in C++, are already set up as they must be.
+	TInlineComponentArray<UPrimitiveComponent*> Primitives(this);
+	for (UPrimitiveComponent* Primitive : Primitives)
+	{
+		if (Primitive->CreationMethod != EComponentCreationMethod::Native)
+		{
+			MakeVisualOnly(Primitive);
+		}
+	}
+
+	// Actors attached to the ship, such as rooms built as their own Blueprints. Never a crew member.
+	ArtActors.Reset();
+	TArray<AActor*> Attached;
+	GetAttachedActors(Attached, true, true);
+	for (AActor* Actor : Attached)
+	{
+		if (!Actor || Actor->IsA<APawn>())
+		{
+			continue;
+		}
+		ArtActors.Add(Actor);
+		TInlineComponentArray<UPrimitiveComponent*> ActorPrimitives(Actor);
+		for (UPrimitiveComponent* Primitive : ActorPrimitives)
+		{
+			MakeVisualOnly(Primitive);
+		}
+	}
+}
+
+void AThalassaVessel::IgnoreShipInQuery(FCollisionQueryParams& Params) const
+{
+	Params.AddIgnoredActor(this);
+	for (const TWeakObjectPtr<AActor>& Actor : ArtActors)
+	{
+		if (Actor.IsValid())
+		{
+			Params.AddIgnoredActor(Actor.Get());
+		}
 	}
 }
 
@@ -641,7 +735,8 @@ float AThalassaVessel::GetSecondsSinceCollision() const
 bool AThalassaVessel::IsHullBlocked(const FVector& Location, const FQuat& Rotation) const
 {
 	const FBox& HullBox = GetLayout().HullBounds;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(ThalassaHullOverlap), false, this);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(ThalassaHullOverlap), false);
+	IgnoreShipInQuery(Params);
 	return GetWorld()->OverlapAnyTestByObjectType(Location + Rotation.RotateVector(HullBox.GetCenter()), Rotation,
 		FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionShape::MakeBox(HullBox.GetExtent()), Params);
 }
@@ -669,7 +764,8 @@ FVector AThalassaVessel::ConstrainMove(const FVector& From, const FVector& To, c
 		return Result;
 	}
 
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(ThalassaHull), false, this);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(ThalassaHull), false);
+	IgnoreShipInQuery(Params);
 	FHitResult Hit;
 	const bool bHit = GetWorld()->SweepSingleByObjectType(Hit, From + Center, Result + Center, Rotation,
 		FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionShape::MakeBox(HullBox.GetExtent()), Params);

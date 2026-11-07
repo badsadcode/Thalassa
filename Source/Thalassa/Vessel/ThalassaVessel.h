@@ -79,6 +79,16 @@ public:
 
 	static AThalassaVessel* Find(const UWorld* World);
 
+	/** Makes a world query ignore the ship itself and everything built onto it, such as rooms added in its Blueprint. */
+	void IgnoreShipInQuery(FCollisionQueryParams& Params) const;
+
+	/**
+	 * The grey boxes. Switch off to see the art alone, in the Blueprint editor or in play. Only what you
+	 * see changes: walking still uses the grey layout's collision until a walkable shell replaces it.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Thalassa|Art")
+	bool bShowGreybox = true;
+
 	/** World-space spawn point for the Nth player. */
 	FTransform GetSpawnTransform(int32 PlayerIndex) const;
 
@@ -167,6 +177,13 @@ private:
 	void UpdateClockFromSnapshot();
 	void GetExtrapolatedPose(double Time, FVector& OutPosition, FQuat& OutRotation) const;
 	void UpdateConsoleText(float DeltaSeconds);
+
+	/**
+	 * Everything added to the ship in its Blueprint, and any actor attached to it, is scenery: players can
+	 * neither stand on it nor bump into it. All walkable collision must stay in one component
+	 * (docs/INTERIOR_RULES.md, rule 1), or players appear metres from where they are on bad connections.
+	 */
+	void MakeArtVisualOnly();
 	void TickAirlockServer(float DeltaSeconds);
 	void TickAirlockVisuals(float DeltaSeconds);
 	bool IsDoorwayOccupied(float DoorY) const;
@@ -274,6 +291,9 @@ private:
 
 	/** Server: the hull was against something last tick. */
 	bool bTouching = false;
+
+	/** Actors built onto the ship. Ignored by the ship's own collision checks and by the sonar. */
+	TArray<TWeakObjectPtr<AActor>> ArtActors;
 
 	// Server motion state. Targets come from the helm or from the motion profile.
 	float SpeedCmS = 0.f;

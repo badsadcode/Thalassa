@@ -1,6 +1,6 @@
 # Rules for the ship's interior
 
-The grey deck is temporary, and the final interiors will replace it. These rules are not temporary: each one came from a test that failed. A final model that breaks one brings its bug back.
+The grey deck is temporary, and the final interiors will replace it. How to build them is in [SHIP_ART.md](SHIP_ART.md). These rules are not temporary: each one came from a test that failed. A final model that breaks one brings its bug back.
 
 ## Collision
 

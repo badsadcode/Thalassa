@@ -24,7 +24,17 @@ void AThalassaGameMode::InitGameState()
 	// 200 m below the surface (Z = 0), well clear of the test seabed.
 	FVector Start(0.f, 0.f, -20000.f);
 	ThalassaTestConfig::GetShipStartOverride(Start);
-	Vessel = GetWorld()->SpawnActor<AThalassaVessel>(Start, FRotator::ZeroRotator, Params);
+	UClass* ShipClass = VesselClass.IsNull() ? nullptr : VesselClass.LoadSynchronous();
+	if (!ShipClass)
+	{
+		if (!VesselClass.IsNull())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("THALASSA: ship class %s did not load; using the plain C++ ship."), *VesselClass.ToString());
+		}
+		ShipClass = AThalassaVessel::StaticClass();
+	}
+	UE_LOG(LogTemp, Display, TEXT("THALASSA: spawning ship %s"), *ShipClass->GetName());
+	Vessel = GetWorld()->SpawnActor<AThalassaVessel>(ShipClass, Start, FRotator::ZeroRotator, Params);
 }
 
 void AThalassaGameMode::PostLogin(APlayerController* NewPlayer)

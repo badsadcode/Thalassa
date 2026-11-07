@@ -7,7 +7,7 @@
 class AThalassaVessel;
 
 /** Spawns the vessel, puts every player aboard it, and starts the motion test when configured. */
-UCLASS()
+UCLASS(Config = Game)
 class THALASSA_API AThalassaGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
@@ -22,6 +22,13 @@ public:
 
 private:
 	void StartProfile();
+
+	/**
+	 * The ship to spawn: the ship Blueprint the art is built in (DefaultGame.ini). If it is missing or
+	 * fails to load, the plain C++ ship is used instead, and the log says so.
+	 */
+	UPROPERTY(Config)
+	TSoftClassPtr<AThalassaVessel> VesselClass;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AThalassaVessel> Vessel;

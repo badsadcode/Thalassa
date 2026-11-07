@@ -56,6 +56,9 @@ namespace ThalassaTestConfig
 	/** -ThalassaSlide: scripted walkers sprint, and slide every few seconds. */
 	bool IsBotSliding();
 
+	/** -ThalassaArtProbe: attach a solid crate to the ship in the walkers' path, to test that art never blocks anyone. */
+	bool IsArtProbe();
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

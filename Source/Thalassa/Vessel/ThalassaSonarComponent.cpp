@@ -5,6 +5,7 @@
 #include "Thalassa.h"
 #include "Tools/ThalassaTestConfig.h"
 #include "Vessel/ThalassaSurveySave.h"
+#include "Vessel/ThalassaVessel.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
@@ -166,6 +167,10 @@ void UThalassaSonarComponent::SweepServer()
 	const FVector Origin = Ship->GetActorLocation();
 
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(ThalassaSonar), false, Ship);
+	if (const AThalassaVessel* Vessel = Cast<AThalassaVessel>(Ship))
+	{
+		Vessel->IgnoreShipInQuery(Params); // Never map the ship's own hull.
+	}
 	FCollisionObjectQueryParams Objects(ECC_WorldStatic);
 
 	const float ForwardTilt = FMath::DegreesToRadians(ForwardTiltDeg);
