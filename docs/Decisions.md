@@ -4,6 +4,16 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 ## 2026-11-07
 
+**Setting: the ocean world Thalassa, settled by humanity for generations (owner's direction).** This answers the design document's open "alien planet or future Earth" question, and explains the cities, industries, trade networks, and people who find the ocean normal. An initial sketch, public at `site/src/pages/world.astro`, and expected to change.
+
+**The Long Call and the Viator are never objectives (owner's direction).** Players find them organically, perhaps after dozens of hours of ordinary exploration. No quest marker, no "Find the Viator: 0/1". Consequences for systems:
+
+- Rare acoustic events need a stable signature identity, so a clip recorded early can be recognised as the same sound many expeditions later. The hydrophone archive must keep these for the life of a save.
+- Nothing may announce what a recording is. Recognising it is the player's job, with the archive's comparison tools at most suggesting a match.
+- Nothing may steer the player toward them, and a whole game without ever solving them must still be complete.
+
+**Tone: the crew can be funny, the setting is not (owner's direction).** Sea Chicken recipes and a sarcastic ship computer sit alongside exploration, science, isolation and danger, all taken seriously.
+
 **Crew use soft collision (owner's choice).** Crew do not block each other, and are nudged apart through ordinary movement input. Hard collision caused up to 1430 corrections per client with four players; this caused at most 1. The nudge strength is untuned.
 
 **All hull collision is one component.** A character's movement base must not change as they walk around the ship. Under packet loss, several bases made other players appear 16 m away. A real hull mesh must keep this.
@@ -34,4 +44,4 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 ## Still open
 
-From design document section 26: setting, ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.
+From design document section 26: ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.

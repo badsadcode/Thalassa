@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import { REPO_URL } from '../site';
+import { REPO_URL, withBase } from '../site';
 ---
 
 <Base title="About" description="What THALASSA is, what the subtitle means, and who is making it.">
@@ -17,6 +17,10 @@ import { REPO_URL } from '../site';
       <p>
         The plan is a free game with no microtransactions and no paid servers. Co-op is designed in from the start, and a
         solo player gets an AI crew to run the ship alongside them.
+      </p>
+
+      <p>
+        It is set on <a href={withBase('/world/')}>an ocean world</a> where humanity has lived beneath the waves for generations.
       </p>
 
       <h2>Why "Beep. Bloop."?</h2>

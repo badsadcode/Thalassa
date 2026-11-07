@@ -1,0 +1,368 @@
+---
+import Base from '../layouts/Base.astro';
+import { withBase } from '../site';
+
+const stations = [
+  { name: 'Industrial settlements', text: 'Built around mineral deposits and geothermal plants. They keep the heavy machinery of civilisation running.' },
+  { name: 'Biological stations', text: 'Aquaculture, algae and food, from organisms native to Thalassa and carefully adapted descendants of Earth species.' },
+  { name: 'Research outposts', text: 'Sometimes well funded. Sometimes a handful of scientists and equipment that should have been replaced decades ago.' },
+  { name: 'Trading hubs', text: 'Cargo, crew, repairs and rumours. The closest thing Thalassa has to cities.' },
+  { name: 'Independent installations', text: 'Private mines, isolated labs, abandoned facilities, and places that left the trade networks on purpose. Some welcome visitors. Some do not.' },
+];
+
+const aboard = ['A bridge', 'Engineering', 'Crew quarters', 'A galley', 'Laboratories', 'Medical', 'An observation lounge', 'A hangar', 'Narrow corridors between them all'];
+---
+
+<Base
+  title="The World"
+  description="The setting of THALASSA: an ocean world where humanity lives beneath the waves, most of the charts are blank, and something very large may or may not exist."
+  image="/images/concept/ruins.jpg"
+>
+  <header class="opening">
+    <img
+      src={withBase('/images/concept/ruins.jpg')}
+      alt="Concept art: stone arches and stairs on the seabed, lit from within by cyan bioluminescence."
+      width="1000"
+      height="857"
+    />
+    <div class="wrap opening-text">
+      <p class="eyebrow">Working sketch / the setting</p>
+      <h1>The World</h1>
+      <div class="narration">
+        <p>There is a world far from Earth.</p>
+        <p>A world without continents. Without roads connecting its cities.</p>
+        <p>There is only water.</p>
+        <p>You have a ship. You have a crew. And beyond your observation windows lies an ocean that does not yet know your name.</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <aside class="notice">
+      <p class="label">Status: concept</p>
+      <p>
+        This is an early sketch of where THALASSA is set and what it is about. It will change as the game does, and
+        almost none of it exists in the game yet. <a href={withBase('/devlog/')}>The devlog</a> is the place to see what does.
+      </p>
+    </aside>
+
+    <section class="chapter">
+      <p class="eyebrow">Survey file 01</p>
+      <h2>A second ocean</h2>
+      <div class="prose">
+        <p>
+          Nobody came to Thalassa expecting to build a civilisation. It was logged as a resource world: distant, breathable,
+          rich in minerals and unusually full of life. Orbital surveys found almost no land. More than ninety-nine percent of
+          the surface was water, over mountain ranges, drowned continents and trenches deeper than the first vehicles could reach.
+        </p>
+        <p class="pull">The planet was beautiful. It was also profoundly inconvenient.</p>
+        <p>
+          Surface storms made floating installations expensive to keep, so the first permanent settlements went underwater:
+          along the continental shelves, in sheltered formations, and near hydrothermal vents where energy and food were easy
+          to find. Settlements became towns, and towns became ports and independent communities. Generations passed, and
+          children were born who had never stood on solid ground. To them the ocean was not an alien environment. It was home.
+        </p>
+        <p>They named it with a word borrowed from an ancient Earth language. <em>Thalassa.</em> The sea.</p>
+      </div>
+    </section>
+
+    <hr class="contour" />
+
+    <section class="chapter">
+      <p class="eyebrow">Survey file 02</p>
+      <h2>The civilisation beneath</h2>
+      <div class="prose">
+        <p>
+          No empire rules Thalassa. People are scattered across enormous distances, connected by the ocean and isolated by it
+          too. A trip between stations can take hours or much longer, depending on distance, currents, your vessel and what
+          you meet on the way.
+        </p>
+      </div>
+      <ul class="stations">
+        {
+          stations.map((station) => (
+            <li>
+              <h3>{station.name}</h3>
+              <p>{station.text}</p>
+            </li>
+          ))
+        }
+      </ul>
+      <div class="prose">
+        <p>
+          Not every unfamiliar station is dangerous, and not every friendly-looking one is entirely honest. But most people
+          here are just trying to make a living. Nobody is fighting a grand war for the ocean. They are trying to survive,
+          prosper, and understand the planet they live on.
+        </p>
+      </div>
+    </section>
+
+    <hr class="contour" />
+
+    <section class="chapter">
+      <p class="eyebrow">Survey file 03</p>
+      <h2>We have mapped almost nothing</h2>
+      <div class="prose">
+        <p>
+          After generations here, the charts still only cover the places people regularly go: shipping corridors, continental
+          shelves, known mineral fields. Beyond those, they grow uncertain. Depths are incomplete, sonar records contradict one
+          another, some geological structures appear to shift between surveys, and enormous migrating organisms get in the way
+          of the mapping.
+        </p>
+        <p>
+          Nothing forbids exploring the blanks. There is just always something more practical to do. A captain delivering
+          medicine has no reason to descend into an unknown trench, and a mining company will not pay to look where nothing is
+          confirmed. That is where independent exploration vessels come in.
+        </p>
+      </div>
+    </section>
+
+    <section class="chapter split">
+      <div>
+        <p class="eyebrow">Survey file 04</p>
+        <h2>A home between worlds</h2>
+        <div class="prose">
+          <p>
+            Your ship is a large, independent expedition submarine. It is not a warship, though it can protect itself. It is
+            not a liner, though its crew have made it comfortable. It is not just a freighter, though hauling supplies often
+            pays the bills.
+          </p>
+          <p>
+            It has a history, and some peculiarities. The crew know which doors need a little extra force to close, which
+            coolant pump makes a strange noise on startup, and which observation window has the best view through the
+            illuminated shallows.
+          </p>
+          <p>
+            You recruit specialists from the settlements, and over time they become familiar faces, with routines, experience,
+            and memories of the expeditions they survived.
+          </p>
+          <p class="pull">A submarine can be repaired. A lost crew member is not always so easily replaced.</p>
+        </div>
+      </div>
+      <div class="ship-side">
+        <figure>
+          <img src={withBase('/images/concept/submarine.jpg')} alt="Concept art: a riveted, weathered submarine with lit windows, its lamps cutting through dark water." loading="lazy" width="1000" height="598" />
+          <figcaption>Concept art, not the game.</figcaption>
+        </figure>
+        <p class="label">Aboard</p>
+        <ul class="aboard">
+          {aboard.map((space) => <li>{space}</li>)}
+        </ul>
+      </div>
+    </section>
+
+    <hr class="contour" />
+
+    <section class="chapter">
+      <p class="eyebrow">Survey file 05</p>
+      <h2>The ocean is alive</h2>
+      <div class="prose">
+        <p>
+          Reefs stretch across the sunlit shelves, and plant-like colonies rise from the seabed as whole forests. Deeper down,
+          life gets stranger. Luminous animals drift through enormous dark spaces, massive filter feeders follow ancient
+          migration routes, and predators hunt by pressure, heat, electricity and sound. Some organisms are colonies of
+          thousands. Some live for extraordinary lengths of time. Many species have been classified. Countless others have not.
+        </p>
+        <p>
+          Researchers tend to name unfamiliar creatures after Earth animals, not always because the resemblance means anything.
+          One common edible species is known across several settlements as the <strong>Sea Chicken</strong>. Its scientific name
+          is considerably less convenient, and the nickname has survived generations of taxonomic objections.
+        </p>
+        <p>Even on another world, people remain people.</p>
+      </div>
+    </section>
+
+    <hr class="contour" />
+
+    <section class="chapter unresolved">
+      <p class="eyebrow">Open file / unresolved</p>
+      <h2>The Long Call</h2>
+      <svg class="trace" viewBox="0 0 600 60" preserveAspectRatio="none" role="presentation" aria-hidden="true">
+        <path d="M0 30h170c18 0 22-3 34-3s18 6 34 6 16-22 34-22 18 44 40 44 20-34 38-34 14 14 30 14 18-5 34-5h186" />
+      </svg>
+      <div class="prose">
+        <p>
+          In the early decades of deep exploration, hydrophones recorded an unusually powerful low-frequency signal. It was
+          filed as geological, because Thalassa makes plenty of strange sounds. But on several occasions, instruments thousands
+          of kilometres apart seem to have recorded the same event.
+        </p>
+        <p>
+          Some scientists proposed an enormous organism. Others suggested tectonic resonance, deep currents, or errors in the
+          early sensors. One research vessel recorded what sounded like several immense tones at once. None of it proved
+          anything, and most people moved on with their lives.
+        </p>
+        <p>Occasionally, deep listening stations still record it. Sometimes decades pass between events. The source is unknown.</p>
+      </div>
+    </section>
+
+    <section class="chapter unresolved viator">
+      <div>
+        <p class="eyebrow">Open file / unconfirmed</p>
+        <h2>The Viator</h2>
+        <div class="prose">
+          <p>
+            One of the oldest stories among deep-water crews is of the Viator, from an old Earth word for <em>traveller</em>:
+            an organism of extraordinary size, moving slowly through the deepest water. Some accounts describe a surface
+            mistaken for the seabed. Others describe a single eye so large a submarine could cross it without realising what it
+            was looking at.
+          </p>
+          <p>
+            There is no reliable evidence it is hostile. The few credible accounts suggest it takes remarkably little interest
+            in ships. It may be one of a population. It may be exhausted sailors and misread geology. The most controversial
+            theory says it was here long before humanity arrived, and perhaps long before humanity existed.
+          </p>
+          <p class="pull">
+            On Thalassa, the difference between mythology and biology is sometimes a matter of obtaining a sufficiently good photograph.
+          </p>
+        </div>
+      </div>
+      <figure>
+        <img src={withBase('/images/concept/leviathan.jpg')} alt="Concept art: a whale-like creature speckled with glowing points, drifting beneath the surface above a school of fish." loading="lazy" width="1000" height="620" />
+        <figcaption>Concept art. Not a sufficiently good photograph.</figcaption>
+      </figure>
+    </section>
+
+    <hr class="contour" />
+
+    <section class="chapter">
+      <p class="eyebrow">Ship's log</p>
+      <h2>No chosen one. No imminent apocalypse.</h2>
+      <div class="prose">
+        <p>
+          No prophecy predicts your arrival, and no catastrophe waits on you finishing a list of missions. You command an
+          exploration vessel. Nothing more, and that is enough.
+        </p>
+        <p>
+          You might haul supplies between stations, investigate abandoned facilities, photograph unknown species, salvage
+          wrecks, or help an isolated settlement with a practical problem. You might become a respected explorer, or simply a
+          competent captain who looks after a ship and crew.
+        </p>
+        <p>
+          The mysteries of the deep can connect through what you discover, but you will never get a mission that says
+          <em>Find the Viator: 0/1</em>. Someone records a peculiar signal, and nobody thinks much of it. Several expeditions
+          later, someone recognises the same sound. Much later, deep inside an unexplored trench, you realise what you have
+          been listening to. Or you never do.
+        </p>
+        <p>
+          Some expeditions are peaceful scientific journeys. Others are desperate struggles to bring a damaged submarine home.
+          And some evenings are just beautiful water, the crew talking, and unfamiliar creatures drifting past the window.
+        </p>
+        <p class="pull">The ocean existed before you arrived. It will continue to exist when you leave.</p>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <p class="eyebrow">Ship's log</p>
+      <h2>Humanity travels with us</h2>
+      <div class="prose">
+        <p>
+          People still need ordinary things out here: a decent meal, a comfortable bed, someone to complain to when the coffee
+          machine breaks. Crews form habits and friendships, and argue over whose turn it is to clean the galley. The ship's AI
+          can be strictly professional or somewhat more expressive, but it is equally competent either way, and an emergency is
+          never a joke.
+        </p>
+        <p>
+          The humour comes from the people, not from a universe that refuses to take itself seriously. An engineer makes a dry
+          comment about the captain's piloting. A cook insists an unfamiliar animal tastes exactly like chicken. These moments
+          make the ship feel inhabited, and they make the silence of the abyss considerably more unsettling.
+        </p>
+      </div>
+    </section>
+
+    <hr class="contour" />
+
+    <section class="chapter closing">
+      <p class="eyebrow">What this is really about</p>
+      <div class="prose">
+        <p>
+          Thalassa does not exist to satisfy human expectations. A creature that destroys a submarine may be defending its
+          territory. A vast shadow beneath the window may be no danger at all. The ocean is neither kind nor cruel, and the
+          real challenge is understanding enough to share it, and perhaps learning when to leave something undisturbed.
+        </p>
+        <p>
+          At heart this is a game about curiosity, about the people you live and work with in a small and isolated place,
+          about looking after the machinery that keeps you alive, and about the peculiar mix of courage, foolishness and
+          optimism it takes to go somewhere too vast to ever fully understand.
+        </p>
+      </div>
+      <p class="final">We are not here to conquer it.<br />We are here to explore.</p>
+      <p class="sign"><em>Beep. Bloop.</em></p>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .opening {
+    position: relative;
+    display: grid;
+    align-items: end;
+    min-height: min(74vh, 660px);
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .opening > img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 55%;
+  }
+  .opening::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, var(--abyss) 8%, rgba(6, 19, 29, 0.72) 55%, rgba(6, 19, 29, 0.25));
+  }
+  .opening-text { position: relative; z-index: 1; padding-block: 3rem 2.5rem; }
+  h1 { margin: 0 0 1.2rem; font-size: clamp(2.4rem, 1.5rem + 4vw, 4.4rem); font-weight: 400; letter-spacing: 0.06em; }
+  .narration { max-width: 34rem; font-style: italic; font-size: 1.1em; }
+  .narration p { margin: 0 0 0.6rem; }
+  .narration p:last-child { margin: 1rem 0 0; color: var(--amber); }
+
+  .notice {
+    margin-top: 2.5rem;
+    padding: 1rem 1.25rem;
+    max-width: var(--measure);
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-left: 2px solid var(--amber);
+  }
+  .notice p { margin: 0; }
+  .notice .label { color: var(--amber); margin-bottom: 0.35rem; }
+
+  .chapter { padding-block: clamp(2.5rem, 6vw, 4rem); }
+  h2 { font-size: clamp(1.6rem, 1.3rem + 1.4vw, 2.4rem); margin: 0 0 1.2rem; }
+  .pull { font-family: var(--display); font-size: 1.2em; line-height: 1.35; color: var(--amber); }
+
+  .stations {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+    gap: 1.5rem 2rem;
+    margin: 2rem 0;
+    padding: 0;
+    list-style: none;
+  }
+  .stations li { border-top: 1px solid var(--sonar); padding-top: 0.8rem; }
+  .stations h3 { margin: 0 0 0.4rem; font-size: 1.1rem; }
+  .stations p { margin: 0; color: var(--muted); font-size: 0.95em; }
+
+  .split, .viator { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 2rem 3.5rem; align-items: start; }
+  figure { margin: 0; }
+  figure img { width: 100%; height: auto; border: 1px solid var(--panel-edge); }
+  figcaption { margin-top: 0.5rem; color: var(--muted); font-size: 0.9rem; }
+  .ship-side > .label { margin: 1.8rem 0 0.6rem; }
+  .aboard { margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: 0.98em; }
+  .aboard li { padding-block: 0.3rem; border-bottom: 1px solid var(--panel-edge); }
+
+  .unresolved .eyebrow { color: var(--coral); }
+  .trace { display: block; width: 100%; max-width: var(--measure); height: 60px; margin-bottom: 1.2rem; fill: none; stroke: var(--sonar); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+  .trace path { vector-effect: non-scaling-stroke; }
+
+  .final { margin: 2.5rem 0 1rem; font-family: var(--display); font-size: clamp(1.5rem, 1.2rem + 1.5vw, 2.4rem); line-height: 1.25; }
+  .sign { margin: 0; color: var(--amber); font-size: 1.2em; }
+
+  @media (max-width: 820px) {
+    .split, .viator { grid-template-columns: 1fr; }
+  }
+</style>
