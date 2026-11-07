@@ -61,6 +61,7 @@ private:
 	float BotPressCooldown = 0.f;
 
 	int32 BotWaypoint = 0;
+	bool bTourStarted = false;
 	float BotJumpTimer = 6.f;
 	float BotSecondsOnWaypoint = 0.f;
 };

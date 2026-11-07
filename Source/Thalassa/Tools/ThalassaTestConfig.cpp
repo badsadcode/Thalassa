@@ -40,6 +40,24 @@ namespace ThalassaTestConfig
 		return Value;
 	}
 
+	bool UseTestRig()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaTestRig"));
+		return bValue;
+	}
+
+	bool GetSpawnOverride(FVector& OutLocation)
+	{
+		FString Text;
+		TArray<FString> Parts;
+		if (!FParse::Value(FCommandLine::Get(), TEXT("ThalassaSpawnAt="), Text, /*bShouldStopOnSeparator=*/ false) || Text.ParseIntoArray(Parts, TEXT(",")) != 3)
+		{
+			return false;
+		}
+		OutLocation = FVector(FCString::Atof(*Parts[0]), FCString::Atof(*Parts[1]), FCString::Atof(*Parts[2]));
+		return true;
+	}
+
 	bool IsBotJumpDisabled()
 	{
 		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoJump"));

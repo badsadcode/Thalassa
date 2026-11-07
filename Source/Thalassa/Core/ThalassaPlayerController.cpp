@@ -113,8 +113,22 @@ void AThalassaPlayerController::OnMove(const FInputActionValue& Value)
 	{
 		const FVector2D Axis = Value.Get<FVector2D>();
 
-		// On foot you walk where you face on the deck. In the water you swim where you look.
 		const AThalassaCharacter* Crew = Cast<AThalassaCharacter>(ControlledPawn);
+
+		// On a ladder, forward climbs: up, or down if you are looking down. Pushing ahead as well as
+		// up is what carries you off the top of the ladder when you reach it.
+		if (Crew && Crew->GetThalassaMovement()->IsClimbingLadder())
+		{
+			const float LookPitch = FRotator::NormalizeAxis(GetControlRotation().Pitch);
+			const float Climb = (LookPitch < -30.f ? -1.f : 1.f) * Axis.Y;
+			const FRotator LadderFacing(0.f, GetControlRotation().Yaw, 0.f);
+			ControlledPawn->AddMovementInput(FVector::UpVector, Climb);
+			ControlledPawn->AddMovementInput(LadderFacing.RotateVector(FVector::ForwardVector), Axis.Y * 0.6f);
+			ControlledPawn->AddMovementInput(LadderFacing.RotateVector(FVector::RightVector), Axis.X);
+			return;
+		}
+
+		// On foot you walk where you face on the deck. In the water you swim where you look.
 		const bool bSwimming = Crew && Crew->GetThalassaMovement()->IsSwimmingInSea();
 		const FRotator Facing = bSwimming ? GetControlRotation() : FRotator(0.f, GetControlRotation().Yaw, 0.f);
 		ControlledPawn->AddMovementInput(Facing.RotateVector(FVector::ForwardVector), Axis.Y);

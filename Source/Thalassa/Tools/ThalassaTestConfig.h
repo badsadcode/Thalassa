@@ -23,6 +23,12 @@ namespace ThalassaTestConfig
 	 */
 	float HullStretch();
 
+	/** -ThalassaTestRig: use the original three-compartment rig instead of the real deck. */
+	bool UseTestRig();
+
+	/** -ThalassaSpawnAt=X,Y,Z: start at this point in ship coordinates, for screenshots. */
+	bool GetSpawnOverride(FVector& OutLocation);
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

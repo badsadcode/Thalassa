@@ -78,6 +78,12 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 
 void AThalassaCharacter::ApplyCrewNudge()
 {
+	// Never on a ladder: it would push you sideways off it, and you would fall and grab it again.
+	if (GetThalassaMovement()->IsClimbingLadder())
+	{
+		return;
+	}
+
 	// Applied as movement input by whoever controls this character. Input is already predicted and
 	// sent to the server, so the nudge needs no extra replication and causes no disagreement, unlike
 	// a push applied on the server.
@@ -210,6 +216,47 @@ void AThalassaCharacter::TickWalkerBot(float DeltaSeconds)
 {
 	if (!BoundVessel || BoundVessel->GetProfileState() != EVesselProfileState::Running)
 	{
+		return;
+	}
+
+	const TArray<FVector>& Tour = BoundVessel->GetTourRoute();
+	if (Tour.Num() > 0)
+	{
+		const FTransform Ship = BoundVessel->GetActorTransform();
+		const FVector Here = Ship.InverseTransformPosition(GetActorLocation());
+		if (!bTourStarted)
+		{
+			// Walkers spread out along the route, as a crew would, instead of moving as one. Both
+			// starting points are in the corridor beside the spawn points, so both are reachable.
+			const int32 Id = GetPlayerState() ? GetPlayerState()->GetPlayerId() : 0;
+			BotWaypoint = (Id % 2) * 8;
+			bTourStarted = true;
+		}
+		const FVector Target = Tour[BotWaypoint % Tour.Num()];
+
+		// Height only matters on a ladder. Elsewhere your feet decide how high you are.
+		const FVector Offset = Target - Here;
+		const bool bClimbing = GetThalassaMovement()->IsClimbingLadder();
+		const bool bReached = FVector2D(Offset.X, Offset.Y).SizeSquared() < FMath::Square(80.f)
+			&& (FMath::Abs(Offset.Z) < 150.f);
+
+		BotSecondsOnWaypoint += DeltaSeconds;
+		if (bReached)
+		{
+			Interact();
+			BotWaypoint = (BotWaypoint + 1) % Tour.Num();
+			BotSecondsOnWaypoint = 0.f;
+		}
+		else if (BotSecondsOnWaypoint > 40.f)
+		{
+			++BotStuckCount;
+			UE_LOG(LogTemp, Display, TEXT("WALKERSTUCK waypoint %d at %s heading for %s"), BotWaypoint, *Here.ToString(), *Target.ToString());
+			BotWaypoint = (BotWaypoint + 1) % Tour.Num();
+			BotSecondsOnWaypoint = 0.f;
+		}
+
+		const FVector Direction = bClimbing ? Offset.GetSafeNormal() : FVector(Offset.X, Offset.Y, 0.f).GetSafeNormal();
+		AddMovementInput(Ship.TransformVectorNoScale(Direction));
 		return;
 	}
 

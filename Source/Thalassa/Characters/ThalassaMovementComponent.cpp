@@ -67,11 +67,15 @@ void UThalassaMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaS
 
 	const FVector Location = UpdatedComponent->GetComponentLocation();
 	const bool bInWater = Vessel->IsWaterAt(Location);
-	if (bInWater && MovementMode != MOVE_Flying)
+
+	// You take hold of a ladder by moving while next to it, and stay on it until you leave its zone.
+	const bool bOnLadder = Vessel->IsLadderAt(Location) && (MovementMode == MOVE_Flying || !Acceleration.IsNearlyZero());
+
+	if ((bInWater || bOnLadder) && MovementMode != MOVE_Flying)
 	{
 		SetMovementMode(MOVE_Flying); // Also clears the base; it is restored below if still aboard.
 	}
-	else if (!bInWater && MovementMode == MOVE_Flying)
+	else if (!bInWater && !bOnLadder && MovementMode == MOVE_Flying)
 	{
 		SetMovementMode(MOVE_Falling); // Drained: drop to the deck, or stepped indoors.
 	}
@@ -96,6 +100,33 @@ void UThalassaMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaS
 			SetBase(&NoBase);
 		}
 	}
+}
+
+bool UThalassaMovementComponent::IsAtLadder() const
+{
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	return Vessel && UpdatedComponent && Vessel->IsLadderAt(UpdatedComponent->GetComponentLocation());
+}
+
+bool UThalassaMovementComponent::IsClimbingLadder() const
+{
+	return MovementMode == MOVE_Flying && !IsSwimmingInSea();
+}
+
+bool UThalassaMovementComponent::IsSwimmingInSea() const
+{
+	if (MovementMode != MOVE_Flying)
+	{
+		return false;
+	}
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	return !Vessel || !UpdatedComponent || Vessel->IsWaterAt(UpdatedComponent->GetComponentLocation());
+}
+
+float UThalassaMovementComponent::GetMaxSpeed() const
+{
+	constexpr float LadderSpeed = 200.f;
+	return IsClimbingLadder() ? LadderSpeed : Super::GetMaxSpeed();
 }
 
 bool UThalassaMovementComponent::ClientUpdatePositionAfterServerUpdate()

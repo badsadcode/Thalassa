@@ -52,6 +52,8 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 **Status labels use the brief's section 6 wording** (`concept`, `prototype`, `in-development`, `implemented`, `tested`) instead of the example frontmatter in section 4, because section 6 is the rule about honest labelling.
 
+**Stop polishing the grey deck (owner's direction).** The models and graphics will be replaced. What is worth keeping is in [INTERIOR_RULES.md](INTERIOR_RULES.md).
+
 ## Planned, not started
 
 **Helm (owner's direction, for later).** The current keys, which steer from anywhere, are only for testing.

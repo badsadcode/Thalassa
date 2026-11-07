@@ -31,7 +31,7 @@ The test map `Content/TestMaps/L_ShipMotion` is committed. To regenerate it, see
 
 ## Try it
 
-Open `Thalassa.uproject` in the editor and press Play. Set **Number of Players** to 2 and **Net Mode** to **Play As Listen Server** to walk around with a second player.
+Open `Thalassa.uproject` in the editor and press Play. You start on the main deck, in the corridor north of the mess hall. Set **Number of Players** to 2 and **Net Mode** to **Play As Listen Server** to walk around with a second player.
 
 | Keys | Action |
 |---|---|

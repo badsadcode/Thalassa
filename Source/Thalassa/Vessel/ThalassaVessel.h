@@ -93,6 +93,12 @@ public:
 	/** True if this world location is in a ship compartment, so anyone there moves with the ship. */
 	bool IsInCompartment(const FVector& WorldLocation) const;
 
+	/** True if a character here can hold onto a ladder. */
+	bool IsLadderAt(const FVector& WorldLocation) const;
+
+	/** The ship's route for the scripted walker, in ship coordinates. Empty on the test rig. */
+	const TArray<FVector>& GetTourRoute() const;
+
 	/** The hull's one movement base. See the class comment. */
 	UPrimitiveComponent* GetMovementBaseComponent() const;
 

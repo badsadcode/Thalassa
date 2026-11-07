@@ -93,7 +93,7 @@ void AThalassaHUD::DrawHUD()
 		FString::Printf(TEXT("crew  ship-frame %.0f %.0f %.0f cm"), Local.X, Local.Y, Local.Z),
 		FString::Printf(TEXT("base  %s   mode %d"), Base ? *Base->GetName() : TEXT("none"), static_cast<int32>(Movement->MovementMode.GetValue())),
 		FString::Printf(TEXT("corrections %d  max %.1f cm  last %.1f cm"), Movement->CorrectionCount, Movement->MaxCorrectionCm, Movement->LastCorrectionCm),
-		FString::Printf(TEXT("%s   airlock %s, water %.0f%%%s"), bSwimming ? TEXT("SWIMMING") : TEXT("on foot"),
+		FString::Printf(TEXT("%s   airlock %s, water %.0f%%%s"), bSwimming ? TEXT("SWIMMING") : Movement->IsClimbingLadder() ? TEXT("ON LADDER") : TEXT("on foot"),
 			AirlockNames[static_cast<int32>(Vessel->GetAirlockState())], Vessel->GetAirlockWaterLevel() * 100.f,
 			Vessel->IsAirlockDoorwayBlocked() ? TEXT("   DOORWAY BLOCKED") : TEXT("")),
 		TEXT("WASD/mouse move   SPACE jump/up   C down   E use console or airlock   TAB station view"),

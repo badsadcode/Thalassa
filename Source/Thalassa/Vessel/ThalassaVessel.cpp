@@ -1,5 +1,7 @@
 #include "Vessel/ThalassaVessel.h"
 
+#include "Vessel/ThalassaVesselLayout.h"
+
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -17,14 +19,7 @@
 
 namespace ThalassaVesselLayout
 {
-	struct FHullBox
-	{
-		const TCHAR* Name;
-		FVector Center;
-		FVector Size;
-		FLinearColor Color;
-		bool bVisible;
-	};
+	struct FRigBox { const TCHAR* Name; FVector Center; FVector Size; FLinearColor Color; bool bVisible; };
 
 	const FLinearColor Hull(0.10f, 0.13f, 0.16f);
 	const FLinearColor Deck(0.20f, 0.24f, 0.27f);
@@ -36,7 +31,7 @@ namespace ThalassaVesselLayout
 
 	// Ship frame: +X forward, +Z up, deck surface at Z = 0, centimetres.
 	// Bridge X 1000..2000, corridor X -1000..1000, engineering X -2000..-1000.
-	const FHullBox Boxes[] =
+	const FRigBox Boxes[] =
 	{
 		{ TEXT("Deck"),            FVector(0, 0, -25),        FVector(4000, 900, 50),  Deck, true },
 		{ TEXT("Ceiling"),         FVector(0, 0, 375),        FVector(4000, 900, 50),  Hull, true },
@@ -82,8 +77,8 @@ namespace ThalassaVesselLayout
 
 	// The hull is a sealed box, so nothing from outside lights the interior. Warm in the working
 	// spaces, in keeping with the contrast the art direction wants against cold water.
-	struct FInteriorLight { const TCHAR* Name; FVector Location; FColor Color; };
-	const FInteriorLight Lights[] =
+	struct FRigLight { const TCHAR* Name; FVector Location; FColor Color; };
+	const FRigLight Lights[] =
 	{
 		{ TEXT("LightBridge"),      FVector(1500, 0, 310),  FColor(255, 214, 170) },
 		{ TEXT("LightCorridorFwd"), FVector(500, 0, 310),   FColor(255, 224, 190) },
@@ -162,15 +157,55 @@ namespace ThalassaVesselLayout
 
 namespace
 {
-	// Layout coordinates to ship coordinates, for the hull length test. See HullStretch.
-	FVector Stretched(const FVector& Layout)
+	/** The original three-compartment rig. Kept so test results stay comparable over time. */
+	FVesselLayout BuildTestRigLayout()
 	{
-		return FVector(Layout.X * ThalassaTestConfig::HullStretch(), Layout.Y, Layout.Z);
+		using namespace ThalassaVesselLayout;
+
+		const auto Stretched = [](const FVector& Layout)
+		{
+			return FVector(Layout.X * ThalassaTestConfig::HullStretch(), Layout.Y, Layout.Z);
+		};
+
+		FVesselLayout Layout;
+		for (const FRigBox& Box : Boxes)
+		{
+			FHullBox Piece;
+			Piece.Name = Box.Name;
+			Piece.Center = Stretched(Box.Center);
+			Piece.Size = Stretched(Box.Size);
+			Piece.Color = Box.Color;
+			Piece.bVisible = Box.bVisible;
+			Layout.Boxes.Add(Piece);
+		}
+		for (const FRigLight& Light : Lights)
+		{
+			Layout.Lights.Add({ Light.Name, Stretched(Light.Location), Light.Color });
+		}
+		for (const FBox& Compartment : DryCompartments)
+		{
+			Layout.DryCompartments.Add(FBox(Stretched(Compartment.Min), Stretched(Compartment.Max)));
+		}
+		Layout.HullBounds = FBox(Stretched(HullBoundsMin), Stretched(HullBoundsMax));
+		Layout.ConsoleLocation = Stretched(ConsoleLocation);
+		Layout.ConsoleTextLocation = Stretched(FVector(1918.f, 0.f, 90.f));
+		for (int32 Index = 0; Index < 8; ++Index)
+		{
+			Layout.Spawns.Add(Stretched(FVector(1500.f - 100.f * Index, Index % 2 == 0 ? -70.f : 70.f, 120.f)));
+		}
+		Layout.AirlockViewpoint = FVector(0.f, -100.f, 120.f);
+		return Layout;
 	}
 
-	FBox Stretched(const FBox& Layout)
+	const FVesselLayout& GetLayout()
 	{
-		return FBox(Stretched(Layout.Min), Stretched(Layout.Max));
+		static const FVesselLayout Layout = ThalassaTestConfig::UseTestRig() ? BuildTestRigLayout() : BuildMainDeckLayout();
+		return Layout;
+	}
+
+	FBox AirlockChamberBox()
+	{
+		return ThalassaVesselLayout::AirlockChamber.ShiftBy(GetLayout().AirlockOffset);
 	}
 }
 
@@ -193,15 +228,17 @@ AThalassaVessel::AThalassaVessel()
 	// The cube's default material has no colour parameter; this one does. See BeginPlay.
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TintableMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 
-	for (const ThalassaVesselLayout::FHullBox& Box : ThalassaVesselLayout::Boxes)
+	const FVesselLayout& Layout = GetLayout();
+	for (const FHullBox& Box : Layout.Boxes)
 	{
 		UStaticMeshComponent* Piece = CreateDefaultSubobject<UStaticMeshComponent>(Box.Name);
 		Piece->SetupAttachment(ShipRoot);
 		Piece->SetMobility(EComponentMobility::Movable);
 		Piece->SetStaticMesh(CubeMesh.Object);
 		Piece->SetMaterial(0, TintableMaterial.Object);
-		Piece->SetRelativeLocation(Stretched(Box.Center));
-		Piece->SetRelativeScale3D(Stretched(Box.Size) / 100.f); // Engine cube is 100 cm per side.
+		Piece->SetRelativeLocation(Box.Center);
+		Piece->SetRelativeRotation(Box.Rotation);
+		Piece->SetRelativeScale3D(Box.Size / 100.f); // Engine cube is 100 cm per side.
 		Piece->SetCollisionEnabled(ECollisionEnabled::NoCollision); // HullCollision does this.
 		Piece->SetVisibility(Box.bVisible);
 		HullPieces.Add(Piece);
@@ -214,7 +251,7 @@ AThalassaVessel::AThalassaVessel()
 		Door->SetMobility(EComponentMobility::Movable);
 		Door->SetStaticMesh(CubeMesh.Object);
 		Door->SetMaterial(0, TintableMaterial.Object);
-		Door->SetRelativeLocation(FVector(0.f, DoorY, 125.f));
+		Door->SetRelativeLocation(Layout.AirlockOffset + FVector(0.f, DoorY, 125.f));
 		Door->SetRelativeScale3D(ThalassaVesselLayout::DoorSize / 100.f);
 		Door->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 		return Door;
@@ -228,7 +265,7 @@ AThalassaVessel::AThalassaVessel()
 	AirlockWater->SetMobility(EComponentMobility::Movable);
 	AirlockWater->SetStaticMesh(PlaneMesh.Object);
 	AirlockWater->SetMaterial(0, TintableMaterial.Object);
-	AirlockWater->SetRelativeLocation(FVector(0.f, 337.f, 0.f));
+	AirlockWater->SetRelativeLocation(Layout.AirlockOffset + FVector(0.f, 337.f, 0.f));
 	AirlockWater->SetRelativeScale3D(FVector(4.f, 1.75f, 1.f));
 	AirlockWater->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AirlockWater->SetCastShadow(false);
@@ -241,12 +278,12 @@ AThalassaVessel::AThalassaVessel()
 	HullCollision->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 	HullCollision->SetHiddenInGame(true);
 
-	for (const ThalassaVesselLayout::FInteriorLight& Light : ThalassaVesselLayout::Lights)
+	for (const FInteriorLight& Light : Layout.Lights)
 	{
 		UPointLightComponent* Lamp = CreateDefaultSubobject<UPointLightComponent>(Light.Name);
 		Lamp->SetupAttachment(ShipRoot);
 		Lamp->SetMobility(EComponentMobility::Movable);
-		Lamp->SetRelativeLocation(Stretched(Light.Location));
+		Lamp->SetRelativeLocation(Light.Location);
 		Lamp->SetLightColor(Light.Color);
 		Lamp->SetIntensity(ThalassaVesselLayout::InteriorLightIntensity);
 		Lamp->SetAttenuationRadius(ThalassaVesselLayout::InteriorLightRadius);
@@ -255,7 +292,7 @@ AThalassaVessel::AThalassaVessel()
 
 	ConsoleText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("ConsoleText"));
 	ConsoleText->SetupAttachment(ShipRoot);
-	ConsoleText->SetRelativeLocation(Stretched(FVector(1918.f, 0.f, 90.f)));
+	ConsoleText->SetRelativeLocation(Layout.ConsoleTextLocation);
 	ConsoleText->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
 	ConsoleText->SetHorizontalAlignment(EHTA_Center);
 	ConsoleText->SetVerticalAlignment(EVRTA_TextCenter);
@@ -294,9 +331,12 @@ void AThalassaVessel::OnConstruction(const FTransform& Transform)
 	// Runs on server and clients alike, so both see identical collision.
 	if (HullCollision->GetInstanceCount() == 0)
 	{
-		for (const ThalassaVesselLayout::FHullBox& Box : ThalassaVesselLayout::Boxes)
+		for (const FHullBox& Box : GetLayout().Boxes)
 		{
-			HullCollision->AddInstance(FTransform(FRotator::ZeroRotator, Stretched(Box.Center), Stretched(Box.Size) / 100.f));
+			if (Box.bCollision)
+			{
+				HullCollision->AddInstance(FTransform(Box.Rotation, Box.Center, Box.Size / 100.f));
+			}
 		}
 	}
 }
@@ -311,7 +351,7 @@ void AThalassaVessel::BeginPlay()
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		int32 Index = 0;
-		for (const ThalassaVesselLayout::FHullBox& Box : ThalassaVesselLayout::Boxes)
+		for (const FHullBox& Box : GetLayout().Boxes)
 		{
 			if (UMaterialInstanceDynamic* Material = HullPieces[Index]->CreateAndSetMaterialInstanceDynamic(0))
 			{
@@ -523,13 +563,11 @@ void AThalassaVessel::TickClient(float DeltaSeconds)
 
 FTransform AThalassaVessel::GetSpawnTransform(int32 PlayerIndex) const
 {
-	if (ThalassaTestConfig::IsSpawnAtAirlock())
-	{
-		return FTransform(GetActorRotation(), GetActorTransform().TransformPosition(FVector(0.f, -100.f, 120.f)));
-	}
-
-	// Staggered along the bridge so players never spawn overlapping.
-	const FVector Local = Stretched(FVector(1500.f - 100.f * (PlayerIndex % 8), PlayerIndex % 2 == 0 ? -70.f : 70.f, 120.f));
+	const FVesselLayout& Layout = GetLayout();
+	FVector Local = ThalassaTestConfig::IsSpawnAtAirlock()
+		? Layout.AirlockViewpoint
+		: Layout.Spawns[PlayerIndex % Layout.Spawns.Num()];
+	ThalassaTestConfig::GetSpawnOverride(Local);
 	return FTransform(GetActorRotation(), GetActorTransform().TransformPosition(Local));
 }
 
@@ -541,7 +579,7 @@ bool AThalassaVessel::TryPressBeep(const FVector& WorldLocation)
 	}
 
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	if (FVector::DistSquared(Local, Stretched(ThalassaVesselLayout::ConsoleLocation)) > FMath::Square(ThalassaVesselLayout::ConsoleUseRadius))
+	if (FVector::DistSquared(Local, GetLayout().ConsoleLocation) > FMath::Square(ThalassaVesselLayout::ConsoleUseRadius))
 	{
 		return false;
 	}
@@ -553,7 +591,7 @@ bool AThalassaVessel::TryPressBeep(const FVector& WorldLocation)
 bool AThalassaVessel::IsInsideHull(const FVector& WorldLocation) const
 {
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	return Stretched(FBox(ThalassaVesselLayout::HullBoundsMin, ThalassaVesselLayout::HullBoundsMax)).IsInsideOrOn(Local);
+	return GetLayout().HullBounds.IsInsideOrOn(Local);
 }
 
 UPrimitiveComponent* AThalassaVessel::GetMovementBaseComponent() const
@@ -564,13 +602,13 @@ UPrimitiveComponent* AThalassaVessel::GetMovementBaseComponent() const
 bool AThalassaVessel::IsInCompartment(const FVector& WorldLocation) const
 {
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	if (Stretched(ThalassaVesselLayout::AirlockChamber).IsInsideOrOn(Local))
+	if (AirlockChamberBox().IsInsideOrOn(Local))
 	{
 		return true;
 	}
-	for (const FBox& Compartment : ThalassaVesselLayout::DryCompartments)
+	for (const FBox& Compartment : GetLayout().DryCompartments)
 	{
-		if (Stretched(Compartment).IsInsideOrOn(Local))
+		if (Compartment.IsInsideOrOn(Local))
 		{
 			return true;
 		}
@@ -586,15 +624,33 @@ bool AThalassaVessel::IsWaterAt(const FVector& WorldLocation) const
 	}
 
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	return Stretched(ThalassaVesselLayout::AirlockChamber).IsInsideOrOn(Local)
+	return AirlockChamberBox().IsInsideOrOn(Local)
 		&& Local.Z < AirlockWaterLevel * ThalassaVesselLayout::AirlockCeilingCm;
+}
+
+bool AThalassaVessel::IsLadderAt(const FVector& WorldLocation) const
+{
+	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
+	for (const FBox& Ladder : GetLayout().LadderZones)
+	{
+		if (Ladder.IsInsideOrOn(Local))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+const TArray<FVector>& AThalassaVessel::GetTourRoute() const
+{
+	return GetLayout().TourRoute;
 }
 
 bool AThalassaVessel::IsDoorwayOccupied(float DoorY) const
 {
 	for (TActorIterator<AThalassaCharacter> It(GetWorld()); It; ++It)
 	{
-		const FVector Local = GetActorTransform().InverseTransformPosition(It->GetActorLocation());
+		const FVector Local = GetActorTransform().InverseTransformPosition(It->GetActorLocation()) - GetLayout().AirlockOffset;
 		if (FMath::Abs(Local.Y - DoorY) < ThalassaVesselLayout::DoorClearanceCm && FMath::Abs(Local.X) < 130.f)
 		{
 			return true;
@@ -613,7 +669,7 @@ bool AThalassaVessel::TryCycleAirlock(const FVector& WorldLocation)
 	}
 
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	if (FVector::DistSquared(Local, AirlockPanelLocation) > FMath::Square(AirlockPanelRadius))
+	if (FVector::DistSquared(Local, AirlockPanelLocation + GetLayout().AirlockOffset) > FMath::Square(AirlockPanelRadius))
 	{
 		return false;
 	}
@@ -684,7 +740,7 @@ void AThalassaVessel::TickAirlockVisuals(float DeltaSeconds)
 		{
 			Open = FMath::FInterpConstantTo(Open, Target, 1.f, DoorStep);
 		}
-		Door->SetRelativeLocation(FVector(0.f, DoorY, 125.f + Open * DoorOpenRaiseCm));
+		Door->SetRelativeLocation(GetLayout().AirlockOffset + FVector(0.f, DoorY, 125.f + Open * DoorOpenRaiseCm));
 
 		// A door stops being solid as soon as it starts opening. Clients hear about it late, so their
 		// door is always lower than the server's. If it were solid, they would bump into a door the
@@ -695,7 +751,7 @@ void AThalassaVessel::TickAirlockVisuals(float DeltaSeconds)
 	MoveDoor(AirlockOuterDoor, AirlockOuterDoorOpen, AirlockState == EAirlockState::OuterOpen, DoorOuterY);
 
 	AirlockWater->SetVisibility(AirlockWaterLevel > 0.f);
-	AirlockWater->SetRelativeLocation(FVector(0.f, 337.f, AirlockWaterLevel * AirlockCeilingCm));
+	AirlockWater->SetRelativeLocation(GetLayout().AirlockOffset + FVector(0.f, 337.f, AirlockWaterLevel * AirlockCeilingCm));
 }
 
 void AThalassaVessel::UpdateConsoleText(float DeltaSeconds)
