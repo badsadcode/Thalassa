@@ -29,6 +29,9 @@ namespace ThalassaTestConfig
 	/** -ThalassaSpawnAt=X,Y,Z: start at this point in ship coordinates, for screenshots. */
 	bool GetSpawnOverride(FVector& OutLocation);
 
+	/** -ThalassaWalkStraight: the local player holds forward and logs where they go. */
+	bool IsWalkStraight();
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

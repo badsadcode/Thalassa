@@ -7,6 +7,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "Tools/ThalassaTestConfig.h"
 #include "UObject/ConstructorHelpers.h"
@@ -56,6 +57,31 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 		{
 			// The deck must move before the people standing on it do, or they lag it by a frame.
 			GetCharacterMovement()->AddTickPrerequisiteActor(BoundVessel);
+		}
+	}
+
+	if (IsLocallyControlled() && ThalassaTestConfig::IsWalkStraight() && BoundVessel && GetController()
+		&& GetWorld()->GetGameState() && GetWorld()->GetGameState()->PlayerArray.Num() >= ThalassaTestConfig::ExpectedPlayers())
+	{
+		// Exactly what holding W does: forward along the view's yaw. Logged twice a second.
+		const FRotator YawOnly(0.f, GetController()->GetControlRotation().Yaw, 0.f);
+		AddMovementInput(YawOnly.RotateVector(FVector::ForwardVector), 1.f);
+		BotSecondsOnWaypoint += DeltaSeconds;
+		if (BotSecondsOnWaypoint >= 0.5f)
+		{
+			BotSecondsOnWaypoint = 0.f;
+			const FVector Local = BoundVessel->GetActorTransform().InverseTransformPosition(GetActorLocation());
+			float Nearest = -1.f;
+			for (TActorIterator<AThalassaCharacter> It(GetWorld()); It; ++It)
+			{
+				if (*It != this)
+				{
+					const float Gap = static_cast<float>(FVector::Dist(It->GetActorLocation(), GetActorLocation()));
+					Nearest = Nearest < 0.f ? Gap : FMath::Min(Nearest, Gap);
+				}
+			}
+			UE_LOG(LogTemp, Display, TEXT("WALKSTRAIGHT local %.1f %.1f %.1f yaw %.3f velocity %s nearest %.0f"), Local.X, Local.Y, Local.Z,
+				GetController()->GetControlRotation().Yaw, *GetVelocity().ToString(), Nearest);
 		}
 	}
 

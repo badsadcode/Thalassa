@@ -58,6 +58,12 @@ namespace ThalassaTestConfig
 		return true;
 	}
 
+	bool IsWalkStraight()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaWalkStraight"));
+		return bValue;
+	}
+
 	bool IsBotJumpDisabled()
 	{
 		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoJump"));
