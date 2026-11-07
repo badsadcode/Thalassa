@@ -93,6 +93,17 @@ namespace ThalassaHelmDisplay
 			FString::Printf(TEXT("DEPTH     %.0f m"), Vessel.GetDepthMeters()),
 			FString::Printf(TEXT("PITCH     %+.1f"), Vessel.GetActorRotation().Pitch),
 		};
+
+		// Warnings, under the title, where the helmsman looks first.
+		const float SinceCollision = Vessel.GetSecondsSinceCollision();
+		const bool bCollisionWarning = SinceCollision >= 0.f && SinceCollision < 4.f;
+		const FString Warning = bCollisionWarning ? FString(TEXT("COLLISION")) : Vessel.IsSurfaced() ? FString(TEXT("SURFACED")) : FString();
+		if (!Warning.IsEmpty())
+		{
+			// A collision flashes; surfacing is steady.
+			const bool bLit = !bCollisionWarning || FMath::Fmod(SinceCollision, 0.5f) < 0.3f;
+			Text(Canvas, Warning, TopLeft + FVector2D(Size * 0.6f, Margin), bLit ? (bCollisionWarning ? FLinearColor(1.f, 0.3f, 0.2f) : Amber) : Dim(Amber, 0.3f), TextScale * 1.3f);
+		}
 		float Y = BarTop;
 		for (const FString& Line : Lines)
 		{

@@ -87,6 +87,13 @@ public:
 	/** Where the helmsman stands, in ship coordinates. */
 	FVector GetHelmSeatLocal() const;
 
+	/** True while the ship is floating at the surface and cannot rise further. */
+	bool IsSurfaced() const;
+
+	/** How many times the ship has run into the seabed or anything else, and how long ago the last time was (negative: never). */
+	int32 GetCollisionCount() const { return CollisionCount; }
+	float GetSecondsSinceCollision() const;
+
 	/** Server: if a character at this world location can reach the console, increment the counter. */
 	bool TryPressBeep(const FVector& WorldLocation);
 
@@ -133,6 +140,12 @@ private:
 	void TickClient(float DeltaSeconds);
 	void UpdateProfileTargets();
 	void TickHelmMotion(float DeltaSeconds);
+
+	/** Server: where the ship can actually get to on its way from one place to the next. Sets bOutHit if something stopped it. */
+	FVector ConstrainMove(const FVector& From, const FVector& To, const FQuat& Rotation, bool& bOutHit);
+
+	/** True if the hull, posed like this, would be inside the seabed or anything else in the world. */
+	bool IsHullBlocked(const FVector& Location, const FQuat& Rotation) const;
 	void TickHelmVisuals(float DeltaSeconds);
 	void UpdateClockFromSnapshot();
 	void GetExtrapolatedPose(double Time, FVector& OutPosition, FQuat& OutRotation) const;
@@ -214,6 +227,16 @@ private:
 
 	UPROPERTY(Replicated)
 	int32 BeepCount = 0;
+
+	UPROPERTY(Replicated)
+	int32 CollisionCount = 0;
+
+	/** Server time of the last collision, or negative for never. */
+	UPROPERTY(Replicated)
+	double LastCollisionTime = -1.0;
+
+	/** Server: the hull was against something last tick. */
+	bool bTouching = false;
 
 	// Server motion state. Targets come from the helm or from the motion profile.
 	float SpeedCmS = 0.f;

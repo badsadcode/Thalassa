@@ -169,6 +169,10 @@ namespace ThalassaVesselLayout
 	const float HelmMaxPitchDeg = 12.f;
 	const float HelmLeverSwingDeg = 35.f;
 	const float HelmTestSeconds = 160.f;
+
+	// The sea's surface is world Z = 0. Surfaced, the ship floats with its origin this far below it.
+	const float SurfacedDepthCm = 1500.f;
+	const float CollisionPullBackCm = 5.f;
 	const float PoseSmoothingRate = 6.f;      // 1/s, decay of client pose corrections
 	const float ClockSmoothingRate = 2.f;     // 1/s, how quickly the client follows snapshot timing
 	const double ClockSnapErrorSeconds = 0.25; // Beyond this (a stall), jump rather than drift back
@@ -367,6 +371,8 @@ void AThalassaVessel::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AThalassaVessel, Snapshot);
 	DOREPLIFETIME(AThalassaVessel, ProfileState);
 	DOREPLIFETIME(AThalassaVessel, BeepCount);
+	DOREPLIFETIME(AThalassaVessel, CollisionCount);
+	DOREPLIFETIME(AThalassaVessel, LastCollisionTime);
 	DOREPLIFETIME(AThalassaVessel, AirlockState);
 	DOREPLIFETIME(AThalassaVessel, AirlockWaterLevel);
 	DOREPLIFETIME(AThalassaVessel, bAirlockDoorwayBlocked);
@@ -506,6 +512,85 @@ void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
 	CurrentRate.Yaw = FMath::FInterpConstantTo(static_cast<float>(CurrentRate.Yaw), TargetYawRate, DeltaSeconds, HelmYawAccelDegS2);
 	TargetPitch = Levers.Planes * HelmMaxPitchDeg;
 	TargetRoll = 0.f;
+
+	// At the surface the planes cannot lift the ship any further, so it levels off.
+	if (IsSurfaced())
+	{
+		TargetPitch = FMath::Min(TargetPitch, 0.f);
+	}
+}
+
+bool AThalassaVessel::IsSurfaced() const
+{
+	return GetActorLocation().Z >= -ThalassaVesselLayout::SurfacedDepthCm - 10.f;
+}
+
+float AThalassaVessel::GetSecondsSinceCollision() const
+{
+	return LastCollisionTime < 0.0 ? -1.f : static_cast<float>(GetSyncedTime() - LastCollisionTime);
+}
+
+bool AThalassaVessel::IsHullBlocked(const FVector& Location, const FQuat& Rotation) const
+{
+	const FBox& HullBox = GetLayout().HullBounds;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(ThalassaHullOverlap), false, this);
+	return GetWorld()->OverlapAnyTestByObjectType(Location + Rotation.RotateVector(HullBox.GetCenter()), Rotation,
+		FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionShape::MakeBox(HullBox.GetExtent()), Params);
+}
+
+FVector AThalassaVessel::ConstrainMove(const FVector& From, const FVector& To, const FQuat& Rotation, bool& bOutHit)
+{
+	using namespace ThalassaVesselLayout;
+	FVector Result = To;
+
+	// The surface: the ship can float there, not rise out of the water.
+	const float SurfaceZ = -SurfacedDepthCm;
+	if (Result.Z > SurfaceZ)
+	{
+		Result.Z = FMath::Max(SurfaceZ, FMath::Min(From.Z, Result.Z));
+	}
+
+	// The seabed and anything else in the world: sweep the hull's box along the move. Only world
+	// geometry stops the ship, never a swimmer. The box turns with the ship, but a turn on the spot is
+	// not swept: only the move from one place to the next is.
+	const FBox& HullBox = GetLayout().HullBounds;
+	const FVector Center = Rotation.RotateVector(HullBox.GetCenter());
+	const FVector Delta = Result - From;
+	if (Delta.IsNearlyZero())
+	{
+		return Result;
+	}
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(ThalassaHull), false, this);
+	FHitResult Hit;
+	const bool bHit = GetWorld()->SweepSingleByObjectType(Hit, From + Center, Result + Center, Rotation,
+		FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionShape::MakeBox(HullBox.GetExtent()), Params);
+	if (!bHit)
+	{
+		return Result;
+	}
+
+	// Already touching: moving away is allowed, pushing further in is not.
+	if (Hit.bStartPenetrating)
+	{
+		if (FVector::DotProduct(Delta, Hit.Normal) > 0.f)
+		{
+			return Result;
+		}
+		Result = From;
+	}
+	else
+	{
+		// Stop just short of the contact, but never back away from it: a pull-back made the pinned ship
+		// shudder a few centimetres twice a second, creeping in and being pushed out again.
+		const float Length = static_cast<float>(Delta.Size());
+		Result = From + Delta * FMath::Max(0.f, Hit.Time - CollisionPullBackCm / Length);
+	}
+
+	// A ship this heavy stops dead. Shown on the helm; later it can do damage.
+	SpeedCmS = 0.f;
+	bOutHit = true;
+	return Result;
 }
 
 void AThalassaVessel::TickHelmVisuals(float DeltaSeconds)
@@ -575,12 +660,40 @@ void AThalassaVessel::TickServer(float DeltaSeconds)
 	CurrentRate.Pitch = DeltaSeconds > 0.f ? (NewPitch - OldPitch) / DeltaSeconds : 0.f;
 	CurrentRate.Roll = DeltaSeconds > 0.f ? (NewRoll - OldRoll) / DeltaSeconds : 0.f;
 
+	const FRotator OldRotation = PoseRotation;
 	PoseRotation.Pitch = NewPitch;
 	PoseRotation.Roll = NewRoll;
 	PoseRotation.Yaw = FRotator::NormalizeAxis(PoseRotation.Yaw + CurrentRate.Yaw * DeltaSeconds);
 
-	const FVector Velocity = PoseRotation.Vector() * SpeedCmS;
-	const FVector NewPosition = GetActorLocation() + Velocity * DeltaSeconds;
+	const FVector OldPosition = GetActorLocation();
+	const bool bConstrained = ProfileState != EVesselProfileState::Running || bHelmTest;
+	bool bHit = false;
+
+	// The scripted test's path is fixed, so earlier results stay comparable. Under the helm, the
+	// surface and the seabed are in the way. A long hull swings a long way when it turns or pitches,
+	// so a turn that would put it into rock is refused first: 12 degrees of pitch moves the bow 29 m.
+	if (bConstrained && PoseRotation != OldRotation && IsHullBlocked(OldPosition, PoseRotation.Quaternion()) && !IsHullBlocked(OldPosition, OldRotation.Quaternion()))
+	{
+		PoseRotation = OldRotation;
+		CurrentRate = FRotator::ZeroRotator;
+		bHit = true;
+	}
+
+	FVector NewPosition = OldPosition + PoseRotation.Vector() * SpeedCmS * DeltaSeconds;
+	if (bConstrained)
+	{
+		NewPosition = ConstrainMove(OldPosition, NewPosition, PoseRotation.Quaternion(), bHit);
+	}
+
+	// One contact is one collision, however long the hull stays pressed against the rock.
+	if (bHit && !bTouching)
+	{
+		++CollisionCount;
+		LastCollisionTime = GetWorld()->GetTimeSeconds();
+		UE_LOG(LogTemp, Display, TEXT("SHIPCOLLISION %d at %s depth %.1f m"), CollisionCount, *NewPosition.ToString(), -NewPosition.Z / 100.0);
+	}
+	bTouching = bHit;
+	const FVector Velocity = DeltaSeconds > 0.f ? (NewPosition - OldPosition) / DeltaSeconds : FVector::ZeroVector;
 	SetActorLocationAndRotation(NewPosition, PoseRotation, false, nullptr, ETeleportType::None);
 
 	Snapshot.Position = NewPosition;

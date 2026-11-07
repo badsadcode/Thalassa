@@ -43,6 +43,8 @@ def main():
     parser.add_argument("--exe", help="test a packaged build's Thalassa.exe instead of the editor")
     parser.add_argument("--sonar", action="store_true", help="survey with the sonar during the test")
     parser.add_argument("--helm", action="store_true", help="the deck, driven from the helm by the first client instead of the script")
+    parser.add_argument("--helm-course", choices=["tour", "dive", "rise"], default="tour", help="what the scripted helmsman does")
+    parser.add_argument("--ship-at", help="start the ship at X,Y,Z world centimetres")
     parser.add_argument("--deck", action="store_true", help="use the real deck instead of the test rig")
     parser.add_argument("--hull-stretch", type=float, help="stretch the hull lengthwise; walkers only")
     parser.add_argument("--no-jump", action="store_true", help="walkers never jump")
@@ -75,7 +77,9 @@ def main():
     if args.sonar:
         common.append("-ThalassaSonar")
     if args.helm:
-        common.append("-ThalassaHelmTest")
+        common += ["-ThalassaHelmTest", f"-ThalassaHelmCourse={args.helm_course}"]
+    if args.ship_at:
+        common.append(f"-ThalassaShipAt={args.ship_at}")
     if not args.deck and not args.helm:
         common.append("-ThalassaTestRig")
     if args.hull_stretch:

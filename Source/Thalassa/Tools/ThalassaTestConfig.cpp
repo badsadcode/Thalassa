@@ -70,6 +70,25 @@ namespace ThalassaTestConfig
 		return true;
 	}
 
+	bool GetShipStartOverride(FVector& OutLocation)
+	{
+		FString Text;
+		TArray<FString> Parts;
+		if (!FParse::Value(FCommandLine::Get(), TEXT("ThalassaShipAt="), Text, /*bShouldStopOnSeparator=*/ false) || Text.ParseIntoArray(Parts, TEXT(",")) != 3)
+		{
+			return false;
+		}
+		OutLocation = FVector(FCString::Atof(*Parts[0]), FCString::Atof(*Parts[1]), FCString::Atof(*Parts[2]));
+		return true;
+	}
+
+	FString HelmCourse()
+	{
+		FString Course = TEXT("tour");
+		FParse::Value(FCommandLine::Get(), TEXT("ThalassaHelmCourse="), Course);
+		return Course;
+	}
+
 	bool IsWalkStraight()
 	{
 		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaWalkStraight"));

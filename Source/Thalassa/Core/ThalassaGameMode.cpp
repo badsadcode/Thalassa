@@ -22,7 +22,9 @@ void AThalassaGameMode::InitGameState()
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	// 200 m below the surface (Z = 0), well clear of the test seabed.
-	Vessel = GetWorld()->SpawnActor<AThalassaVessel>(FVector(0.f, 0.f, -20000.f), FRotator::ZeroRotator, Params);
+	FVector Start(0.f, 0.f, -20000.f);
+	ThalassaTestConfig::GetShipStartOverride(Start);
+	Vessel = GetWorld()->SpawnActor<AThalassaVessel>(Start, FRotator::ZeroRotator, Params);
 }
 
 void AThalassaGameMode::PostLogin(APlayerController* NewPlayer)

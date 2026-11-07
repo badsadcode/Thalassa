@@ -44,6 +44,12 @@ namespace ThalassaTestConfig
 	/** -ThalassaHelmBot: the local player walks to the helm, sits, and drives a scripted course. */
 	bool IsHelmBot();
 
+	/** -ThalassaShipAt=X,Y,Z: start the ship here, in world centimetres, instead of 200 m down at the origin. */
+	bool GetShipStartOverride(FVector& OutLocation);
+
+	/** -ThalassaHelmCourse=name: which course the scripted helmsman drives: tour (default), dive or rise. */
+	FString HelmCourse();
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

@@ -197,7 +197,29 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 	// At the helm: a scripted course through both modes. Seconds after sitting down.
 	enum class EPress : uint8 { None, Mode, AllStop, Stand };
 	struct FCue { float At; float Throttle; float Turn; float Dive; EPress Press; };
-	static const FCue Cues[] =
+	// Dive: full ahead and full dive into the seabed, then all stop and back away from it.
+	static const FCue DiveCues[] =
+	{
+		{ 2.f,   0.f,  0.f,  0.f, EPress::Mode },
+		{ 3.f,   1.f,  0.f, -1.f, EPress::None },
+		{ 5.5f,  0.f,  0.f,  0.f, EPress::None },
+		{ 45.f,  0.f,  0.f,  0.f, EPress::AllStop },
+		{ 47.f,  0.f,  0.f,  1.f, EPress::None },    // Planes to rise...
+		{ 48.f, -1.f,  0.f,  0.f, EPress::None },    // ...and astern.
+		{ 50.5f, 0.f,  0.f,  0.f, EPress::None },
+		{ 80.f,  0.f,  0.f,  0.f, EPress::AllStop },
+		{ 90.f,  0.f,  0.f,  0.f, EPress::Stand },
+	};
+	// Rise: full ahead and full rise until the ship surfaces, then hold it there.
+	static const FCue RiseCues[] =
+	{
+		{ 2.f,   0.f,  0.f,  0.f, EPress::Mode },
+		{ 3.f,   1.f,  0.f,  1.f, EPress::None },
+		{ 5.5f,  0.f,  0.f,  0.f, EPress::None },
+		{ 80.f,  0.f,  0.f,  0.f, EPress::AllStop },
+		{ 90.f,  0.f,  0.f,  0.f, EPress::Stand },
+	};
+	static const FCue TourCues[] =
 	{
 		{ 2.f,   0.f,  0.f,  0.f, EPress::Mode },    // To set-and-go.
 		{ 3.f,   1.f,  0.f,  0.f, EPress::None },    // Push the throttle up...
@@ -216,7 +238,9 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		{ 95.f,  0.f,  0.f,  0.f, EPress::None },    // ...and let go.
 		{ 100.f, 0.f,  0.f,  0.f, EPress::Stand },
 	};
-	const int32 CueCount = UE_ARRAY_COUNT(Cues);
+	static const FString Course = ThalassaTestConfig::HelmCourse();
+	const FCue* Cues = Course == TEXT("dive") ? DiveCues : Course == TEXT("rise") ? RiseCues : TourCues;
+	const int32 CueCount = Course == TEXT("dive") ? UE_ARRAY_COUNT(DiveCues) : Course == TEXT("rise") ? UE_ARRAY_COUNT(RiseCues) : UE_ARRAY_COUNT(TourCues);
 
 	BotHelmSeconds += DeltaSeconds;
 	while (BotHelmCue < CueCount && BotHelmSeconds >= Cues[BotHelmCue].At)
@@ -244,10 +268,10 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 	{
 		BotHelmLogTimer = 1.f;
 		const FHelmLevers& Levers = Helm->GetLevers();
-		UE_LOG(LogTemp, Display, TEXT("HELMBOT t %.1f seated %d mode %d throttle %.2f rudder %.2f planes %.2f speed %.2f heading %.1f pitch %.1f depth %.1f"),
+		UE_LOG(LogTemp, Display, TEXT("HELMBOT t %.1f seated %d mode %d throttle %.2f rudder %.2f planes %.2f speed %.2f heading %.1f pitch %.1f depth %.1f surfaced %d collisions %d"),
 			BotHelmSeconds, Helm->IsSeated(this) ? 1 : 0, static_cast<int32>(Helm->GetMode()), Levers.Throttle, Levers.Rudder, Levers.Planes,
 			BoundVessel->GetForwardSpeedMetersPerSecond(), FRotator::ClampAxis(BoundVessel->GetActorRotation().Yaw),
-			BoundVessel->GetActorRotation().Pitch, BoundVessel->GetDepthMeters());
+			BoundVessel->GetActorRotation().Pitch, BoundVessel->GetDepthMeters(), BoundVessel->IsSurfaced() ? 1 : 0, BoundVessel->GetCollisionCount());
 	}
 }
 
