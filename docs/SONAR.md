@@ -36,7 +36,7 @@ The chart is also on a screen at the sonar station: the middle console on the br
 - The ping is synthesised as it plays (`UThalassaSonarPingComponent`), so there is no sound asset: a 1,650 Hz tone falling slightly, a 0.3 s decay, and damped repeats 0.37 s apart. It is heard from the screen and fades out within about 30 m. It is a placeholder, like the grey deck.
 - The audible ping and the survey are separate. The survey still sweeps every 0.1 s.
 
-Tested on the deck with the sonar on: the chart matched between host and client at about 15 ms, at 149 ms with 1% loss, and at 238 ms with 3% loss. Walking matched the earlier deck runs at similar ping. Frames confirmed that the screen is the right way up and matches the **Tab** view. **The ping has not been heard in the game yet**: every automated run is silent (`-nosound`).
+Tested on the deck with the sonar on: the chart matched between host and client at about 15 ms, at 149 ms with 1% loss, and at 238 ms with 3% loss. Walking matched the earlier deck runs at similar ping. Frames confirmed that the screen is the right way up and matches the **Tab** view. The ping was heard in the editor. Automated runs are silent (`-nosound`).
 
 ## Not done yet
 
