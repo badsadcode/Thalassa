@@ -17,9 +17,15 @@ namespace ThalassaTestConfig
 		return bValue;
 	}
 
-	bool IsPawnCollisionDisabled()
+	bool IsCrewNudgeDisabled()
 	{
-		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoPawnCollision"));
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoNudge"));
+		return bValue;
+	}
+
+	bool IsSpawnTogether()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaSpawnTogether"));
 		return bValue;
 	}
 

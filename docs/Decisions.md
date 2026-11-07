@@ -4,6 +4,8 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 ## 2026-11-07
 
+**Crew use soft collision (owner's choice).** Crew do not block each other, and are nudged apart through ordinary movement input. Hard collision caused up to 1430 corrections per client with four players; this caused at most 1. The nudge strength is untuned.
+
 **All hull collision is one component.** A character's movement base must not change as they walk around the ship. Under packet loss, several bases made other players appear 16 m away. A real hull mesh must keep this.
 
 **`p.NetServerMaxMoveDeltaTimeScalar=1`.** The default of 1.75 forces a correction on every frame over 125 ms. Revisit if corrections appear with merged or delayed moves.
@@ -31,7 +33,5 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 **Status labels use the brief's section 6 wording** (`concept`, `prototype`, `in-development`, `implemented`, `tested`) instead of the example frontmatter in section 4, because section 6 is the rule about honest labelling.
 
 ## Still open
-
-Collision between players: see the options in [MOVING_SHIP_SPIKE.md](MOVING_SHIP_SPIKE.md).
 
 From design document section 26: setting, ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.

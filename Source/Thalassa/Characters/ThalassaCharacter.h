@@ -18,7 +18,6 @@ class THALASSA_API AThalassaCharacter : public ACharacter
 public:
 	AThalassaCharacter(const FObjectInitializer& ObjectInitializer);
 
-	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
 	/** Local player: try to use whatever console is in reach. */
@@ -34,6 +33,15 @@ private:
 	void ServerInteract();
 
 	void TickWalkerBot(float DeltaSeconds);
+	void ApplyCrewNudge();
+
+	/** Crew closer than this, centre to centre, are nudged apart. Capsules touch at 68 cm. */
+	UPROPERTY(EditDefaultsOnly, Category = "Crew")
+	float PersonalSpaceCm = 90.f;
+
+	/** Strongest nudge, as a fraction of full movement input, when standing right on top of someone. */
+	UPROPERTY(EditDefaultsOnly, Category = "Crew")
+	float MaxNudgeInput = 0.35f;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UCameraComponent> Camera;

@@ -56,5 +56,6 @@ APawn* AThalassaGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPla
 	{
 		return Super::SpawnDefaultPawnFor_Implementation(NewPlayer, StartSpot);
 	}
-	return SpawnDefaultPawnAtTransform(NewPlayer, Vessel->GetSpawnTransform(PlayersSpawned++));
+	const int32 SpawnIndex = ThalassaTestConfig::IsSpawnTogether() ? 0 : PlayersSpawned++;
+	return SpawnDefaultPawnAtTransform(NewPlayer, Vessel->GetSpawnTransform(SpawnIndex));
 }

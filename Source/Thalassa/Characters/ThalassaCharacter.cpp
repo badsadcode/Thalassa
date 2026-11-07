@@ -6,6 +6,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerState.h"
 #include "Tools/ThalassaTestConfig.h"
 #include "UObject/ConstructorHelpers.h"
@@ -17,6 +18,10 @@ AThalassaCharacter::AThalassaCharacter(const FObjectInitializer& ObjectInitializ
 	PrimaryActorTick.bCanEverTick = true;
 
 	GetCapsuleComponent()->InitCapsuleSize(34.f, 88.f);
+
+	// Crew do not block each other. Each client sees the others slightly in the past, so hard
+	// collisions between players disagree and force constant corrections. See ApplyCrewNudge.
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	bUseControllerRotationYaw = true;
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -40,16 +45,6 @@ UThalassaMovementComponent* AThalassaCharacter::GetThalassaMovement() const
 	return Cast<UThalassaMovementComponent>(GetCharacterMovement());
 }
 
-void AThalassaCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (ThalassaTestConfig::IsPawnCollisionDisabled())
-	{
-		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-	}
-}
-
 void AThalassaCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -64,9 +59,53 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 		}
 	}
 
-	if (IsLocallyControlled() && ThalassaTestConfig::IsBot())
+	if (IsLocallyControlled())
 	{
-		TickWalkerBot(DeltaSeconds);
+		if (ThalassaTestConfig::IsBot())
+		{
+			TickWalkerBot(DeltaSeconds);
+		}
+		if (!ThalassaTestConfig::IsCrewNudgeDisabled())
+		{
+			ApplyCrewNudge();
+		}
+	}
+}
+
+void AThalassaCharacter::ApplyCrewNudge()
+{
+	// Applied as movement input by whoever controls this character. Input is already predicted and
+	// sent to the server, so the nudge needs no extra replication and causes no disagreement, unlike
+	// a push applied on the server.
+	FVector Nudge = FVector::ZeroVector;
+	const FVector Up = GetActorUpVector();
+	for (TActorIterator<AThalassaCharacter> It(GetWorld()); It; ++It)
+	{
+		if (*It == this)
+		{
+			continue;
+		}
+
+		FVector Away = FVector::VectorPlaneProject(GetActorLocation() - It->GetActorLocation(), Up);
+		const float Distance = static_cast<float>(Away.Size());
+		if (Distance >= PersonalSpaceCm)
+		{
+			continue;
+		}
+
+		if (Distance < 1.f)
+		{
+			// Exactly on top of each other there is no "away", so each picks a direction of their own.
+			const int32 Id = GetPlayerState() ? GetPlayerState()->GetPlayerId() : 0;
+			Away = FVector::ForwardVector.RotateAngleAxis(Id * 137.5f, Up);
+		}
+
+		Nudge += Away.GetSafeNormal() * (1.f - Distance / PersonalSpaceCm);
+	}
+
+	if (!Nudge.IsNearlyZero())
+	{
+		AddMovementInput(Nudge.GetClampedToMaxSize(1.f), MaxNudgeInput);
 	}
 }
 

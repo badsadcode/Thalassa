@@ -11,8 +11,11 @@ namespace ThalassaTestConfig
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 
-	/** -ThalassaNoPawnCollision: characters walk through each other. */
-	bool IsPawnCollisionDisabled();
+	/** -ThalassaNoNudge: crew pass through each other without being nudged apart. */
+	bool IsCrewNudgeDisabled();
+
+	/** -ThalassaSpawnTogether: every player spawns at the same spot, to test separation. */
+	bool IsSpawnTogether();
 
 	/** -ThalassaGravity=ship: pull characters toward the deck instead of world down. */
 	bool UseShipGravity();

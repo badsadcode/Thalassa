@@ -18,11 +18,13 @@ Run it with `python Scripts/build/run_motion_matrix.py`, which takes about 25 mi
 | `moving_lan` | 2 | Moving | 15 ms | 1 | 0 | 35 cm |
 | `moving_rtt100` | 2 | Moving | 134 ms | 6 | 0 | 4 cm |
 | `moving_rtt200` | 2 | Moving | 238 ms | 43 | 3 (71 cm) | 80 cm, 5 over 10 cm |
+| `crew_lag_worse` | 2 | Moving | about 240 ms | 33 | 2 (69 cm) | 77 cm, 3 over 10 cm |
 | `moving_shipgravity` | 2 | Moving | 15 ms | 1 | 0 | 17 cm |
-| `moving_4players` | 4 | Moving | 20–32 ms | 158 / 1430 / 140 | 70 / 1106 / 6 (49 cm) | 64 cm (first client only) |
-| `moving_4players_nocollide` | 4 | Moving | 15–32 ms | 1 / 0 / 1 | 0 | 39 cm (first client only) |
+| `crew_4players` | 4 | Moving | 15 ms | 0 / 1 / 1 | 0 | none (first client only) |
 
-Across these runs: 0 frames outside the hull, base never lost, and ship attitude within 0.1 degrees. Ship position agreed to under 14 cm, and under 5 cm at normal ping. The only stuck waypoints were in `moving_4players`: 1, 3 and 0, on its three clients.
+Across these runs: 0 frames outside the hull, base never lost, no stuck waypoints. In the two-player runs without `crew_lag_worse`, ship attitude agreed within 0.1 degrees, and ship position to under 14 cm, or under 5 cm at normal ping.
+
+`crew_4players` and `crew_lag_worse` include soft collision. The other rows are from just before it. Corrections at about 240 ms are not gone: the remaining ones are not explained by frame stalls, and were not explored further, as 3% packet loss is a harsh test.
 
 How to read this:
 
@@ -72,15 +74,21 @@ The first runs had 309 corrections and the client's ship up to 161 degrees off. 
 
 The first report's "largest correction" compared the current position with an acknowledgement one round trip old, so it grows with speed times ping even when nothing visibly jumps. The figure of about 2 m at high ping came from this and from the stalls, and it was not a real 2 m snap. Visible pops and visible snaps now measure what a player sees.
 
-## Open: players colliding with each other
+## Players colliding: soft collision
 
-Almost all corrections in `moving_4players` were "near other pawn". With pawn collision off, the same test went from 1430 corrections to 0 on the worst client. The test exaggerates this: four walkers share two lanes through 2 m doorways, head-on, for three minutes. But a crowded corridor is a real situation, and collisions with a remote player are hard to predict, because each client sees the others slightly in the past.
+Hard collision between players was the main remaining source of corrections, because each client sees the others slightly in the past and so disagrees about who bumped whom. The owner chose soft collision.
 
-Options, for the owner to decide:
+Crew capsules no longer block each other. Instead, whoever controls a character adds a small movement input away from anyone within 90 cm, up to 35% of full input (`AThalassaCharacter::ApplyCrewNudge`). Input is already predicted and sent to the server, so this needs no new replication and should not cause disagreement. The values are placeholders, tuned by no one yet.
 
-1. **No player collision aboard** (the test switch does this): simplest and proven in this test, but players can stand inside each other.
-2. **Soft collision:** players pass through but get gently nudged apart. A common co-op approach. More work, and not tested.
-3. **Keep hard collision:** most physical, and accept corrections when people jostle.
+| Four players, moving ship, one run each | Corrections per client | Pops per client | Time any pair overlaps |
+|---|---|---|---|
+| Hard collision | 158 / 1430 / 140 | 70 / 1106 / 6 | not measured |
+| Soft collision | 0 / 1 / 1 | 0 / 0 / 0 | 8.8% |
+| Pass through, no nudge | 2 / 1 / 1 | 0 / 0 / 0 | 59.2% |
+
+Two players spawned on the same spot, with nobody walking, ended about 90 cm apart on both a still ship and a moving one, with no corrections. Both were already apart when measurement began, so how long separating takes was not measured.
+
+The 8.8% is partly the test: four walkers keep meeting in 2 m doorways, where there is little room to separate. How the nudge feels has not been tried by a person, and nobody has tested it with more than four players.
 
 ## Not tested yet
 
@@ -96,6 +104,6 @@ Ship-relative gravity looked good again on one run, but mouse look does not yet 
 
 ## Next steps
 
-1. Decide on player collision.
+1. The owner tries soft collision in the editor.
 2. Airlock and swimming, the next item on the gate.
 3. A packaged build tested on two real PCs.
