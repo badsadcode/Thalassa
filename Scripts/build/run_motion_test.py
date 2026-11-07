@@ -1,0 +1,121 @@
+"""Runs the moving-ship test: one listen host and N clients as separate headless processes.
+
+Both ends run scripted walkers while the server drives the ship through a fixed motion profile.
+Each process writes a telemetry CSV; analyze_motion_test.py compares them.
+
+    python Scripts/build/run_motion_test.py --name rtt100 --rtt 100 --jitter 10 --loss 1
+    python Scripts/build/run_motion_test.py --name shipgrav --gravity ship
+"""
+import argparse
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).parent))
+import analyze_corrections  # noqa: E402
+import analyze_motion_test  # noqa: E402
+
+MAP = "/Game/TestMaps/L_ShipMotion"
+PROFILE_SECONDS = 320  # The longer of the two motion profiles.
+STARTUP_ALLOWANCE_SECONDS = 180
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--name", default="baseline", help="result folder under Saved/MotionTests")
+    parser.add_argument("--engine", default=r"D:\EPIC\UE_5.8")
+    parser.add_argument("--clients", type=int, default=1)
+    parser.add_argument("--port", type=int, default=7777)
+    parser.add_argument("--rtt", type=int, default=0, help="simulated round trip, ms (split across both directions)")
+    parser.add_argument("--jitter", type=int, default=0, help="simulated lag variance per direction, ms")
+    parser.add_argument("--loss", type=int, default=0, help="simulated packet loss per direction, percent")
+    parser.add_argument("--gravity", choices=["world", "ship"], default="world")
+    parser.add_argument("--static-ship", action="store_true", help="control run: same walkers, ship held still")
+    parser.add_argument("--solo-walker", action="store_true", help="only the client walks; the host stands aside")
+    parser.add_argument("--no-nudge", action="store_true", help="crew pass through each other without being nudged apart")
+    parser.add_argument("--spawn-together", action="store_true", help="every player spawns at the same spot")
+    parser.add_argument("--no-walkers", action="store_true", help="nobody walks; players only react to each other")
+    parser.add_argument("--eva", action="store_true", help="slow ship; first client is a diver, others walk")
+    parser.add_argument("--eva-all", action="store_true", help="slow ship; everyone is a diver, sharing the airlock")
+    parser.add_argument("--exe", help="test a packaged build's Thalassa.exe instead of the editor")
+    parser.add_argument("--deck", action="store_true", help="use the real deck instead of the test rig")
+    parser.add_argument("--hull-stretch", type=float, help="stretch the hull lengthwise; walkers only")
+    parser.add_argument("--no-jump", action="store_true", help="walkers never jump")
+    parser.add_argument("--out", help="result folder's parent; defaults to the system temp folder")
+    parser.add_argument("--server-move-scalar", type=float, help="value for p.NetServerMaxMoveDeltaTimeScalar")
+    args = parser.parse_args()
+
+    # Not under the project by default. The test writes constantly, and on a slow disk that stalls
+    # the game enough to dominate the results. Use --out to test deliberately under stalls.
+    out = (Path(args.out) if args.out else Path(tempfile.gettempdir()) / "ThalassaMotionTests") / args.name
+    out.mkdir(parents=True, exist_ok=True)
+    for stale in [*out.glob("*.csv"), *out.glob("*.log")]:
+        stale.unlink()
+
+    editor = Path(args.engine) / "Engine" / "Binaries" / "Win64" / "UnrealEditor-Cmd.exe"
+    project = ROOT / "Thalassa.uproject"
+    timeout = PROFILE_SECONDS + STARTUP_ALLOWANCE_SECONDS
+
+    common = [
+        "-game", "-nullrhi", "-nosound", "-unattended", "-nosplash", "-NoVerifyGC",
+        f"-ThalassaTimeout={timeout}", f"-ThalassaGravity={args.gravity}",
+        "-ExecCmds=t.MaxFPS 60" + (f",p.NetServerMaxMoveDeltaTimeScalar {args.server_move_scalar}" if args.server_move_scalar else ""),
+    ]
+    if args.no_nudge:
+        common.append("-ThalassaNoNudge")
+    if args.spawn_together:
+        common.append("-ThalassaSpawnTogether")
+    if args.eva or args.eva_all:
+        common.append("-ThalassaEvaProfile")
+    if not args.deck:
+        common.append("-ThalassaTestRig")
+    if args.hull_stretch:
+        common.append(f"-ThalassaHullStretch={args.hull_stretch}")
+    if args.no_jump:
+        common.append("-ThalassaNoJump")
+    if args.static_ship:
+        common.append("-ThalassaStaticShip")
+    if args.rtt or args.loss:
+        common += [f"PktLag={args.rtt // 2}", f"PktLagVariance={args.jitter}", f"PktLoss={args.loss}"]
+
+    def launch(role, url, extra):
+        target = [args.exe] if args.exe else [str(editor), str(project)]
+        command = [*target, url, *common, *extra,
+                   f"-ThalassaTelemetry={out / (role + '.csv')}", f"-abslog={out / (role + '.log')}"]
+        return subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    processes = {"host": launch("host", f"{MAP}?listen?port={args.port}", [
+        f"-ThalassaExpectPlayers={args.clients + 1}", f"-port={args.port}",
+        *([] if args.solo_walker or args.no_walkers else ["-ThalassaBot"]),
+        *(["-ThalassaDiver"] if args.eva_all else [])])}
+    time.sleep(25)  # The host must be listening before clients try to connect.
+    for index in range(args.clients):
+        processes[f"client{index}"] = launch(f"client{index}", f"127.0.0.1:{args.port}", [] if args.no_walkers else ["-ThalassaBot", *(["-ThalassaDiver"] if args.eva_all or (args.eva and index == 0) else [])])
+
+    deadline = time.time() + timeout + 30
+    failed = False
+    for role, process in processes.items():
+        try:
+            code = process.wait(timeout=max(1, deadline - time.time()))
+            print(f"{role}: exit code {code}")
+            failed = failed or code != 0
+        except subprocess.TimeoutExpired:
+            print(f"{role}: did not exit in time, killing")
+            process.kill()
+            failed = True
+
+    text = analyze_motion_test.report(out)
+    print(text)
+    print(analyze_corrections.report(out))
+    print(f"Results in {out}")
+    # A clean process exit proves nothing: the test also fails if it produced no measurements.
+    failed = failed or "FAILED" in text or "NO SAMPLES" in text
+    print("RESULT: " + ("FAILED" if failed else "completed (read the numbers; this is not a pass/fail gate)"))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -3,7 +3,8 @@ Binaries/
 Intermediate/
 Saved/
 DerivedDataCache/
-Build/
+# Root only: on Windows a bare "Build/" also matches Scripts/build.
+/Build/
 Plugins/*/Binaries/
 Plugins/*/Intermediate/
 
