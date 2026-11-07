@@ -1,5 +1,7 @@
 #include "Tools/ThalassaTelemetry.h"
 
+#include "Components/CapsuleComponent.h"
+
 #include "Characters/ThalassaCharacter.h"
 #include "Characters/ThalassaMovementComponent.h"
 #include "Engine/World.h"
@@ -110,13 +112,16 @@ void UThalassaTelemetry::TrackLocalFrameStep(float DeltaTime)
 
 	WorstFrameSeconds = FMath::Max(WorstFrameSeconds, DeltaTime);
 
-	const FVector Local = Vessel->GetActorTransform().InverseTransformPosition(Character->GetActorLocation());
+	// Measured at the feet: crouching moves the capsule's centre 33 cm, but nobody's feet leave the floor.
+	const FVector Feet = Character->GetActorLocation() - Character->GetActorUpVector() * Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FVector Local = Vessel->GetActorTransform().InverseTransformPosition(Feet);
 	if (bHasLastLocalPosition)
 	{
 		// In the ship's frame a walker moves at walking speed. Anything well beyond that is a
 		// visible pop for this player, whatever caused it.
 		const UThalassaMovementComponent* Movement = Character->GetThalassaMovement();
-		const float Allowed = FMath::Max(Movement->GetMaxSpeed(), Movement->JumpZVelocity) * PopAllowanceFactor * DeltaTime; // GetMaxSpeed: sprinting is not a pop.
+		const float MoveSpeed = Movement->IsSliding() ? Movement->SprintSpeed : Movement->GetMaxSpeed(); // Sprinting and sliding are not pops.
+		const float Allowed = FMath::Max(MoveSpeed, Movement->JumpZVelocity) * PopAllowanceFactor * DeltaTime;
 		const float Excess = static_cast<float>(FVector::Dist(Local, LastLocalPosition)) - Allowed;
 		if (Excess > PopThresholdCm)
 		{

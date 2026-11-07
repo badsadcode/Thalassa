@@ -17,6 +17,7 @@ public:
 	virtual void PrepMoveFor(ACharacter* C) override;
 
 	bool bSavedWantsToSprint = false;
+	bool bSavedSliding = false;
 };
 
 class FNetworkPredictionData_Client_Thalassa : public FNetworkPredictionData_Client_Character
@@ -59,6 +60,23 @@ public:
 
 	static constexpr float LadderSpeedCm = 200.f;
 
+	/**
+	 * Sliding: crouching while moving faster than this on foot. You keep your speed and lose it slowly, can
+	 * steer a little, and come up into a crouch once it is gone. There is no slide timer or boost: whether
+	 * you slide follows from your speed and the crouch flag, both of which the network already corrects,
+	 * so client and server cannot disagree about it.
+	 */
+	bool IsSliding() const;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float SlideMinSpeed = 500.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float SlideDeceleration = 200.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float SlideSteerDegreesPerSecond = 45.f;
+
 	bool bWantsToSprint = false;
 
 	/** Swimming uses MOVE_Flying: no gravity, full 3D input, and it needs no water volume to exist. */
@@ -87,6 +105,7 @@ public:
 protected:
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
+	virtual void CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration) override;
 
 private:
 	void LogCorrection(const FVector& NewLocation, const FMovementBaseInterfaceData* NewBase, uint8 ServerMovementMode) const;

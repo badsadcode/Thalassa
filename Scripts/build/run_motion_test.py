@@ -49,6 +49,7 @@ def main():
     parser.add_argument("--hull-stretch", type=float, help="stretch the hull lengthwise; walkers only")
     parser.add_argument("--no-jump", action="store_true", help="walkers never jump")
     parser.add_argument("--sprint", action="store_true", help="walkers sprint everywhere")
+    parser.add_argument("--slide", action="store_true", help="walkers sprint, and slide every few seconds")
     parser.add_argument("--out", help="result folder's parent; defaults to the system temp folder")
     parser.add_argument("--server-move-scalar", type=float, help="value for p.NetServerMaxMoveDeltaTimeScalar")
     args = parser.parse_args()
@@ -89,6 +90,8 @@ def main():
         common.append("-ThalassaNoJump")
     if args.sprint:
         common.append("-ThalassaSprint")
+    if args.slide:
+        common.append("-ThalassaSlide")
     if args.static_ship:
         common.append("-ThalassaStaticShip")
     if args.rtt or args.loss:

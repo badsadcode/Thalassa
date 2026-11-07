@@ -23,6 +23,8 @@ All of it is tested headless with a real listen host and clients as separate pro
 - **Full stop:** X at the helm, or the red button on the helm console that anyone can press. The ship brakes to a standstill and holds until the helmsman touches a control. See `HELM.md`.
 - **Sprinting:** Shift, at 8 m/s on foot. It is part of each saved move, so the server agrees with the client. Grabbing a ladder slows you to climbing speed, or a sprinter crossed the climbing zone and bounced off. `--sprint` makes test walkers sprint.
 - **Stations and the camera station:** helm and cameras share one station class (E to take, E to leave, leave if pushed away). Six hull cameras show on a large and a grid screen at the starboard console beside the sonar. Cameras render only while someone can see them. See `STATIONS.md`.
+- **Crouch and slide:** C crouches. Sprinting into a crouch slides: you keep your speed, lose 2 m/s each second, steer a little, and stop sliding below 5 m/s. Space jumps out of a crouch or slide with its speed. Sliding follows from speed and the crouch flag, both already corrected by the network, so there is no slide timer to disagree about. Moves are not combined while sliding. The view eases when you crouch. `--slide` makes walkers slide every 6 s. At about 133 ms: 14 corrections and 1 visible snap of 11 cm in a run, against 9 corrections and none for sprinting alone.
+- **Unreal MCP:** Epic's experimental MCP plugin is enabled for the editor and starts with it. A Claude Code session started in the project folder while the editor runs can work in the editor. Test processes do not start it. See `TOOLCHAIN.md`.
 - **Surface and seabed:** under the helm, the ship floats at 15 m at most and stops dead against the seabed or anything solid, including a pitch or turn that would swing the hull into rock. The helm shows SURFACED and flashes COLLISION. The scripted motion test is not constrained. See `HELM.md`.
 - **Sonar station on the bridge:** a screen above the starboard middle console shows the same chart as **Tab**, with a ping every 2 s on the server's clock. The ping is synthesised in code, with no sound asset. The owner heard it in the editor on 2026-11-07. Automated runs are silent (`-nosound`).
 - **Packaging:** `Scripts/build/package-windows.ps1` writes to `D:\ThalassaBuilds\Windows`, with `Host.bat`, `Join.bat` and a README. Repackaged on 2026-11-07 with the sonar screen and the ladder fix. Tested as host plus client on one PC: a deck run with the sonar on had identical charts, no corrections and no stuck waypoints, and a frame showed the bridge screen working.
@@ -45,7 +47,7 @@ All of this is recorded in `Decisions.md`.
 
 ## Suggested next steps
 
-The owner's direction on movement: smooth and fluid like Titanfall (see `Decisions.md`), so a slide is a natural next move, with the same network testing as walking. Also: something to do when the ship hits the seabed (a bump everyone feels the same, a sound), hull floodlights for the cameras, more monitors, or internet play with playit.gg.
+The owner's direction on movement: smooth and fluid like Titanfall (see `Decisions.md`). Next for the art: make the ship a Blueprint the owner can dress in the editor, with gameplay markers as components instead of numbers in `ThalassaMainDeckLayout.cpp`, keeping `INTERIOR_RULES.md`. The Unreal MCP should help with that. Also: something to do when the ship hits the seabed (a bump everyone feels the same, a sound), hull floodlights for the cameras, more monitors, or internet play with playit.gg.
 
 ## How to work here
 

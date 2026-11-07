@@ -21,12 +21,18 @@ Development machine: Ryzen 9 5950X, 32 GB RAM, RTX 3080.
 | Enhanced Input | Player controls | Runtime | Built in |
 | Python Editor Script Plugin | Generating the test map | Editor only | Built in |
 | Editor Scripting Utilities | Editor automation | Editor only | Built in |
+| Unreal MCP (`ModelContextProtocol`) | Lets Claude Code work in the open editor | Editor only | Built in, experimental |
+| All Toolsets | The tools the MCP server offers | Editor only | Built in, experimental |
 
 No third-party plugins.
 
 ## Automation bridges
 
-No Unreal or Blender MCP server is configured. Everything so far runs through ordinary command-line tools and Unreal's own editor Python, and nothing has needed more. Blender 5.1 is installed on the development machine but has not been used yet.
+**Unreal MCP**, Epic's own MCP server, ships with UE 5.8 as an experimental plugin, and it is enabled here for the editor only. It starts with the editor (`Config/DefaultEditorPerProjectUserSettings.ini`) and listens on this machine only, at `http://127.0.0.1:8000/mcp`. It has no authentication, so it must never be exposed beyond this PC. Epic's usage analytics for it are turned off in `DefaultEngine.ini`.
+
+`.mcp.json` in the project root points Claude Code at it. A Claude Code session started in the project folder while the editor is running can then use the editor's tools: spawning and editing actors, materials, scenes, and running automation tests. Tool calls run one at a time on the editor's game thread. Epic's guide: https://dev.epicgames.com/documentation/unreal-engine/unreal-mcp-in-unreal-editor
+
+Before this, everything ran through ordinary command-line tools and Unreal's own editor Python, and those still work. Compiling C++ still needs the editor closed. No Blender MCP is configured. Blender 5.1 is installed on the development machine but has not been used yet.
 
 ## Machine-specific notes
 

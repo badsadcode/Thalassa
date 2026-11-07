@@ -17,6 +17,12 @@
 #include "Vessel/ThalassaCameraStation.h"
 #include "Vessel/ThalassaVessel.h"
 
+namespace ThalassaCrew
+{
+	constexpr float CameraHeightCm = 64.f;      // Above the capsule's centre.
+	constexpr float CameraCrouchEaseSpeed = 12.f;
+}
+
 AThalassaCharacter::AThalassaCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UThalassaMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
@@ -31,7 +37,7 @@ AThalassaCharacter::AThalassaCharacter(const FObjectInitializer& ObjectInitializ
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(GetCapsuleComponent());
-	Camera->SetRelativeLocation(FVector(0.f, 0.f, 64.f));
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, ThalassaCrew::CameraHeightCm));
 	Camera->bUsePawnControlRotation = true;
 
 	// Placeholder body seen by other players. Parented to the skeletal mesh component so it
@@ -53,6 +59,17 @@ UThalassaMovementComponent* AThalassaCharacter::GetThalassaMovement() const
 void AThalassaCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	// Crouching and standing move the capsule at once. The view eases after it instead of snapping.
+	if (CameraCrouchOffset != 0.f)
+	{
+		CameraCrouchOffset = FMath::FInterpTo(CameraCrouchOffset, 0.f, DeltaSeconds, ThalassaCrew::CameraCrouchEaseSpeed);
+		if (FMath::Abs(CameraCrouchOffset) < 0.1f)
+		{
+			CameraCrouchOffset = 0.f;
+		}
+		Camera->SetRelativeLocation(FVector(0.f, 0.f, ThalassaCrew::CameraHeightCm + CameraCrouchOffset));
+	}
 
 	if (!BoundVessel)
 	{
@@ -101,7 +118,27 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 		}
 		else if (ThalassaTestConfig::IsBot())
 		{
-			GetThalassaMovement()->SetWantsToSprint(ThalassaTestConfig::IsBotSprinting());
+			GetThalassaMovement()->SetWantsToSprint(ThalassaTestConfig::IsBotSprinting() || ThalassaTestConfig::IsBotSliding());
+			if (ThalassaTestConfig::IsBotSliding())
+			{
+				// Every few seconds, a slide: crouch while sprinting, for a second and a half.
+				BotSlideTimer -= DeltaSeconds;
+				if (BotSlideTimer <= 0.f)
+				{
+					BotSlideTimer = 6.f;
+					Crouch();
+					BotSlideStart = BoundVessel ? BoundVessel->GetActorTransform().InverseTransformPosition(GetActorLocation()) : FVector::ZeroVector;
+					BotSlideStartSpeed = static_cast<float>(GetCharacterMovement()->Velocity.Size2D());
+				}
+				else if (BotSlideTimer < 4.5f && bIsCrouched)
+				{
+					const FVector Here = BoundVessel ? BoundVessel->GetActorTransform().InverseTransformPosition(GetActorLocation()) : FVector::ZeroVector;
+					UE_LOG(LogTemp, Display, TEXT("SLIDE from %.0f cm/s, after 1.5 s: %.0f cm/s, %s, moved %.0f cm"), BotSlideStartSpeed,
+						GetCharacterMovement()->Velocity.Size2D(), GetThalassaMovement()->IsSliding() ? TEXT("still sliding") : TEXT("crouching"),
+						FVector::Dist2D(Here, BotSlideStart));
+					UnCrouch();
+				}
+			}
 			TickWalkerBot(DeltaSeconds);
 		}
 		if (IsAtStation())
@@ -359,6 +396,34 @@ void AThalassaCharacter::ApplyCrewNudge()
 	{
 		AddMovementInput(Nudge.GetClampedToMaxSize(1.f), MaxNudgeInput);
 	}
+}
+
+void AThalassaCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	// The capsule's centre just dropped. Hold the view where it was, then let it follow down smoothly.
+	CameraCrouchOffset += ScaledHalfHeightAdjust;
+}
+
+void AThalassaCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	CameraCrouchOffset -= ScaledHalfHeightAdjust;
+}
+
+bool AThalassaCharacter::CanJumpInternal_Implementation() const
+{
+	// The engine refuses to jump while crouched. Here a crouch, or a slide, can always be jumped out of.
+	return JumpIsAllowedInternal();
+}
+
+void AThalassaCharacter::JumpFromAnywhere()
+{
+	if (bIsCrouched)
+	{
+		UnCrouch();
+	}
+	Jump();
 }
 
 void AThalassaCharacter::Interact()

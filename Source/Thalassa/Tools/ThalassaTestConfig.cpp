@@ -17,6 +17,12 @@ namespace ThalassaTestConfig
 		return bValue;
 	}
 
+	bool IsBotSliding()
+	{
+		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaSlide"));
+		return bValue;
+	}
+
 	bool IsBotSprinting()
 	{
 		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaSprint"));

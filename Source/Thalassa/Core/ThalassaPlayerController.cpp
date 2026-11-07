@@ -173,6 +173,20 @@ void AThalassaPlayerController::OnSwimVertical(const FInputActionValue& Value)
 	{
 		return; // Space and C work the planes. PlayerTick sends them.
 	}
+
+	// On foot, C crouches while held, and slides if you are sprinting.
+	if (AThalassaCharacter* Walker = Cast<AThalassaCharacter>(GetPawn()))
+	{
+		const bool bWantsCrouch = VerticalAxis < -0.5f && !Walker->GetThalassaMovement()->IsSwimmingInSea() && !Walker->GetThalassaMovement()->IsClimbingLadder();
+		if (bWantsCrouch && !Walker->bIsCrouched)
+		{
+			Walker->Crouch();
+		}
+		else if (!bWantsCrouch && Walker->bIsCrouched)
+		{
+			Walker->UnCrouch();
+		}
+	}
 	const AThalassaCharacter* Crew = Cast<AThalassaCharacter>(GetPawn());
 	if (Crew && Crew->GetThalassaMovement()->IsSwimmingInSea())
 	{
@@ -202,9 +216,9 @@ void AThalassaPlayerController::OnJumpStart()
 	{
 		return;
 	}
-	if (ACharacter* ControlledCharacter = GetCharacter())
+	if (AThalassaCharacter* Walker = Cast<AThalassaCharacter>(GetPawn()))
 	{
-		ControlledCharacter->Jump();
+		Walker->JumpFromAnywhere();
 	}
 }
 

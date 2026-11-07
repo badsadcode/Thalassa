@@ -106,7 +106,7 @@ void AThalassaHUD::DrawHUD()
 		FString::Printf(TEXT("%s   airlock %s, water %.0f%%%s"), bSwimming ? TEXT("SWIMMING") : Movement->IsClimbingLadder() ? TEXT("ON LADDER") : TEXT("on foot"),
 			AirlockNames[static_cast<int32>(Vessel->GetAirlockState())], Vessel->GetAirlockWaterLevel() * 100.f,
 			Vessel->IsAirlockDoorwayBlocked() ? TEXT("   DOORWAY BLOCKED") : TEXT("")),
-		TEXT("WASD/mouse move   SHIFT sprint   SPACE jump/up   C down   E use helm, console or airlock   TAB station view"),
+		TEXT("WASD/mouse move   SHIFT sprint   C crouch (sprinting: slide)   SPACE jump/up   E use helm, console or airlock   TAB station view"),
 		TEXT("N sonar   P run motion test"),
 	};
 	DrawLines(Diagnostics, 16.f, 16.f, FLinearColor(0.35f, 0.84f, 0.83f), 1.f);

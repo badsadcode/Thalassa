@@ -23,6 +23,16 @@ public:
 	/** Local player: try to use whatever console is in reach. */
 	void Interact();
 
+	/** Jump, from a crouch or a slide too. Leaving a slide this way keeps its speed. */
+	void JumpFromAnywhere();
+
+protected:
+	virtual bool CanJumpInternal_Implementation() const override;
+	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+
+public:
+
 	UThalassaMovementComponent* GetThalassaMovement() const;
 
 	/** Waypoints the test walker failed to reach in time. Reported by telemetry. */
@@ -72,4 +82,10 @@ private:
 	float BotHelmSeconds = -1.f;
 	int32 BotHelmCue = 0;
 	float BotHelmLogTimer = 0.f;
+	/** How far the view still has to travel after a crouch or stand moved the capsule. Eased to zero. */
+	float CameraCrouchOffset = 0.f;
+
+	float BotSlideTimer = 5.f;
+	FVector BotSlideStart = FVector::ZeroVector;
+	float BotSlideStartSpeed = 0.f;
 };

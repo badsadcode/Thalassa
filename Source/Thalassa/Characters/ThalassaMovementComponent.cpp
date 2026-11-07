@@ -17,6 +17,11 @@ UThalassaMovementComponent::UThalassaMovementComponent()
 	bImpartBaseVelocityZ = true;
 	bImpartBaseAngularVelocity = true;
 
+	// Crouching, and through it the slide.
+	GetNavAgentPropertiesRef().bCanCrouch = true;
+	MaxWalkSpeedCrouched = 250.f;
+	SetCrouchedHalfHeight(55.f);
+
 	MaxFlySpeed = 400.f;                // Swimming speed.
 	BrakingDecelerationFlying = 600.f;  // Water stops you quickly when you stop swimming.
 }
@@ -161,7 +166,32 @@ float UThalassaMovementComponent::GetMaxSpeed() const
 	{
 		return LadderSpeedCm;
 	}
-	return IsSprinting() ? SprintSpeed : Super::GetMaxSpeed();
+	// Crouched, you move at crouching speed even with sprint held. A slide is not limited here: CalcVelocity
+	// carries its speed.
+	return IsSprinting() && !IsCrouching() ? SprintSpeed : Super::GetMaxSpeed();
+}
+
+bool UThalassaMovementComponent::IsSliding() const
+{
+	return IsCrouching() && IsMovingOnGround() && Velocity.SizeSquared2D() > FMath::Square(SlideMinSpeed);
+}
+
+void UThalassaMovementComponent::CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration)
+{
+	if (!IsSliding())
+	{
+		Super::CalcVelocity(DeltaTime, Friction, bFluid, BrakingDeceleration);
+		return;
+	}
+
+	// Sliding: no ground friction and no running, just a slow loss of speed. Input only steers.
+	const float Speed = FMath::Max(0.f, static_cast<float>(Velocity.Size()) - SlideDeceleration * DeltaTime);
+	FVector Direction = Velocity.GetSafeNormal();
+	if (!Acceleration.IsNearlyZero())
+	{
+		Direction = FMath::VInterpNormalRotationTo(Direction, Acceleration.GetSafeNormal(), DeltaTime, SlideSteerDegreesPerSecond);
+	}
+	Velocity = Direction * Speed;
 }
 
 bool UThalassaMovementComponent::IsSprinting() const
@@ -195,6 +225,7 @@ void FSavedMove_Thalassa::Clear()
 {
 	Super::Clear();
 	bSavedWantsToSprint = false;
+	bSavedSliding = false;
 }
 
 uint8 FSavedMove_Thalassa::GetCompressedFlags() const
@@ -209,7 +240,14 @@ uint8 FSavedMove_Thalassa::GetCompressedFlags() const
 
 bool FSavedMove_Thalassa::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
 {
-	if (bSavedWantsToSprint != static_cast<const FSavedMove_Thalassa*>(NewMove.Get())->bSavedWantsToSprint)
+	const FSavedMove_Thalassa* Next = static_cast<const FSavedMove_Thalassa*>(NewMove.Get());
+	if (bSavedWantsToSprint != Next->bSavedWantsToSprint)
+	{
+		return false;
+	}
+	// A slide steers and slows by the frame, so one long step does not land where several short ones
+	// did. Sent separately, the server runs exactly the steps the client ran.
+	if (bSavedSliding || Next->bSavedSliding)
 	{
 		return false;
 	}
@@ -222,6 +260,7 @@ void FSavedMove_Thalassa::SetMoveFor(ACharacter* C, float InDeltaTime, FVector c
 	if (const UThalassaMovementComponent* Movement = Cast<UThalassaMovementComponent>(C->GetCharacterMovement()))
 	{
 		bSavedWantsToSprint = Movement->bWantsToSprint;
+		bSavedSliding = Movement->IsSliding();
 	}
 }
 

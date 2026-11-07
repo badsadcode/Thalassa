@@ -53,6 +53,9 @@ namespace ThalassaTestConfig
 	/** -ThalassaSprint: scripted walkers sprint everywhere. */
 	bool IsBotSprinting();
 
+	/** -ThalassaSlide: scripted walkers sprint, and slide every few seconds. */
+	bool IsBotSliding();
+
 	/** -ThalassaNoJump: the scripted walker never jumps. */
 	bool IsBotJumpDisabled();
 

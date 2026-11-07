@@ -37,6 +37,7 @@ Open `Thalassa.uproject` in the editor and press Play. You start on the main dec
 |---|---|
 | WASD, mouse, Space | Walk, look, jump (in water: swim where you look) |
 | Shift | Sprint |
+| C | On foot: crouch. While sprinting: slide. Space jumps out of a crouch or slide, keeping its speed |
 | Space / C | In water: up / down |
 | E | Take or leave a station: the helm (middle of the console at the bridge's forward window) or the cameras (starboard console beside the sonar). Also presses the red full stop button, and cycles the airlock (off the corridor, to starboard) |
 | At the helm | W/S throttle, A/D rudder, Space/C planes, R precise or set-and-go, X full stop. See `docs/HELM.md` |

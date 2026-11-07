@@ -75,6 +75,9 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 **Player movement (owner's direction).** Walking the ship takes too long, so there is sprinting (**Shift**, built). In the final game, movement should be smooth and fluid, like Titanfall: fast, keeping momentum, with moves like a slide. It should still work on a moving ship over the network, so every new move needs the same testing as walking did.
 
+- **Built so far:** sprinting, crouching, a slide (C while sprinting) that keeps your speed and can be jumped out of, and a view that eases down and up instead of snapping when you crouch.
+- **Possible next moves:** a longer or boosted slide, mantling onto ledges, and wall running if the ship's spaces suit it.
+
 **Stations and their monitors (owner's direction).** Following design document sections 5.6 and 17: each station has physical screens in the world, and a key expands the picture to read it properly.
 
 - **A camera station:** cameras mounted on the hull, showing what is to port, to starboard and around the ship. The station shows them all together and one at a time on a bigger screen, and may later have several monitors. This fits section 6.1: an external camera helps, as long as the player stays a crew member rather than a detached overhead camera.
