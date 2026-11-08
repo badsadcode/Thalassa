@@ -63,7 +63,7 @@ The ship stops on the server at once, but a client is still predicting it forwar
 
 ## Tested
 
-`python Scripts/build/run_motion_test.py --name helm --helm [--clients 2] [--rtt 200 --jitter 20 --loss 3]` runs the deck with a scripted helmsman on the first client. He walks from the spawn to the bridge, takes the helm, and drives a course: full ahead in set-and-go, a turn each way, a dive and level off, all stop, then precise mode, and stands up. His log lines start `HELMBOT`.
+`python Scripts/build/run_motion_test.py --name helm --helm [--clients 2] [--rtt 200 --jitter 20 --loss 3]` runs the deck with a scripted helmsman on the first client. He walks from the spawn (on the bridge, since 2026-11-08) to the helm, takes it, and drives a course: full ahead in set-and-go, a turn each way, a dive and level off, all stop, then precise mode, and stands up. His log lines start `HELMBOT`.
 
 | Run (one each) | Median ping | Helmsman's corrections | Ship disagreement, max |
 |---|---|---|---|

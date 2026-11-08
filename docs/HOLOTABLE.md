@@ -4,7 +4,7 @@ The owner's idea (2026-11-08): a table aboard with a 3D hologram of the terrain 
 
 ## What exists: first version
 
-- **Where:** the sunken centre of the mess hall, between the mess tables, at ship coordinates (-1950, -450), top at 40 cm. It's the `HoloTable` component in `BP_Thalassa` (Thalassa | Spots): move it and the table and hologram move with it.
+- **Where:** on the bridge's lowest tier, behind the helm, at ship coordinates (11650, 0), top at 30 cm (90 cm above that tier's floor). It moved there from the mess hall on 2026-11-08, at the owner's request, so the crew plan where they're going next to the helm. It's the `HoloTable` component in `BP_Thalassa` (Thalassa | Spots): move it and the table and hologram move with it.
 - **What it shows:** the charted seabed within 800 m of the ship, ahead, astern and abeam, as a point cloud of 96 × 96 points on a 2 m table. Only what the sonar has surveyed appears, so the hologram fills in as the ship maps the seabed.
 - **Heading-up:** the bow always points the same way across the room, so ahead on the table is ahead in the ship.
 - **Heights** are stretched three times, so gentle ground still has shape, but the relief never stands taller than 40 cm. Steep ground is flattened to fit.

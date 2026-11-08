@@ -77,6 +77,7 @@ private:
 
 	int32 BotWaypoint = 0;
 	bool bTourStarted = false;
+	bool bHelmRouteStarted = false;
 	float BotJumpTimer = 6.f;
 	float BotSecondsOnWaypoint = 0.f;
 	float BotHelmSeconds = -1.f;

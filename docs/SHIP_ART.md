@@ -49,7 +49,7 @@ The places the game cares about are components in `BP_Thalassa`, under **Thalass
 |---|---|---|
 | `DryCompartment00`, `01`, ... | Spaces with air. Inside one you walk and move with the ship; outside all of them is sea and you swim. | Blue boxes |
 | `LadderZone00` | Where you take hold of a ladder: about 25 cm deep in front of it, its full width, foot to just above the top. | Yellow box |
-| `SpawnPoint00` to `07` | Where players appear when they join, in name order. | Green capsules |
+| `SpawnPoint00` to `07` | Where players appear when they join, in name order. Since 2026-11-08 they're on the bridge's lowest tier, the first a few steps from the helm. | Green capsules |
 | `HelmSpot`, `CameraSpot` | Where the person at the helm or the camera station stands. You take a station with E within 2 m of its spot. | Purple capsules |
 | `Airlock` | The airlock. Its doors and water hang from it, and its panel and flooding chamber move with it. | A point, with the doors under it |
 

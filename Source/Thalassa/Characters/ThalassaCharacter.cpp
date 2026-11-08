@@ -200,7 +200,8 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 
 	if (BotHelmSeconds < 0.f)
 	{
-		// Walk forward along the corridors to the bridge, then to the station.
+		// Walk forward along the corridors to the bridge, then to the station, starting from the waypoint
+		// nearest the spawn: players spawn on the bridge now, so usually it's only the last steps.
 		const FVector Route[] =
 		{
 			FVector(-1000.f, -1500.f, 90.f), FVector(2000.f, -1500.f, 90.f), FVector(2800.f, -1500.f, 90.f), FVector(2800.f, -300.f, 90.f),
@@ -209,6 +210,17 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		};
 		const int32 RouteLength = UE_ARRAY_COUNT(Route);
 		const FVector Here = Ship.InverseTransformPosition(GetActorLocation());
+		if (!bHelmRouteStarted)
+		{
+			bHelmRouteStarted = true;
+			for (int32 Index = 1; Index < RouteLength; ++Index)
+			{
+				if (FVector::DistSquared(Route[Index], Here) < FVector::DistSquared(Route[BotWaypoint], Here))
+				{
+					BotWaypoint = Index;
+				}
+			}
+		}
 
 		if (Station->IsSeated(this))
 		{
@@ -570,10 +582,18 @@ void AThalassaCharacter::TickWalkerBot(float DeltaSeconds)
 		const FVector Here = Ship.InverseTransformPosition(GetActorLocation());
 		if (!bTourStarted)
 		{
-			// Walkers spread out along the route, as a crew would, instead of moving as one. Both
-			// starting points are in the corridor beside the spawn points, so both are reachable.
+			// Start at the waypoint nearest the spawn, wherever the spawns are. Every second walker starts one
+			// further on, so walkers spread out along the route, as a crew would, instead of moving as one.
+			int32 Nearest = 0;
+			for (int32 Index = 1; Index < Tour.Num(); ++Index)
+			{
+				if (FVector::DistSquared(Tour[Index], Here) < FVector::DistSquared(Tour[Nearest], Here))
+				{
+					Nearest = Index;
+				}
+			}
 			const int32 Id = GetPlayerState() ? GetPlayerState()->GetPlayerId() : 0;
-			BotWaypoint = (Id % 2) * 8;
+			BotWaypoint = (Nearest + Id % 2) % Tour.Num();
 			bTourStarted = true;
 		}
 		const FVector Target = Tour[BotWaypoint % Tour.Num()];

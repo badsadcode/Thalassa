@@ -217,9 +217,10 @@ FVesselLayout BuildMainDeckLayout()
 	// The machinery is heard from the middle of the engineering hall.
 	Layout.MachineryLocation = FVector(-11250.f, 0.f, -150.f);
 
-	// The holotable: in the sunken centre, between the mess tables, where the crew gather. See docs/HOLOTABLE.md.
+	// The holotable: on the bridge's lowest tier, behind the helm, where the crew gather to decide where to go.
+	// The tier's floor is at -60, so the top stands 90 cm above it. See docs/HOLOTABLE.md.
 	Layout.bHasHoloTable = true;
-	Layout.HoloTableLocation = FVector(-1950.f, -450.f, 40.f);
+	Layout.HoloTableLocation = FVector(11650.f, 0.f, 30.f);
 
 	// Side rooms: uneven on each side, so the two halves of the ring do not look alike.
 	B.WallY(-3200.f, -2500.f, -1700.f, CrewColor);
@@ -356,8 +357,10 @@ FVesselLayout BuildMainDeckLayout()
 		B.Light(Lamp, Cool);
 	}
 
-	Layout.Spawns = { FVector(-800.f, -1450.f, 120.f), FVector(-400.f, -1550.f, 120.f), FVector(0.f, -1450.f, 120.f), FVector(400.f, -1550.f, 120.f),
-		FVector(800.f, -1450.f, 120.f), FVector(1200.f, -1550.f, 120.f), FVector(1600.f, -1450.f, 120.f), FVector(2000.f, -1550.f, 120.f) };
+	// Everyone starts on the bridge's lowest tier (floor at -60), facing the window: the first player a few steps
+	// from the helm, the rest between the helm and the holotable.
+	Layout.Spawns = { FVector(12950.f, 0.f, 60.f), FVector(12950.f, -450.f, 60.f), FVector(12950.f, 450.f, 60.f), FVector(12550.f, -250.f, 60.f),
+		FVector(12550.f, 250.f, 60.f), FVector(12150.f, -450.f, 60.f), FVector(12150.f, 450.f, 60.f), FVector(12150.f, 0.f, 60.f) };
 	Layout.AirlockViewpoint = FVector(-7000.f, 1300.f, 120.f);
 
 	// Everywhere the plan says you can go. If a waypoint is unreachable, the test reports it as stuck.
