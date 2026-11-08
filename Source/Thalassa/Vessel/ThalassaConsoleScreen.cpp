@@ -1,4 +1,5 @@
 #include "Vessel/ThalassaConsoleScreen.h"
+#include "Tools/ThalassaPerf.h"
 
 #include "CanvasItem.h"
 #include "Engine/Canvas.h"
@@ -152,6 +153,7 @@ void UThalassaConsoleScreenComponent::TickComponent(float DeltaTime, ELevelTick 
 
 void UThalassaConsoleScreenComponent::DrawScreen(UCanvas* Canvas, int32 Width, int32 Height)
 {
+	THALASSA_PERF_SCOPE("screen draw");
 	if (const AThalassaVessel* Vessel = GetVessel())
 	{
 		DrawContent(Canvas, static_cast<float>(FMath::Min(Width, Height)), *Vessel);

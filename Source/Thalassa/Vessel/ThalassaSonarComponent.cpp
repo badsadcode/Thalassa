@@ -6,6 +6,7 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Thalassa.h"
+#include "Tools/ThalassaPerf.h"
 #include "Tools/ThalassaTestConfig.h"
 #include "Vessel/ThalassaSonarPingComponent.h"
 #include "Vessel/ThalassaSurveySave.h"
@@ -408,6 +409,7 @@ void UThalassaSonarComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
 void UThalassaSonarComponent::TickPulseServer()
 {
+	THALASSA_PERF_SCOPE("ping charting");
 	using namespace ThalassaSonar;
 
 	if (PendingPingNext >= PendingPing.Num())
@@ -473,6 +475,7 @@ void UThalassaSonarComponent::TickPulseServer()
 
 void UThalassaSonarComponent::SweepServer()
 {
+	THALASSA_PERF_SCOPE("survey sweep");
 	using namespace ThalassaSonar;
 
 	const AActor* Ship = GetOwner();
@@ -577,6 +580,7 @@ FLinearColor UThalassaSonarComponent::DepthColour(float HeightM, float DeepM, fl
 
 void UThalassaSonarComponent::SyncDense()
 {
+	THALASSA_PERF_SCOPE("chart sync");
 	bTextureDirty = false;
 	// The first time, nothing glows: a chart loaded or received on joining is not news.
 	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
@@ -699,16 +703,40 @@ UTexture2D* UThalassaSonarComponent::GetLocalChart(const FVector& WorldCentre, i
 	const int32 Across = ViewCells + 8; // A margin, so the crop can follow the ship between rebuilds.
 	const FIntPoint Wanted(FMath::FloorToInt(Centre.X) - Across / 2, FMath::FloorToInt(Centre.Y) - Across / 2);
 	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-	const bool bMoved = LocalCells != Across || FMath::Abs(Wanted.X - LocalOrigin.X) > 3 || FMath::Abs(Wanted.Y - LocalOrigin.Y) > 3;
-	if (bMoved || !LocalChart || Now - LocalBuiltAt >= 0.1)
+
+	// One step of building per frame, however many screens ask for the chart. The screens show the last
+	// finished picture, at its own position, until the next is ready.
+	if (GFrameCounter != BuildFrame)
 	{
-		if (bMoved)
+		BuildFrame = GFrameCounter;
+		if (BuildStage == 0)
 		{
-			LocalOrigin = Wanted;
-			LocalCells = Across;
+			const bool bMoved = LocalCells != Across || FMath::Abs(Wanted.X - LocalOrigin.X) > 3 || FMath::Abs(Wanted.Y - LocalOrigin.Y) > 3;
+			if (bMoved || !LocalChart || Now - LocalBuiltAt >= 0.2)
+			{
+				BuildOrigin = bMoved ? Wanted : LocalOrigin;
+				BuildCells = Across;
+				LocalBuiltAt = Now;
+				StartChartBuild();
+				BuildStage = 1;
+			}
 		}
-		LocalBuiltAt = Now;
-		BuildLocalChart();
+		else
+		{
+			BuildChartRows(BuildStage - 1);
+			if (++BuildStage > ChartSlices)
+			{
+				FinishChartBuild();
+				BuildStage = 0;
+			}
+		}
+	}
+
+	if (!LocalChart || LocalCells == 0)
+	{
+		OutUV0 = FVector2D::ZeroVector;
+		OutUVSize = 1.f;
+		return nullptr;
 	}
 
 	// North up: world +X runs up the image, world +Y to the right.
@@ -721,47 +749,123 @@ UTexture2D* UThalassaSonarComponent::GetLocalChart(const FVector& WorldCentre, i
 	return LocalChart;
 }
 
-void UThalassaSonarComponent::BuildLocalChart()
+void UThalassaSonarComponent::StartChartBuild()
 {
-	const int32 W = LocalCells * PixelsPerCell;
-	if (!LocalChart || LocalChart->GetSizeX() != W)
+	THALASSA_PERF_SCOPE("chart heights");
+	const int32 W = BuildCells * PixelsPerCell;
+
+	// The cells in view, copied out of the pages once into plain grids, so the hundreds of thousands of pixel
+	// lookups below are array reads, not map searches. (Searching the pages per pixel cost 77 ms a rebuild.)
+	struct FGrid
 	{
-		LocalChart = UTexture2D::CreateTransient(W, W, PF_B8G8R8A8);
-		if (!LocalChart)
+		FIntPoint Origin;
+		int32 Size = 0;
+		TArray<int16> Height;
+		TArray<float> Changed;
+		TBitArray<> Known;
+		bool At(int32 X, int32 Y, float& OutHeight) const
 		{
-			return;
+			X -= Origin.X;
+			Y -= Origin.Y;
+			if (X < 0 || Y < 0 || X >= Size || Y >= Size || !Known[Y * Size + X])
+			{
+				return false;
+			}
+			OutHeight = Height[Y * Size + X];
+			return true;
 		}
-		LocalChart->Filter = TF_Bilinear;
-		LocalChart->SRGB = true;
-		LocalChart->UpdateResource();
+		float ChangedAt(int32 X, int32 Y) const
+		{
+			X -= Origin.X;
+			Y -= Origin.Y;
+			return (X < 0 || Y < 0 || X >= Size || Y >= Size || !Known[Y * Size + X]) ? -1000.f : Changed[Y * Size + X];
+		}
+	};
+	FGrid Grids[2];
+	for (int32 Layer = 0; Layer < 2; ++Layer)
+	{
+		const int32 Per = Layer == 0 ? 1 : PingCellCells;
+		FGrid& Grid = Grids[Layer];
+		Grid.Origin = FIntPoint(FMath::FloorToInt((BuildOrigin.X - 1) / float(Per)) - 1, FMath::FloorToInt((BuildOrigin.Y - 1) / float(Per)) - 1);
+		Grid.Size = (BuildCells + 2) / Per + 4;
+		Grid.Height.SetNumZeroed(Grid.Size * Grid.Size);
+		Grid.Changed.Init(-1000.f, Grid.Size * Grid.Size);
+		Grid.Known.Init(false, Grid.Size * Grid.Size);
+		for (int32 Y = 0; Y < Grid.Size; ++Y)
+		{
+			for (int32 X = 0; X < Grid.Size; ++X)
+			{
+				int16 Height;
+				float Changed;
+				if (DenseAt(Layer, Grid.Origin.X + X, Grid.Origin.Y + Y, Height, &Changed))
+				{
+					Grid.Height[Y * Grid.Size + X] = Height;
+					Grid.Changed[Y * Grid.Size + X] = Changed;
+					Grid.Known[Y * Grid.Size + X] = true;
+				}
+			}
+		}
 	}
+	// The same rule as SmoothHeightAt: the survey between its cell centres, else the ping's cells.
+	const auto Smooth = [&Grids](float CellX, float CellY, float& OutHeight, bool& bOutPing)
+	{
+		for (int32 Layer = 0; Layer < 2; ++Layer)
+		{
+			const float Scale = Layer == 0 ? 1.f : 1.f / PingCellCells;
+			const float PX = CellX * Scale - 0.5f, PY = CellY * Scale - 0.5f;
+			const int32 X0 = FMath::FloorToInt(PX), Y0 = FMath::FloorToInt(PY);
+			const float FX = PX - X0, FY = PY - Y0;
+			float Sum = 0.f, Weight = 0.f;
+			for (int32 DX = 0; DX < 2; ++DX)
+			{
+				for (int32 DY = 0; DY < 2; ++DY)
+				{
+					float Height;
+					if (Grids[Layer].At(X0 + DX, Y0 + DY, Height))
+					{
+						const float Wt = (DX ? FX : 1.f - FX) * (DY ? FY : 1.f - FY);
+						Sum += Height * Wt;
+						Weight += Wt;
+					}
+				}
+			}
+			if (Weight > 0.3f)
+			{
+				OutHeight = Sum / Weight;
+				bOutPing = Layer == 1;
+				return true;
+			}
+		}
+		return false;
+	};
 
-	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-	const float PixelM = CellSizeCm / 100.f / PixelsPerCell;
-
-	// Pass 1: heights, smoothed between cell centres. Unmeasured ground takes no part.
-	TArray<float> Heights;
-	TBitArray<> FromPing(false, W * W);
-	Heights.Init(TNumericLimits<float>::Max(), W * W);
+	// Heights, smoothed between cell centres, and when each pixel's cell last changed. Unmeasured ground takes no part.
+	BuildHeights.Init(TNumericLimits<float>::Max(), W * W);
+	BuildChanged.Init(-1000.f, W * W);
+	BuildFromPing.Init(false, W * W);
+	BuildPixels.SetNumUninitialized(W * W);
 	for (int32 V = 0; V < W; ++V)
 	{
-		const float CellX = LocalOrigin.X + LocalCells - (V + 0.5f) / PixelsPerCell;
+		const float CellX = BuildOrigin.X + BuildCells - (V + 0.5f) / PixelsPerCell;
 		for (int32 U = 0; U < W; ++U)
 		{
-			const float CellY = LocalOrigin.Y + (U + 0.5f) / PixelsPerCell;
+			const float CellY = BuildOrigin.Y + (U + 0.5f) / PixelsPerCell;
 			float Height;
 			bool bPing = false;
-			if (SmoothHeightAt(CellX, CellY, Height, &bPing))
+			if (Smooth(CellX, CellY, Height, bPing))
 			{
-				Heights[V * W + U] = Height;
-				FromPing[V * W + U] = bPing;
+				BuildHeights[V * W + U] = Height;
+				BuildFromPing[V * W + U] = bPing;
+				BuildChanged[V * W + U] = bPing
+					? Grids[1].ChangedAt(FMath::FloorToInt(CellX / PingCellCells), FMath::FloorToInt(CellY / PingCellCells))
+					: Grids[0].ChangedAt(FMath::FloorToInt(CellX), FMath::FloorToInt(CellY));
 			}
 		}
 	}
 
 	// Colours span what is in view, like a chart plotter: a gentle plain still shows its shape.
 	float Low = TNumericLimits<float>::Max(), High = -TNumericLimits<float>::Max();
-	for (const float H : Heights)
+	for (const float H : BuildHeights)
 	{
 		if (H != TNumericLimits<float>::Max())
 		{
@@ -773,30 +877,56 @@ void UThalassaSonarComponent::BuildLocalChart()
 	{
 		const float Middle = (Low + High) * 0.5f;
 		const float HalfSpan = FMath::Max((High - Low) * 0.5f, 30.f);
-		LocalDeepM = Middle - HalfSpan;
-		LocalShallowM = Middle + HalfSpan;
+		BuildDeepM = Middle - HalfSpan;
+		BuildShallowM = Middle + HalfSpan;
 	}
+}
+
+void UThalassaSonarComponent::BuildChartRows(int32 Slice)
+{
+	THALASSA_PERF_SCOPE("chart rows");
+	const int32 W = BuildCells * PixelsPerCell;
+	if (BuildHeights.Num() != W * W)
+	{
+		return;
+	}
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	const float PixelM = CellSizeCm / 100.f / PixelsPerCell;
+
 	// Contours: 10 m and 50 m over gentle ground, 20 m and 100 m over steep.
-	const float Minor = LocalShallowM - LocalDeepM > 150.f ? 20.f : 10.f;
+	const float Minor = BuildShallowM - BuildDeepM > 150.f ? 20.f : 10.f;
 	const float Major = Minor * 5.f;
 
-	// Pass 2: colour, light from the north-west, contours, and the glow of news.
+	// Linear colour to an sRGB byte through a table: the exact conversion's powers, per pixel, were most of the cost.
+	static const TArray<uint8> SRGBTable = []
+	{
+		TArray<uint8> Table;
+		Table.SetNumUninitialized(4096);
+		for (int32 Index = 0; Index < 4096; ++Index)
+		{
+			Table[Index] = FLinearColor(Index / 4095.f, 0.f, 0.f).ToFColor(true).R;
+		}
+		return Table;
+	}();
+	const auto ToSRGB = [](float Linear) { return SRGBTable[FMath::Clamp(FMath::RoundToInt(Linear * 4095.f), 0, 4095)]; };
+
+	// Colour, light from the north-west, contours, and the glow of news.
 	const FVector Light = FVector(0.6f, -0.6f, 0.55f).GetSafeNormal();
 	constexpr float Exaggeration = 6.f;
-	TArray<FColor> Pixels;
-	Pixels.SetNumUninitialized(W * W);
-	for (int32 V = 0; V < W; ++V)
+	const TArray<float>& Heights = BuildHeights;
+	const int32 RowFrom = W * Slice / ChartSlices, RowTo = W * (Slice + 1) / ChartSlices;
+	for (int32 V = RowFrom; V < RowTo; ++V)
 	{
-		const float CellX = LocalOrigin.X + LocalCells - (V + 0.5f) / PixelsPerCell;
+		const float CellX = BuildOrigin.X + BuildCells - (V + 0.5f) / PixelsPerCell;
 		for (int32 U = 0; U < W; ++U)
 		{
-			const float CellY = LocalOrigin.Y + (U + 0.5f) / PixelsPerCell;
+			const float CellY = BuildOrigin.Y + (U + 0.5f) / PixelsPerCell;
 			const float H = Heights[V * W + U];
 			if (H == TNumericLimits<float>::Max())
 			{
 				// Unknown water: near black, with a faint 100 m grid fixed to the world.
 				const bool bGrid = FMath::Fmod(FMath::Abs(CellX), 4.f) < 1.f / PixelsPerCell || FMath::Fmod(FMath::Abs(CellY), 4.f) < 1.f / PixelsPerCell;
-				Pixels[V * W + U] = bGrid ? FColor(8, 20, 27) : FColor(3, 8, 12);
+				BuildPixels[V * W + U] = bGrid ? FColor(8, 20, 27) : FColor(3, 8, 12);
 				continue;
 			}
 			const auto At = [&](int32 PU, int32 PV)
@@ -810,10 +940,11 @@ void UThalassaSonarComponent::BuildLocalChart()
 			const float SlopeX = (At(U, V - 1) - At(U, V + 1)) / (2.f * PixelM);
 			const float SlopeY = (At(U + 1, V) - At(U - 1, V)) / (2.f * PixelM);
 			// Ping ground is shaded gently: its 100 m cells, lit as strongly as the survey's, show as square facets.
-			const float Relief = FromPing[V * W + U] ? Exaggeration * 0.3f : Exaggeration;
+			const bool bPing = BuildFromPing[V * W + U];
+			const float Relief = bPing ? Exaggeration * 0.3f : Exaggeration;
 			const FVector Normal = FVector(-SlopeX * Relief, -SlopeY * Relief, 1.f).GetSafeNormal();
 			const float Shade = FMath::Max(0.f, FVector::DotProduct(Normal, Light));
-			FLinearColor Colour = DepthColour(H, LocalDeepM, LocalShallowM) * (0.3f + 0.95f * Shade);
+			FLinearColor Colour = DepthColour(H, BuildDeepM, BuildShallowM) * (0.3f + 0.95f * Shade);
 
 			const float Right = At(U + 1, V), Below = At(U, V + 1);
 			if (FMath::FloorToInt(H / Major) != FMath::FloorToInt(Right / Major) || FMath::FloorToInt(H / Major) != FMath::FloorToInt(Below / Major))
@@ -826,27 +957,44 @@ void UThalassaSonarComponent::BuildLocalChart()
 			}
 
 			// Ground only the ping has seen is coarser: a little dimmer and greyer than surveyed ground.
-			const bool bPing = FromPing[V * W + U];
 			if (bPing)
 			{
 				Colour = FMath::Lerp(Colour, FLinearColor(Colour.GetLuminance(), Colour.GetLuminance(), Colour.GetLuminance()), 0.3f) * 0.8f;
 			}
 
-			int16 Unused;
-			float Changed = -1000.f;
-			const int32 FX = FMath::FloorToInt(CellX), FY = FMath::FloorToInt(CellY);
-			if (bPing ? DenseAt(1, FMath::FloorToInt(CellX / PingCellCells), FMath::FloorToInt(CellY / PingCellCells), Unused, &Changed) : DenseAt(0, FX, FY, Unused, &Changed))
+			const float Age = Now - BuildChanged[V * W + U];
+			if (Age < 6.f)
 			{
-				const float Glow = FMath::Exp(-(Now - Changed) / 1.2f);
-				Colour += FLinearColor(0.3f, 0.85f, 0.8f) * Glow * 0.7f;
+				Colour += FLinearColor(0.3f, 0.85f, 0.8f) * FMath::Exp(-Age / 1.2f) * 0.7f;
 			}
-			Pixels[V * W + U] = Colour.ToFColor(true);
+			BuildPixels[V * W + U] = FColor(ToSRGB(Colour.R), ToSRGB(Colour.G), ToSRGB(Colour.B), 255);
 		}
+	}
+}
+
+void UThalassaSonarComponent::FinishChartBuild()
+{
+	THALASSA_PERF_SCOPE("chart upload");
+	const int32 W = BuildCells * PixelsPerCell;
+	if (BuildPixels.Num() != W * W)
+	{
+		return;
+	}
+	if (!LocalChart || LocalChart->GetSizeX() != W)
+	{
+		LocalChart = UTexture2D::CreateTransient(W, W, PF_B8G8R8A8);
+		if (!LocalChart)
+		{
+			return;
+		}
+		LocalChart->Filter = TF_Bilinear;
+		LocalChart->SRGB = true;
+		LocalChart->UpdateResource();
 	}
 
 	// Upload without stalling: the renderer frees the copy when it is done with it.
-	uint8* Data = static_cast<uint8*>(FMemory::Malloc(Pixels.Num() * sizeof(FColor)));
-	FMemory::Memcpy(Data, Pixels.GetData(), Pixels.Num() * sizeof(FColor));
+	uint8* Data = static_cast<uint8*>(FMemory::Malloc(BuildPixels.Num() * sizeof(FColor)));
+	FMemory::Memcpy(Data, BuildPixels.GetData(), BuildPixels.Num() * sizeof(FColor));
 	FUpdateTextureRegion2D* Region = new FUpdateTextureRegion2D(0, 0, 0, 0, W, W);
 	LocalChart->UpdateTextureRegions(0, 1, Region, W * sizeof(FColor), sizeof(FColor), Data,
 		[](uint8* SrcData, const FUpdateTextureRegion2D* Regions)
@@ -854,4 +1002,10 @@ void UThalassaSonarComponent::BuildLocalChart()
 			FMemory::Free(SrcData);
 			delete Regions;
 		});
+
+	// The finished picture takes over: its place, its size, and its colour range for the legend.
+	LocalOrigin = BuildOrigin;
+	LocalCells = BuildCells;
+	LocalDeepM = BuildDeepM;
+	LocalShallowM = BuildShallowM;
 }

@@ -1,4 +1,5 @@
 #include "Vessel/ThalassaHoloTable.h"
+#include "Tools/ThalassaPerf.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Vessel/ThalassaSonarComponent.h"
@@ -44,6 +45,7 @@ void UThalassaHoloTableComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 void UThalassaHoloTableComponent::Rebuild()
 {
+	THALASSA_PERF_SCOPE("holotable");
 	AThalassaVessel* Vessel = GetVessel();
 	UThalassaSonarComponent* Sonar = Vessel ? Vessel->GetSonar() : nullptr;
 	if (!Sonar || !Points)

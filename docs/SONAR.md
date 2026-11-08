@@ -88,6 +88,19 @@ Tested (one run each, pinging every 10 s, sonar surveying, walkers aboard):
 
 From 30 m above the start plateau, one ping charted 292 of its 448 cells; the rest were in the ping's shadow.
 
+### Frame drops, fixed (2026-11-09)
+
+The owner had frame drops after the ping. Timing showed why: every rebuild of the chart picture took about 77 ms, up to ten times a second whenever the chart was on a screen. The bigger view had 2.25 times the pixels, and every pixel searched the chart's pages up to eight times. Now:
+
+- the cells in view are copied out of the pages into plain grids once per rebuild, and the pixels read those;
+- 4 pixels per cell instead of 6, about 420 across, for screens drawn at 512 or less;
+- an sRGB lookup table instead of the exact conversion per pixel, and no glow maths on old ground;
+- five rebuilds a second instead of ten, each spread over five frames: heights in one, then the colouring in four slices. The screens show the last finished picture, at its own place, until the next is ready.
+
+Measured on the bridge with the chart and holotable in view, pinging every 8 s: the worst frame in each two-second window fell from 77–122 ms to about 9 ms (one window 19 ms). The chart's work in any one frame is now at most about 7.5 ms. A networked ocean test with pings still gave identical charts (4,620 cells).
+
+**`-ThalassaPerf`** on the command line logs, every two seconds, the worst frame and the worst time spent in each timed piece of work (`THALASSA_PERF_SCOPE` in `Tools/ThalassaPerf.h`): the chart's stages, the holotable, the ping's charting, the survey sweep and screen drawing. Pass it to `capture_screenshots.py` to measure a rendered game.
+
 ## Not done yet
 
 - **More of the look:** a real 3D hologram of the chart on the bridge (the holotable is a first step), and contacts.

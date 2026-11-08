@@ -1,4 +1,5 @@
 #include "Tools/ThalassaHUD.h"
+#include "Tools/ThalassaPerf.h"
 
 #include "Characters/ThalassaCharacter.h"
 #include "Characters/ThalassaMovementComponent.h"
@@ -68,6 +69,7 @@ void AThalassaHUD::DrawHUD()
 {
 	Super::DrawHUD();
 	TickScreenshotRequest();
+	ThalassaPerf::Frame(GetWorld()->GetDeltaSeconds());
 
 	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
 	const AThalassaPlayerController* Controller = Cast<AThalassaPlayerController>(GetOwningPlayerController());

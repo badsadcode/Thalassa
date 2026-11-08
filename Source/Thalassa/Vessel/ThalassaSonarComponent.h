@@ -174,7 +174,10 @@ private:
 
 	/** Brings the local copy of the chart up to date, noting when each cell last changed here. */
 	void SyncDense();
-	void BuildLocalChart();
+	/** The chart picture is built over several frames, so no one frame carries it: heights, then rows in slices, then the upload. */
+	void StartChartBuild();
+	void BuildChartRows(int32 Slice);
+	void FinishChartBuild();
 
 	/** A layer's height at a cell, from the local copy. False if unmeasured, or not yet reached by the ping's wave. */
 	bool DenseAt(int32 Layer, int32 X, int32 Y, int16& OutHeight, float* OutChanged = nullptr) const;
@@ -242,7 +245,19 @@ private:
 	double LocalBuiltAt = -1.0;
 	float LocalDeepM = -700.f;
 	float LocalShallowM = -100.f;
-	static constexpr int32 PixelsPerCell = 6;
+	// The picture being built, and how far along it is (0: not building).
+	FIntPoint BuildOrigin = FIntPoint(0, 0);
+	int32 BuildCells = 0;
+	int32 BuildStage = 0;
+	uint64 BuildFrame = 0;
+	TArray<float> BuildHeights;
+	TArray<float> BuildChanged;
+	TBitArray<> BuildFromPing;
+	TArray<FColor> BuildPixels;
+	float BuildDeepM = -700.f;
+	float BuildShallowM = -100.f;
+	static constexpr int32 ChartSlices = 4;
+	static constexpr int32 PixelsPerCell = 4;   // About 420 pixels across the 2.4 km view: the screens draw it at 512 or less.
 
 	bool bTextureDirty = true;
 	bool bUnsavedChanges = false;
