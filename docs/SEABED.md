@@ -18,7 +18,8 @@ How the ocean floor and the underwater look are built, what exists today, and th
   - **The monolith** stands alone on the flat basin floor at (-500, -420) m, 650 m astern of the start and clear of every test route, with five huge fallen blocks of its broken top at its foot, on the side it leans toward.
   - **The slab towers,** fourteen of them, stand only on moderate slopes (12 to 60%) in the south-west, at least 70 m apart and away from the map's rim. Each has 5 to 11 broken plates scattered around its feet.
   - **Sinking:** every piece is sunk to the lowest ground under its footprint, so nothing floats.
-- **Not there yet:** surface detail. Geometry alone gives either facets or clay: the plates' ribbed edges help at a distance, but close up rock needs scanned textures (Megascans, below). Also missing: more formation families, regions, a water surface, sediment clouds, sound.
+- **Scanned surfaces (2026-11-08):** CC0 textures from Poly Haven and ambientCG (`docs/ASSET_LICENSES.md`). `M_Rock` (dark layered rock, tinted by each rock's vertex-colour strata and streaks) is on every formation. `M_SeabedGround` (rippled sediment on the flats, coral gravel on slopes over about 25 degrees, with a wandering edge) is on the seabed. Both project textures by world position, since the meshes have no texture layouts. Each texture is mixed with itself at three times the size by large-scale noise, which hid an obvious 6 m repeat. Built by `Scripts/unreal/create_ocean_materials.py`. Megascans may still come later for more variety.
+- **Not there yet:** more surface variety: per-region materials, mineral crusts, a fine sediment layer on top of rock ledges. Also missing: more formation families, regions, a water surface, sediment clouds, sound.
 
 ## The hard technical truths
 
@@ -55,7 +56,7 @@ These go beyond the reference. Take them or leave them.
 1. **Done:** terrain, water, floodlights, marine snow.
 2. **Done:** the sonar's look (`SONAR.md`), and a first holotable showing the charted seabed in 3D (`HOLOTABLE.md`).
 3. **Done:** a first formation family (slab towers and fragments) and the bent 300 m monolith, made in Blender and placed by rules.
-4. **A seabed material that changes with the ground:** sediment, sand, gravel and rock, from Megascans once licences are checked, blended by slope, height and curvature in place of today's vertex colours.
+4. **Done, first version:** scanned CC0 surfaces on the rocks and seabed, blended by slope. Next: blend by height and curvature too, sediment settling on ledges, and per-region palettes.
 5. **PCG rules for one region type,** probably the Broken Shelf: slabs, angular boulders and scree, oriented and sized by rules, then baked.
 6. **Sediment clouds** when the hull touches or skims the seabed.
 7. **Sonar substrate and finer local resolution.**
