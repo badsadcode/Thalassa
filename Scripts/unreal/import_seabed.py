@@ -24,6 +24,7 @@ def make_material():
     if unreal.EditorAssetLibrary.does_asset_exist(MATERIAL):
         return unreal.load_asset(MATERIAL)
     material = tools.create_asset("M_Seabed", FOLDER, unreal.Material, unreal.MaterialFactoryNew())
+    material.set_editor_property("used_with_nanite", True)  # The seabed is a Nanite mesh.
     # Sand and rock come from the vertex colours. Two scales of world-space noise break up the flat colour.
     colour = mel.create_material_expression(material, unreal.MaterialExpressionVertexColor, -900, 0)
     broad = mel.create_material_expression(material, unreal.MaterialExpressionNoise, -900, 250)

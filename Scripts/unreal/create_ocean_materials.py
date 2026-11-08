@@ -140,7 +140,10 @@ def fresh_material(name):
     path = MAT + "/" + name
     if eal.does_asset_exist(path):
         eal.delete_asset(path)
-    return tools.create_asset(name, MAT, unreal.Material, unreal.MaterialFactoryNew())
+    material = tools.create_asset(name, MAT, unreal.Material, unreal.MaterialFactoryNew())
+    # The seabed and every rock are Nanite meshes. Without this flag a packaged build draws them in the default material.
+    material.set_editor_property("used_with_nanite", True)
+    return material
 
 
 def make_rock():
