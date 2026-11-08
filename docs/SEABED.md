@@ -12,6 +12,13 @@ How the ocean floor and the underwater look are built, what exists today, and th
   - fixed exposure, so dark water stays dark instead of the camera brightening it;
   - a cold grade, a vignette, light grain and slight colour fringing.
 - **Floodlights:** five spotlights on the hull (`Floodlights` in `BP_Thalassa`). Two at the bow light the water ahead of the bridge window, and three under the keel point at the seabed. They cast no shadows. Move or retune them in the Blueprint.
+  - **Softer and uneven since 2026-11-08,** after the owner found them too strong and too uniform.
+  - **Cones:** each has a 2° inner cone and a wide outer cone (24–32°), so the light is a hot centre fading out instead of an even, hard-edged oval.
+  - **Brightness:** 5,000–12,000 candelas, each lamp different. Before, every lamp was 60,000, which clipped to white on the ground at 30 m.
+  - **Colour and aim:** each lamp is a slightly different cool white and aimed a little differently, so where beams overlap the light is uneven.
+  - **Beam pattern:** `Content/Ship/Lights/MLF_Floodlight`, a light function made by `Scripts/unreal/create_floodlight_material.py`. Two layers of noise mottle each beam, like a lamp behind a worn housing. Each lamp gets its own shifted copy at start (the `Offset` parameter), and `Strength` sets how strong the mottling is.
+  - **In the water:** volumetric scattering is 4, so the beams still show as shafts.
+  - The log lists each lamp's values at start.
 - **Marine snow:** `AThalassaMarineSnow`, 1,200 specks around each player's camera. They're fixed in the water, drifting and sinking slowly, so they stream past when the ship moves. They're lit like everything else, so they mostly show in the lamp beams, and they're hidden inside the ship's dry compartments.
 - **First formations (2026-11-08):** `Scripts/blender/make_formations.py` makes one family and a landmark, imported by `Scripts/unreal/import_formations.py` into `Content/World/Formations`. There are six slab towers (15 to 24 m tall), five broken slab fragments, and `SM_Monolith_Bent`: about 300 m tall, bending as it rises, with strata of varying thickness that dip across it, worn-back soft layers, vertical fractures, and rust and pale mineral streaks. They're Nanite, with collision as their real shape, and use the seabed material for their vertex colours.
 - **Placement by rules** (in `create_test_map.py`, same result every time):

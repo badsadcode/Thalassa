@@ -95,6 +95,10 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 **The ship's look: hard-surface, faceted, "stealth" (owner's direction, 2026-11-08).** Angular facets and flat panels, which are easier to model and to fit interiors into than a cigar hull, and a big panoramic window at the bow. The owner shared concept art showing this style, with side hangar bays open to the sea. **It's a style reference only, not a blueprint:** its size, deck count and room layout are not decisions. The ship is still modelled last.
 
+**Sonar tools come with upgrades; tests can switch grades (owner's direction, 2026-11-08).** The survey sonar maps a strip under the ship as it moves, which is how real survey ships work. But the holotable is for planning, so the crew need the area all around them. Planned: an **active ping**, one loud pulse in every direction that charts the surroundings out to about 1–1.5 km, with a ring of light sweeping over the terrain as it passes, and the holotable filling in from the centre. Pinging is loud, so later it can draw creatures: the crew decide whether to ping or creep in blind. Whether a ship has the ping, and how far it reaches, depends on its upgrades. For testing, assume a fully upgraded ship, with a test key to switch between grades, like the test boost.
+
+**Floodlights: soft, uneven, dimmer (owner's feedback, 2026-11-08).** The owner found the floodlights too strong and too uniform. Each lamp now has a hot centre fading to a wide soft edge, a mottled pattern inside the beam, and its own strength, colour and spread. They're about a third as bright, and light the water more, so the beams still show. See [SEABED.md](SEABED.md).
+
 ## Still open
 
 From design document section 26: ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.

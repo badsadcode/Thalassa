@@ -101,7 +101,6 @@ namespace ThalassaVesselLayout
 		{ TEXT("LightAirlock"),     FVector(0, 340, 310),   FColor(255, 240, 200) },
 	};
 	const float InteriorLightIntensity = 12000.f;
-	const float FloodlightCandelas = 60000.f;
 	const float InteriorLightRadius = 1400.f;
 
 	// Everything outside these ship-frame boxes is sea. Inner and outer door thickness belongs to the
@@ -368,16 +367,20 @@ AThalassaVessel::AThalassaVessel()
 	// Floodlights outside the hull: two at the bow lighting ahead of the bridge window, three under the keel
 	// lighting the seabed. Placed from the hull's bounds, so they follow the deck plan.
 	{
-		struct FLamp { const TCHAR* Name; FVector Location; FRotator Aim; };
+		// Each lamp a little different in strength, colour and spread, so where beams overlap the light is
+		// uneven, as with real lamps of different ages. A hot centre fading to a wide soft edge, not an even
+		// disc, and a mottled pattern inside each beam (MLF_Floodlight, a light function; see docs/SEABED.md).
+		struct FLamp { const TCHAR* Name; FVector Location; FRotator Aim; float Candelas; float Outer; FLinearColor Color; };
 		const FBox& Hull = Layout.HullBounds;
 		const float Below = Hull.Min.Z - 60.f;
 		const FLamp Lamps[] = {
-			{ TEXT("FloodBowPort"),      FVector(Hull.Max.X + 40.f, -700.f, -60.f), FRotator(-20.f, -8.f, 0.f) },
-			{ TEXT("FloodBowStarboard"), FVector(Hull.Max.X + 40.f,  700.f, -60.f), FRotator(-20.f,  8.f, 0.f) },
-			{ TEXT("FloodKeelFore"),     FVector(Hull.Max.X * 0.6f, 0.f, Below),     FRotator(-80.f, 0.f, 0.f) },
-			{ TEXT("FloodKeelMid"),      FVector(Hull.GetCenter().X, 0.f, Below),    FRotator(-90.f, 0.f, 0.f) },
-			{ TEXT("FloodKeelAft"),      FVector(Hull.Min.X * 0.6f, 0.f, Below),     FRotator(-100.f, 0.f, 0.f) },
+			{ TEXT("FloodBowPort"),      FVector(Hull.Max.X + 40.f, -700.f, -60.f), FRotator(-20.f, -8.f, 0.f), 12000.f, 24.f, FLinearColor(0.80f, 0.92f, 1.f) },
+			{ TEXT("FloodBowStarboard"), FVector(Hull.Max.X + 40.f,  700.f, -60.f), FRotator(-18.f,  9.f, 0.f), 10000.f, 27.f, FLinearColor(0.74f, 0.90f, 1.f) },
+			{ TEXT("FloodKeelFore"),     FVector(Hull.Max.X * 0.6f, 0.f, Below),     FRotator(-78.f, 3.f, 0.f), 6000.f, 30.f, FLinearColor(0.76f, 0.90f, 1.f) },
+			{ TEXT("FloodKeelMid"),      FVector(Hull.GetCenter().X, 0.f, Below),    FRotator(-90.f, 0.f, 0.f), 7500.f, 28.f, FLinearColor(0.82f, 0.93f, 1.f) },
+			{ TEXT("FloodKeelAft"),      FVector(Hull.Min.X * 0.6f, 0.f, Below),     FRotator(-101.f, -4.f, 0.f), 5000.f, 32.f, FLinearColor(0.70f, 0.87f, 1.f) },
 		};
+		static ConstructorHelpers::FObjectFinder<UMaterialInterface> FloodPattern(TEXT("/Game/Ship/Lights/MLF_Floodlight.MLF_Floodlight"));
 		for (const FLamp& Spec : Lamps)
 		{
 			USpotLightComponent* Lamp = CreateDefaultSubobject<USpotLightComponent>(Spec.Name);
@@ -385,12 +388,16 @@ AThalassaVessel::AThalassaVessel()
 			Lamp->SetMobility(EComponentMobility::Movable);
 			Lamp->SetRelativeLocationAndRotation(Spec.Location, Spec.Aim);
 			Lamp->SetIntensityUnits(ELightUnits::Candelas);
-			Lamp->SetIntensity(ThalassaVesselLayout::FloodlightCandelas);
-			Lamp->SetAttenuationRadius(12000.f);
-			Lamp->SetInnerConeAngle(10.f);
-			Lamp->SetOuterConeAngle(26.f);
-			Lamp->SetLightColor(FLinearColor(0.75f, 0.9f, 1.f)); // Cool white: warm light looks sickly green through the water.
-			Lamp->SetVolumetricScatteringIntensity(1.5f);
+			Lamp->SetIntensity(Spec.Candelas);
+			Lamp->SetAttenuationRadius(9000.f);
+			Lamp->SetInnerConeAngle(2.f);
+			Lamp->SetOuterConeAngle(Spec.Outer);
+			Lamp->SetLightColor(Spec.Color); // Cool white: warm light looks sickly green through the water.
+			if (FloodPattern.Succeeded())
+			{
+				Lamp->SetLightFunctionMaterial(FloodPattern.Object);
+			}
+			Lamp->SetVolumetricScatteringIntensity(4.f); // Dimmer lamps than before, but the beams still show in the water.
 			Lamp->SetCastShadows(false); // Each points away from the hull; shadows would cost more than they show.
 			Floodlights.Add(Lamp);
 		}
@@ -713,6 +720,23 @@ void AThalassaVessel::BeginPlay()
 	Super::BeginPlay();
 
 	PoseRotation = GetActorRotation();
+
+	// Each floodlight gets its own copy of the beam pattern, shifted, so no two beams are mottled alike.
+	for (int32 Index = 0; Index < Floodlights.Num(); ++Index)
+	{
+		USpotLightComponent* Lamp = Floodlights[Index];
+		if (Lamp && Lamp->LightFunctionMaterial && !Lamp->LightFunctionMaterial->IsA<UMaterialInstanceDynamic>())
+		{
+			UMaterialInstanceDynamic* Pattern = UMaterialInstanceDynamic::Create(Lamp->LightFunctionMaterial, this);
+			Pattern->SetVectorParameterValue(TEXT("Offset"), FLinearColor(3.7f * (Index + 1), 1.9f * (Index + 1), 5.3f * (Index + 1)));
+			Lamp->SetLightFunctionMaterial(Pattern);
+		}
+		if (Lamp)
+		{
+			UE_LOG(LogTemp, Display, TEXT("THALASSA: floodlight %s %.0f cd, cones %.0f/%.0f, pattern %s"), *Lamp->GetName(), Lamp->Intensity,
+				Lamp->InnerConeAngle, Lamp->OuterConeAngle, Lamp->LightFunctionMaterial ? *Lamp->LightFunctionMaterial->GetName() : TEXT("none"));
+		}
+	}
 
 	if (ThalassaTestConfig::IsArtProbe())
 	{
