@@ -13,8 +13,8 @@
 
 namespace ThalassaSonarDisplay
 {
-	// The full chart is 6.4 km across; show the 1.6 km around the ship, so cells are big enough to read.
-	constexpr float ViewFraction = 0.25f;
+	// Show the 2.4 km around the ship: as far as the long ping reaches, with cells still big enough to read.
+	constexpr float ViewFraction = 0.375f;
 	constexpr float ViewMeters = ViewFraction * UThalassaSonarComponent::GridSize * UThalassaSonarComponent::CellSizeCm / 100.f;
 
 	// The ping's ring spreads at the speed of sound in sea water, so it crosses the view in about half a second.
@@ -122,6 +122,18 @@ namespace ThalassaSonarDisplay
 			}
 		}
 
+		// The active ping: a bright ring spreading from where it was sent, as it charts the ground.
+		FVector PulseOrigin;
+		float PulseRadiusM = 0.f, PulseRangeM = 1.f;
+		if (Sonar->GetPulseFront(PulseOrigin, PulseRadiusM, PulseRangeM))
+		{
+			const FVector Offset = (PulseOrigin - Vessel.GetActorLocation()) / 100.f;
+			const FVector2D Centre = Middle + FVector2D(Offset.Y, -Offset.X) * PixelsPerMeter; // North up.
+			const float Fade = 1.f - PulseRadiusM / PulseRangeM;
+			Ring(Canvas, Centre, PulseRadiusM * PixelsPerMeter, Clip, Dim(FLinearColor(0.7f, 1.f, 1.f), Fade), Thin * 3.f);
+			Ring(Canvas, Centre, FMath::Max(0.f, PulseRadiusM - 25.f) * PixelsPerMeter, Clip, Dim(FLinearColor(0.2f, 0.8f, 0.8f), Fade * 0.5f), Thin * 2.f);
+		}
+
 		// The compass: a tick every 10 degrees around the edge, longer every 30, and the four points.
 		for (int32 Degrees = 0; Degrees < 360; Degrees += 10)
 		{
@@ -150,7 +162,7 @@ namespace ThalassaSonarDisplay
 		float SeabedM = 0.f;
 		const bool bKnowSeabed = Sonar->GetSurveyedHeightM(Vessel.GetActorLocation(), SeabedM);
 		const float LineHeight = 17.f * TextScale;
-		Shade(Canvas, TopLeft + FVector2D(Margin * 0.5f), FVector2D(Size * 0.36f, LineHeight * 5.4f), FLinearColor(0.f, 0.02f, 0.03f, 0.65f));
+		Shade(Canvas, TopLeft + FVector2D(Margin * 0.5f), FVector2D(Size * 0.36f, LineHeight * 6.4f), FLinearColor(0.f, 0.02f, 0.03f, 0.65f));
 		FVector2D At = TopLeft + FVector2D(Margin);
 		Text(Canvas, Sonar->IsSurveying() ? TEXT("SONAR  ACTIVE") : TEXT("SONAR  OFF  (N)"), At, Sonar->IsSurveying() ? FLinearColor(0.5f, 1.f, 0.9f) : Amber, TextScale * 1.15f);
 		At.Y += LineHeight * 1.3f;
@@ -159,6 +171,21 @@ namespace ThalassaSonarDisplay
 		Text(Canvas, bKnowSeabed ? FString::Printf(TEXT("KEEL    %4.0f m"), -SeabedM - Depth) : FString(TEXT("KEEL       --")), At, Cyan, TextScale * 0.9f);
 		At.Y += LineHeight;
 		Text(Canvas, FString::Printf(TEXT("HDG     %03.0f    SPD %4.1f m/s"), FMath::Fmod(Heading + 360.f, 360.f), Vessel.GetForwardSpeedMetersPerSecond()), At, Cyan, TextScale * 0.9f);
+		At.Y += LineHeight;
+		const FSonarGrade& Grade = UThalassaSonarComponent::GetGradeInfo(Sonar->GetGrade());
+		const float Cooldown = Sonar->GetPingCooldownLeft();
+		if (Grade.PingRangeM <= 0.f)
+		{
+			Text(Canvas, TEXT("PING    none fitted"), At, Dim(Cyan, 0.6f), TextScale * 0.9f);
+		}
+		else if (Cooldown > 0.f)
+		{
+			Text(Canvas, FString::Printf(TEXT("PING    %.0f m   %.0f s"), Grade.PingRangeM, FMath::CeilToFloat(Cooldown)), At, Dim(Amber, 0.8f), TextScale * 0.9f);
+		}
+		else
+		{
+			Text(Canvas, FString::Printf(TEXT("PING    %.0f m   READY (F)"), Grade.PingRangeM), At, FLinearColor(0.5f, 1.f, 0.9f), TextScale * 0.9f);
+		}
 
 		// The depth legend, bottom right: what the colours mean.
 		const FVector2D LegendSize(Size * 0.3f, Size * 0.022f);

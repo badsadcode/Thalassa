@@ -274,6 +274,10 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UThalassaSonarPingComponent> SonarPing;
 
+	/** The active ping's sound, heard everywhere aboard. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaSonarPingComponent> SonarPulse;
+
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UThalassaHelmComponent> Helm;
 

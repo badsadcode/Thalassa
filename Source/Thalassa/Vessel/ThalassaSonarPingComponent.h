@@ -20,12 +20,28 @@ public:
 	/** Game thread: start a ping. The audio thread picks it up on its next buffer. */
 	void Ping();
 
+	/**
+	 * Before play: make this the active ping, a deep, long, loud pulse heard everywhere aboard, with slower,
+	 * longer echoes, instead of the survey's light tick at the screen.
+	 */
+	void MakeActivePulse();
+
 protected:
 	virtual bool Init(int32& SampleRate) override;
 	virtual int32 OnGenerateAudio(float* OutAudio, int32 NumSamples) override;
 
 private:
 	std::atomic<int32> PendingPings{ 0 };
+
+	// The sound's shape, fixed before play.
+	float StartHz = 1650.f;
+	float FallHzPerSecond = 140.f;   // A slight fall in pitch, so it sounds struck rather than electronic.
+	float DecaySeconds = 0.32f;
+	float LengthSeconds = 2.5f;
+	float Volume = 0.45f;
+	float EchoDelaySeconds = 0.37f;
+	float EchoSend = 0.35f;
+	float EchoFeedback = 0.5f;
 
 	// Audio thread only.
 	float Rate = 48000.f;

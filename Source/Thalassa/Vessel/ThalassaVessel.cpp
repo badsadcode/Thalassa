@@ -446,6 +446,9 @@ AThalassaVessel::AThalassaVessel()
 	ImpactSound->SetupAttachment(ShipRoot);
 
 	Sonar = CreateDefaultSubobject<UThalassaSonarComponent>(TEXT("Sonar"));
+	SonarPulse = CreateDefaultSubobject<UThalassaSonarPingComponent>(TEXT("SonarPulse"));
+	SonarPulse->SetupAttachment(ShipRoot);
+	SonarPulse->MakeActivePulse();
 	Helm = CreateDefaultSubobject<UThalassaHelmComponent>(TEXT("Helm"));
 	Helm->SeatLocal = Layout.HelmSeatLocation;
 	Helm->bAvailable = Layout.bHasHelm;
@@ -720,6 +723,11 @@ void AThalassaVessel::BeginPlay()
 	Super::BeginPlay();
 
 	PoseRotation = GetActorRotation();
+
+	if (Sonar)
+	{
+		Sonar->PulseSound = SonarPulse;
+	}
 
 	// Each floodlight gets its own copy of the beam pattern, shifted, so no two beams are mottled alike.
 	for (int32 Index = 0; Index < Floodlights.Num(); ++Index)

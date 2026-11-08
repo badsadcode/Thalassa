@@ -38,6 +38,12 @@ namespace ThalassaTestConfig
 	/** -ThalassaSurveySlot=name: save and load the sonar chart in this slot during a test. */
 	bool GetSurveySaveSlot(FString& OutSlot);
 
+	/** -ThalassaPingEvery=seconds: the server sends an active sonar ping this often, if the grade allows. */
+	bool GetPingEvery(float& OutSeconds);
+
+	/** -ThalassaPulseHold=metres: for screenshots, the ping's ring stops spreading at this radius and stays. Visual only. */
+	bool GetPulseHold(float& OutMetres);
+
 	/** -ThalassaHelmTest: the timed test runs with the ship under helm control instead of the script. */
 	bool IsHelmTest();
 

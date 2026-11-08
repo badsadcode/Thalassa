@@ -15,11 +15,12 @@ class THALASSA_API UThalassaSurveySave : public USaveGame
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 CurrentVersion = 2; // 2: added World.
+	static constexpr int32 CurrentVersion = 3; // 2: added World. 3: whole-world cell coordinates, and the ping's layer.
 
 	UPROPERTY()
 	int32 Version = CurrentVersion;
 
+	/** Unused since version 3: the chart has no edges. */
 	UPROPERTY()
 	int32 GridSize = 0;
 

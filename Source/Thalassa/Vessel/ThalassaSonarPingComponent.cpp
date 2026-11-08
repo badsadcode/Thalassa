@@ -2,16 +2,7 @@
 
 namespace ThalassaPing
 {
-	constexpr float StartHz = 1650.f;
-	constexpr float FallHzPerSecond = 140.f;  // A slight fall in pitch, so it sounds struck rather than electronic.
 	constexpr float AttackSeconds = 0.004f;
-	constexpr float DecaySeconds = 0.32f;
-	constexpr float LengthSeconds = 2.5f;
-	constexpr float Volume = 0.45f;
-
-	constexpr float EchoDelaySeconds = 0.37f;
-	constexpr float EchoSend = 0.35f;
-	constexpr float EchoFeedback = 0.5f;
 	constexpr float EchoDamping = 0.25f;      // Each repeat is duller than the last, as in water.
 }
 
@@ -31,6 +22,23 @@ UThalassaSonarPingComponent::UThalassaSonarPingComponent(const FObjectInitialize
 	AttenuationOverrides.FalloffDistance = 2600.f;
 }
 
+void UThalassaSonarPingComponent::MakeActivePulse()
+{
+	// Lower, longer and louder, with echoes coming back slowly, as from distant ground.
+	StartHz = 880.f;
+	FallHzPerSecond = 60.f;
+	DecaySeconds = 0.9f;
+	LengthSeconds = 6.f;
+	Volume = 0.6f;
+	EchoDelaySeconds = 0.62f;
+	EchoSend = 0.45f;
+	EchoFeedback = 0.62f;
+
+	// Heard all through the ship: it's the hull itself ringing.
+	bAllowSpatialization = false;
+	bOverrideAttenuation = false;
+}
+
 void UThalassaSonarPingComponent::Ping()
 {
 	PendingPings.fetch_add(1);
@@ -40,7 +48,7 @@ bool UThalassaSonarPingComponent::Init(int32& SampleRate)
 {
 	NumChannels = 1;
 	Rate = static_cast<float>(SampleRate);
-	Echo.SetNumZeroed(FMath::Max(1, FMath::RoundToInt(Rate * ThalassaPing::EchoDelaySeconds)));
+	Echo.SetNumZeroed(FMath::Max(1, FMath::RoundToInt(Rate * EchoDelaySeconds)));
 	EchoIndex = 0;
 	return true;
 }

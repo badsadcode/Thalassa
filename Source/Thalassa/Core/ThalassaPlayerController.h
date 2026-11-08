@@ -59,6 +59,15 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerToggleSonar();
 
+	void OnSonarPing();
+	void OnSonarGrade();
+
+	UFUNCTION(Server, Reliable)
+	void ServerSonarPing();
+
+	UFUNCTION(Server, Reliable)
+	void ServerSonarGrade();
+
 	UFUNCTION(Server, Reliable)
 	void ServerSetHelmInput(float Throttle, float Turn, float Dive, float Heave);
 

@@ -30,7 +30,7 @@ The owner's direction (2026-11-08): the world must be far bigger than the 6 km t
 
 ## Not done yet
 
-- **The sonar chart is still one 6.4 km grid,** centred on the origin. The sonar finds ground anywhere, but only cells within 3.2 km of the origin are kept, so the chart and the holotable are empty further out. Next: chart pages keyed by tile.
+- ~~The sonar chart is one 6.4 km grid.~~ Fixed 2026-11-08: the chart covers the whole ocean, in pages, and the active ping charts the area around the ship. See `SONAR.md`.
 - **No formations, rocks or life in the open ocean.** On purpose, until the terrain looks right. They return as per-cell placement rules (`SEABED.md`).
 - **A coarse whole-ocean plan.** Today's large shapes are noise. The Thornwake way is a plan raster with vector features (trenches, ridge lines, regions and biomes), built once from the seed.
 - **The terrain's character, further.** Revision 2 gives each province a clear look, but every province still wears the same seabed material and the same colours. The province shapes also come from noise, not from a whole-ocean plan.

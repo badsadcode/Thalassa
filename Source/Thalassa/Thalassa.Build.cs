@@ -11,7 +11,7 @@ public class Thalassa : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
-			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "AudioMixer"
+			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "AudioMixer", "NetCore"
 		});
 
 		// The sonar display draws filled triangles with the engine's white texture.

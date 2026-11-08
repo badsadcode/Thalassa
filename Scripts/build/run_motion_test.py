@@ -53,6 +53,7 @@ def main():
     parser.add_argument("--slide", action="store_true", help="walkers sprint, and slide every few seconds")
     parser.add_argument("--map", default=MAP, help="the map to play, e.g. /Game/Maps/L_Ocean (from Git Bash, set MSYS_NO_PATHCONV=1)")
     parser.add_argument("--record-audio", type=float, help="the host plays with sound on and records this many seconds of it to Saved/BouncedWavFiles/<name>.wav")
+    parser.add_argument("--ping-every", type=float, help="the host sends an active sonar ping this often, in seconds")
     parser.add_argument("--survey-slot", help="the host loads and saves the sonar chart in this save slot")
     parser.add_argument("--vessel", help="ship Blueprint class to spawn instead of the configured one, e.g. /Game/Ship/BP_X.BP_X_C")
     parser.add_argument("--art-probe", action="store_true", help="attach a solid crate to the ship in the walkers' path")
@@ -84,6 +85,8 @@ def main():
         common.append("-ThalassaEvaProfile")
     if args.sonar:
         common.append("-ThalassaSonar")
+    if args.ping_every:
+        common.append(f"-ThalassaPingEvery={args.ping_every}")
     if args.helm:
         common += ["-ThalassaHelmTest", f"-ThalassaHelmCourse={args.helm_course}"]
     if args.above_ground:

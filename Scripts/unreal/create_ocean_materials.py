@@ -5,6 +5,9 @@
                                         into each rock's vertex colours. For formations.
   /Game/World/Materials/M_SeabedGround rippled sediment on the flats, coral gravel on slopes.
 
+Both glow where the sonar's active ping passes (MPC_SonarPulse, made by create_sonar_pulse.py, which must run
+first): a bright ring at the wave front, and height contours fading out behind it.
+
 The meshes have no texture layouts, so every texture is projected from three sides by world position
 (the engine's WorldAlignedTexture and WorldAlignedNormal). Rebuilds the materials each run; textures are
 imported only if missing. Assigns them to the seabed and the formations.
@@ -136,6 +139,52 @@ class Graph:
         return self.node(unreal.MaterialExpressionNoise, -700, scale=scale, output_min=low, output_max=high, levels=4)
 
 
+PULSE = "/Game/Ship/Sonar/MPC_SonarPulse"
+
+# The ping's ring on the ground, from where the wave front is now (all in world centimetres): a bright band at
+# the front, then contours every 5 m of height in the 40 m behind it, fading. Black when no ping is out.
+PULSE_HLSL = """
+float d = distance(P, O.xyz);
+float front = saturate(1 - abs(d - R) / 400);
+front *= front;
+float behind = (R - d) / 4000;
+float trail = (behind > 0 && behind < 1) ? (1 - behind) * (1 - behind) : 0;
+float c = frac(P.z / 500);
+float contour = saturate((abs(c * 2 - 1) - 0.93) * 14);
+return (front * 2.5 + trail * (0.04 + contour * 1.2)) * S * float3(0.25, 0.9, 1.0);
+"""
+
+
+def add_pulse(g, m):
+    """Wires the ping's ring into the material's emissive colour."""
+    mpc = unreal.load_asset(PULSE)
+    if not mpc:
+        unreal.log_warning("THALASSA: " + PULSE + " is missing; run create_sonar_pulse.py first. No ping ring on " + m.get_name())
+        return
+
+    def param(name):
+        e = g.node(unreal.MaterialExpressionCollectionParameter, -700)
+        e.set_editor_property("collection", mpc)
+        e.set_editor_property("parameter_name", name)
+        return e
+
+    custom = g.node(unreal.MaterialExpressionCustom, -300)
+    custom.set_editor_property("code", PULSE_HLSL)
+    custom.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    custom.set_editor_property("description", "Sonar ping ring")
+    inputs = []
+    for name in ["P", "O", "R", "S"]:
+        i = unreal.CustomInput()
+        i.set_editor_property("input_name", name)
+        inputs.append(i)
+    custom.set_editor_property("inputs", inputs)
+    g.link(g.node(unreal.MaterialExpressionWorldPosition, -700), custom, "P")
+    g.link(param("PulseOrigin"), custom, "O")
+    g.link(param("PulseRadius"), custom, "R")
+    g.link(param("PulseStrength"), custom, "S")
+    mel.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+
+
 def fresh_material(name):
     path = MAT + "/" + name
     if eal.does_asset_exist(path):
@@ -161,6 +210,7 @@ def make_rock():
     mel.connect_material_property(normal, "XYZ Texture", unreal.MaterialProperty.MP_NORMAL)
     mel.connect_material_property(g.mask(arm, g=True), "", unreal.MaterialProperty.MP_ROUGHNESS)
     mel.connect_material_property(g.mask(arm, r=True), "", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
+    add_pulse(g, m)
     mel.recompile_material(m)
     eal.save_asset(MAT + "/M_Rock")
     return m
@@ -199,6 +249,7 @@ def make_seabed():
     rough_sand = g.channel(sand_r, r=True)
     rough_grav = g.channel(grav_a, g=True)
     mel.connect_material_property(g.lerp(rough_sand, rough_grav, slope), "", unreal.MaterialProperty.MP_ROUGHNESS)
+    add_pulse(g, m)
     mel.recompile_material(m)
     eal.save_asset(MAT + "/M_SeabedGround")
     return m

@@ -75,6 +75,10 @@ void AThalassaPlayerController::SetupInputComponent()
 
 	UInputAction* ToggleSonar = MakeAction(TEXT("ToggleSonar"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(ToggleSonar, EKeys::N);
+	UInputAction* SonarPing = MakeAction(TEXT("SonarPing"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(SonarPing, EKeys::F);
+	UInputAction* SonarGrade = MakeAction(TEXT("SonarGrade"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(SonarGrade, EKeys::G);
 
 	UInputAction* StartProfile = MakeAction(TEXT("StartProfile"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(StartProfile, EKeys::P);
@@ -105,6 +109,8 @@ void AThalassaPlayerController::SetupInputComponent()
 	Input->BindAction(StationView, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleStationView);
 	Input->BindAction(StartProfile, ETriggerEvent::Started, this, &AThalassaPlayerController::OnStartProfile);
 	Input->BindAction(ToggleSonar, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleSonar);
+	Input->BindAction(SonarPing, ETriggerEvent::Started, this, &AThalassaPlayerController::OnSonarPing);
+	Input->BindAction(SonarGrade, ETriggerEvent::Started, this, &AThalassaPlayerController::OnSonarGrade);
 	Input->BindAction(Sprint, ETriggerEvent::Started, this, &AThalassaPlayerController::OnSprintStart);
 	Input->BindAction(Sprint, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnSprintStop);
 	Input->BindAction(HelmMode, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmMode);
@@ -388,6 +394,32 @@ void AThalassaPlayerController::OnStartProfile()
 void AThalassaPlayerController::OnToggleSonar()
 {
 	ServerToggleSonar();
+}
+
+void AThalassaPlayerController::OnSonarPing()
+{
+	ServerSonarPing();
+}
+
+void AThalassaPlayerController::OnSonarGrade()
+{
+	ServerSonarGrade();
+}
+
+void AThalassaPlayerController::ServerSonarPing_Implementation()
+{
+	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
+	{
+		Vessel->GetSonar()->TryPing();
+	}
+}
+
+void AThalassaPlayerController::ServerSonarGrade_Implementation()
+{
+	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
+	{
+		Vessel->GetSonar()->CycleGrade(); // Test builds only.
+	}
 }
 
 void AThalassaPlayerController::ServerToggleSonar_Implementation()

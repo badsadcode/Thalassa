@@ -31,7 +31,7 @@ public:
 	TObjectPtr<UInstancedStaticMeshComponent> Points;
 
 	static constexpr int32 Samples = 96;          // Points along each side of the terrain.
-	static constexpr float ReachM = 800.f;         // Shows the seabed this far from the ship, ahead, astern and abeam.
+	static constexpr float ReachM = 1200.f;        // Shows the seabed this far from the ship, ahead, astern and abeam: as far as the long ping reaches.
 	static constexpr float HalfWidthCm = 100.f;    // The hologram is 2 m across.
 	static constexpr float Exaggeration = 3.f;     // Heights are stretched, so gentle ground still has shape.
 	static constexpr float ReliefCm = 40.f;        // The seabed's relief never stands taller than this.

@@ -124,6 +124,30 @@ namespace ThalassaTestConfig
 		return FParse::Value(FCommandLine::Get(), TEXT("ThalassaSurveySlot="), OutSlot);
 	}
 
+	bool GetPingEvery(float& OutSeconds)
+	{
+		static const float Value = []
+		{
+			float Seconds = 0.f;
+			FParse::Value(FCommandLine::Get(), TEXT("ThalassaPingEvery="), Seconds);
+			return Seconds;
+		}();
+		OutSeconds = Value;
+		return Value > 0.f;
+	}
+
+	bool GetPulseHold(float& OutMetres)
+	{
+		static const float Value = []
+		{
+			float Metres = 0.f;
+			FParse::Value(FCommandLine::Get(), TEXT("ThalassaPulseHold="), Metres);
+			return Metres;
+		}();
+		OutMetres = Value;
+		return Value > 0.f;
+	}
+
 	bool IsBotJumpDisabled()
 	{
 		static const bool bValue = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoJump"));

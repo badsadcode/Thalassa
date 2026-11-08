@@ -54,10 +54,45 @@ The chart was a debug view: one flat pixel per 25 m cell. Now it's built for the
 
 Seeing it: `run_motion_test.py --deck --sonar --survey-slot SonarCanyon --ship-at=-150000,90000,-20000` charts the canyon into a save slot, and `capture_screenshots.py <folder> sonar=0@13000,0,90 -ThalassaSurveySlot=SonarCanyon -ThalassaShipAt=-90000,105000,-20000` captures the chart over it.
 
+## The whole ocean, and the active ping (2026-11-08)
+
+The owner found the sonar didn't do what the holotable needs. The survey paints a strip under the ship as it moves, but to plan (dive, enter the canyon, turn back) the crew need the area all around them. And far from the start, the chart was empty.
+
+- **The chart covers the whole ocean.** Cells are addressed by whole-world cell coordinates (16 bits each way: ±819 km in 25 m cells), not by a 6.4 km grid round the origin. Each machine keeps its copy in 64 × 64-cell pages, made as the ship charts new ground.
+- **It replicates as changes only** (`FSonarCellArray`, a fast array). The whole array used to be sent, which would not have survived an ocean's worth of cells. Saves are version 3; older charts are refused.
+- **Two layers:** the survey's fine 25 m cells, and the ping's coarse 100 m cells. Where both know a place, the survey wins. On the chart, ping-only ground is a little dimmer and greyer, and more gently shaded, so its coarse cells don't show as squares.
+- **The active ping (F, anywhere aboard):** one pulse in every direction. The wave spreads at 500 m/s (slower than sound in water, 1,500 m/s, so it can be watched) and the server charts each 100 m cell as the wave reaches it, nearest first, spread over the 2.4 s it takes. Ground hidden behind terrain stays uncharted: if the line from the ship to a point 15 m above the ground is blocked before 85% of the way there (less 30 m), it's in the ping's shadow. Pinging from higher up sees more.
+- **What everyone sees and hears:** nothing new is drawn by the server. Each machine reads the replicated pulse (where, when on the server's clock, how far) and:
+  - draws the ring on the seabed and rocks: `MPC_SonarPulse` (made by `Scripts/unreal/create_sonar_pulse.py`) carries the pulse to `M_SeabedGround` and `M_Rock`, which glow in a bright band at the wave front, with 5 m height contours fading out behind it (`PULSE_HLSL` in `create_ocean_materials.py`);
+  - draws the ring on the chart screen, spreading from where the ping was sent;
+  - plays a deep, long pulse heard all through the ship (`SonarPulse`, a `UThalassaSonarPingComponent` set up by `MakeActivePulse`).
+- **Grades:** what a ship's sonar can do will come with upgrades. For testing the ship starts with the best, and **G** (test builds only) steps through them:
+
+  | Grade | Ping | Recharge |
+  |---|---|---|
+  | 0, survey only | none | |
+  | 1, short ping | 600 m | 12 s |
+  | 2, long ping | 1,200 m | 8 s |
+
+  The chart's readout shows the ping's range and whether it's ready.
+- **The chart screen** now shows 2.4 km across, as far as the long ping reaches, and **the holotable** shows 1.2 km around the ship.
+- **Test switches:** `run_motion_test.py --ping-every <seconds>` (or `-ThalassaPingEvery=`) pings from the host on a timer. `-ThalassaPulseHold=<metres>` stops the ring's picture at that radius, for screenshots; charting is unaffected.
+
+Tested (one run each, pinging every 10 s, sonar surveying, walkers aboard):
+
+| Run | Ping | Host chart | Client chart | Walking |
+|---|---|---|---|---|
+| Test map deck | 15 ms | 4,476 cells | in step: 3,746 of 3,798 client samples equal a host state; 2 cells in flight at the end | 1 correction (1.9 cm) |
+| Open ocean deck | 15 ms | 4,634 cells | 4,634, same checksum | 0 corrections |
+| Open ocean, 3% loss | 243 ms | 4,618 cells | in step; 1 cell in flight at the end | 21 corrections (largest 107 cm), like earlier runs at this lag |
+
+From 30 m above the start plateau, one ping charted 292 of its 448 cells; the rest were in the ping's shadow.
+
 ## Not done yet
 
 - **More of the look:** a real 3D hologram of the chart on the bridge (the holotable is a first step), and contacts.
-- **Scale.** The array of cells replicates as it grows. A few thousand cells is fine; a whole ocean would need tiles sent on request.
+- **Scale.** Changes replicate cheaply now, but a player joining late still receives the whole chart at once, and the save holds every cell. After hours of charting, both will need pages sent on request, and the chart's ±819 km limit may need lifting.
+- **The ping's look, further:** a visible wave in the water itself, not only on the ground; echoes heard back from big features at the right delay; and creatures that hear it.
 - **Imperfection.** Returns are exact. Real sonar has noise, shadows behind obstacles, and resolution that falls with range.
 - **Hydrophones.** Only the ping exists. There is no listening yet.
 - **Substrate.** Rock and sediment could return different strengths, so the chart shows what the seabed is made of. See `SEABED.md`.
