@@ -28,6 +28,22 @@ How the ocean floor and the underwater look are built, what exists today, and th
   Ground traces ignore rocks already placed, so nothing lands on a ledge.
 - **Not there yet:** more surface variety: per-region materials, mineral crusts, a fine sediment layer on top of rock ledges. Also missing: more formation families, regions, a water surface, sediment clouds, sound.
 
+## Biomes, life and light (owner's direction, 2026-11-08)
+
+After seeing the first textured rocks, the owner said it already triggers a feeling of thalassophobia, and that this feeling is what the game is for. The direction from here:
+
+- **Biomes:** zones of the ocean with different kinds of life and mood. Some are dark and gloomy. Some are a little brighter, with fluorescent plants and animals. They build on the reference's geological regions (Silent Plains, Black Gardens and the rest): geology sets the shape, the biome sets the life and the light.
+- **Deep-sea vegetation:** growth suited to each zone.
+- **Creatures:** different animals in different zones.
+- **Effects:** many are still missing (sediment clouds, plumes, particles, distortion, caustics near the surface, sound). The owner noticed.
+- **Tools:** Blender's rock generators (the owner has `rockforge` and `thornwake_rock_generator`, which provide `add_mesh_rock`), ANT Landscape, and tree generators (`sapling_tree_gen`, `modular_tree`, `easy_tree`) that could grow kelp, sea fans and coral-like branching. Generated shapes plus the scanned CC0 textures. Fab didn't have much that fits, in the owner's view.
+
+Claude's notes:
+- **Bioluminescence is light that tells you something.** In the dark zones, nearly the only light besides the floodlights should come from life, and it should mean something: a pulse that runs away from the ship, a field that dims as you approach, a glow that is not a plant.
+- **Light is a budget.** Hundreds of glowing things should be emissive materials, not real lights. Only a few real lights per scene, or the frame rate goes.
+- **Creatures need sound before they need models.** The scariest version of a large animal is a sonar contact and a sound through the hull, long before it's seen. That fits the sonar, the hydrophones and the mysteries already in the design.
+- **Vegetation must sway.** Underwater plants that don't move look plastic. A gentle sway in the material, driven by the region's current, is cheap and sells it.
+
 ## The hard technical truths
 
 1. **A heightmap can't make most of the vision.** Arches, overhangs, caves, mushroom rocks, stacked slabs and cathedral caverns all fold back over themselves, and a heightfield can't. The terrain stays a heightfield for the broad shape (plains, basins, canyons, seamounts, escarpments). Everything vertical or hollow is **meshes placed on it**: Nanite static meshes, any number of triangles, sunk into the ground so the joins don't show.

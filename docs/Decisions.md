@@ -87,6 +87,8 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 **The seabed follows the owner's environment reference (2026-11-08).** Varied at every scale, shaped by geology, mostly natural, sometimes alien, often deliberately empty. The reference is private (`docs/THALASSA_Seabed_Environment_Reference.md`, not in git). How it is built, and Claude's notes, are in [SEABED.md](SEABED.md).
 
+**Biomes, life and bioluminescence (owner's direction, 2026-11-08).** The ocean has zones with their own life and mood: dark and gloomy ones, and a little brighter ones with fluorescent plants and animals, with deep-sea vegetation and creatures. The goal is the feeling of thalassophobia. Generated shapes (Blender rock and tree generators) with scanned CC0 textures. See [SEABED.md](SEABED.md).
+
 ## Still open
 
 From design document section 26: ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.
