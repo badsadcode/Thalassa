@@ -1211,8 +1211,9 @@ void AThalassaVessel::TickServer(float DeltaSeconds)
 		NewPosition = ConstrainMove(OldPosition, NewPosition, PoseRotation.Quaternion(), bHit);
 	}
 
-	// One contact is one collision, however long the hull stays pressed against the rock.
-	if (bHit && !bTouching)
+	// One contact is one collision, however long the hull stays pressed against the rock, and however it
+	// bumps while settling: thrusters pushing down can lift off and touch again several times a second.
+	if (bHit && !bTouching && GetWorld()->GetTimeSeconds() - LastCollisionTime > 1.5)
 	{
 		++CollisionCount;
 		LastCollisionTime = GetWorld()->GetTimeSeconds();

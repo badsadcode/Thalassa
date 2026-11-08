@@ -1,4 +1,5 @@
 #include "Vessel/ThalassaSonarComponent.h"
+#include "World/ThalassaOcean.h"
 
 #include "Engine/Texture2D.h"
 #include "Kismet/GameplayStatics.h"
@@ -24,7 +25,7 @@ namespace ThalassaSonar
 	// charts are not drawn over the new world. 2: the generated seabed, formations and dark biome (2026-11-08).
 	constexpr int32 SeabedGeneration = 2;
 
-	constexpr float RangeCm = 80000.f;          // 800 m: reaches the seabed at a slant from 300 m above it.
+	constexpr float RangeCm = 300000.f;         // 3 km, like a real survey sonar: the open ocean is often well over 1 km deep.
 
 }
 
@@ -182,6 +183,7 @@ void UThalassaSonarComponent::SweepServer()
 	}
 	FCollisionObjectQueryParams Objects(ECC_WorldStatic);
 
+	const AThalassaOcean* Ocean = AThalassaOcean::Find(GetWorld());
 	const float ForwardTilt = FMath::DegreesToRadians(ForwardTiltDeg);
 	for (int32 Beam = 0; Beam < BeamsPerSweep; ++Beam)
 	{
@@ -190,10 +192,19 @@ void UThalassaSonarComponent::SweepServer()
 		const FVector LocalDirection = FVector(FMath::Sin(ForwardTilt), FMath::Sin(Across), -FMath::Cos(Across)).GetSafeNormal();
 		const FVector End = Origin + ShipTransform.TransformVectorNoScale(LocalDirection) * RangeCm;
 
+		// Anything solid in the world, then the open ocean's seabed, which reaches past the loaded tiles.
 		FHitResult Hit;
-		if (GetWorld()->LineTraceSingleByObjectType(Hit, Origin, End, Objects, Params))
+		bool bHit = GetWorld()->LineTraceSingleByObjectType(Hit, Origin, End, Objects, Params);
+		FVector Return = bHit ? FVector(Hit.ImpactPoint) : End;
+		FVector Ground;
+		if (Ocean && Ocean->Raycast(Origin, Return, Ground, 20.0))
 		{
-			RecordHit(Hit.ImpactPoint);
+			Return = Ground;
+			bHit = true;
+		}
+		if (bHit)
+		{
+			RecordHit(Return);
 		}
 	}
 }

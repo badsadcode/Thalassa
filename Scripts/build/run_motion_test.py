@@ -43,13 +43,15 @@ def main():
     parser.add_argument("--exe", help="test a packaged build's Thalassa.exe instead of the editor")
     parser.add_argument("--sonar", action="store_true", help="survey with the sonar during the test")
     parser.add_argument("--helm", action="store_true", help="the deck, driven from the helm by the first client instead of the script")
-    parser.add_argument("--helm-course", choices=["tour", "dive", "rise", "cameras", "heave"], default="tour", help="what the scripted helmsman does")
+    parser.add_argument("--helm-course", choices=["tour", "dive", "rise", "cameras", "heave", "sink"], default="tour", help="what the scripted helmsman does")
+    parser.add_argument("--above-ground", type=float, help="open ocean: start the ship this many metres above the highest ground under its hull")
     parser.add_argument("--ship-at", help="start the ship at X,Y,Z world centimetres")
     parser.add_argument("--deck", action="store_true", help="use the real deck instead of the test rig")
     parser.add_argument("--hull-stretch", type=float, help="stretch the hull lengthwise; walkers only")
     parser.add_argument("--no-jump", action="store_true", help="walkers never jump")
     parser.add_argument("--sprint", action="store_true", help="walkers sprint everywhere")
     parser.add_argument("--slide", action="store_true", help="walkers sprint, and slide every few seconds")
+    parser.add_argument("--map", default=MAP, help="the map to play, e.g. /Game/Maps/L_Ocean (from Git Bash, set MSYS_NO_PATHCONV=1)")
     parser.add_argument("--record-audio", type=float, help="the host plays with sound on and records this many seconds of it to Saved/BouncedWavFiles/<name>.wav")
     parser.add_argument("--survey-slot", help="the host loads and saves the sonar chart in this save slot")
     parser.add_argument("--vessel", help="ship Blueprint class to spawn instead of the configured one, e.g. /Game/Ship/BP_X.BP_X_C")
@@ -84,6 +86,8 @@ def main():
         common.append("-ThalassaSonar")
     if args.helm:
         common += ["-ThalassaHelmTest", f"-ThalassaHelmCourse={args.helm_course}"]
+    if args.above_ground:
+        common.append(f"-ThalassaShipAboveGround={args.above_ground}")
     if args.ship_at:
         common.append(f"-ThalassaShipAt={args.ship_at}")
     if not args.deck and not args.helm:
@@ -119,7 +123,7 @@ def main():
         # A headless game never has focus, and Unreal mutes unfocused games by default.
         host_extra = [f"-ThalassaRecordAudio={args.record_audio}", f"-ThalassaRecordAudioName={args.name}",
                       "-ini:Engine:[Audio]:UnfocusedVolumeMultiplier=1.0"]
-    processes = {"host": launch("host", f"{MAP}?listen?port={args.port}", [*host_extra,
+    processes = {"host": launch("host", f"{args.map}?listen?port={args.port}", [*host_extra,
         f"-ThalassaExpectPlayers={args.clients + 1}", f"-port={args.port}",
         *([] if args.solo_walker or args.no_walkers else ["-ThalassaBot"]),
         *(["-ThalassaDiver"] if args.eva_all else [])])}

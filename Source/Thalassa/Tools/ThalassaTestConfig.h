@@ -92,6 +92,9 @@ namespace ThalassaTestConfig
 	 */
 	bool GetRecordAudio(float& OutSeconds, FString& OutName);
 
+	/** -ThalassaShipAboveGround=metres: in the open ocean, start the ship this far above the highest ground under its hull. */
+	bool GetShipAboveGround(float& OutMetres);
+
 	/** -ThalassaLookPitch=degrees: initial view pitch, up positive, for screenshots. */
 	float LookPitch();
 

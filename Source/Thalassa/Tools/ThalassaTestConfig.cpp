@@ -193,6 +193,11 @@ namespace ThalassaTestConfig
 		return true;
 	}
 
+	bool GetShipAboveGround(float& OutMetres)
+	{
+		return FParse::Value(FCommandLine::Get(), TEXT("ThalassaShipAboveGround="), OutMetres);
+	}
+
 	float LookPitch()
 	{
 		float Value = 0.f;

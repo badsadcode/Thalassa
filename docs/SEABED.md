@@ -77,7 +77,7 @@ What Thalassa needs that Thornwake doesn't:
 - **The sonar asks the height function directly,** so it can chart far beyond the loaded tiles. The chart becomes pages keyed by tile, not one 6.4 km grid.
 - **Overhangs and caves** don't fit a height function. They need placed meshes, or a separate volume generator later.
 
-This is a project of its own, worth doing before the world fills with hand-placed content. Thornwake's `Game/WorldGen/` and `Game/Rewrite/WorldStreamer.cs` are the reference.
+This is a project of its own, worth doing before the world fills with hand-placed content. **First version done (2026-11-08): see `OCEAN.md`.** Thornwake's `Game/WorldGen/` and `Game/Rewrite/WorldStreamer.cs` are the reference.
 
 ## The hard technical truths
 

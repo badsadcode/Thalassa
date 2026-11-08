@@ -275,6 +275,13 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 	// At the helm: a scripted course through both modes. Seconds after sitting down.
 	enum class EPress : uint8 { None, Mode, FullStop, Stand };
 	struct FCue { float At; float Throttle; float Turn; float Dive; EPress Press; float Heave = 0.f; };
+	// Sink: thrusters full down at zero throttle until the seabed stops the ship, then back up.
+	static const FCue SinkCues[] =
+	{
+		{ 2.f,  0.f, 0.f, 0.f, EPress::None, -1.f },
+		{ 60.f, 0.f, 0.f, 0.f, EPress::None,  1.f },
+		{ 80.f, 0.f, 0.f, 0.f, EPress::None,  0.f },
+	};
 	// Heave: thrusters down, let go and drift, thrusters up, let go. The ship should stay level throughout.
 	static const FCue HeaveCues[] =
 	{
@@ -325,9 +332,9 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		{ 100.f, 0.f,  0.f,  0.f, EPress::Stand },
 	};
 	static const FString Course = ThalassaTestConfig::HelmCourse();
-	const FCue* Cues = Course == TEXT("dive") ? DiveCues : Course == TEXT("rise") ? RiseCues : Course == TEXT("heave") ? HeaveCues : TourCues;
+	const FCue* Cues = Course == TEXT("dive") ? DiveCues : Course == TEXT("rise") ? RiseCues : Course == TEXT("heave") ? HeaveCues : Course == TEXT("sink") ? SinkCues : TourCues;
 	const int32 CueCount = Course == TEXT("dive") ? UE_ARRAY_COUNT(DiveCues) : Course == TEXT("rise") ? UE_ARRAY_COUNT(RiseCues)
-		: Course == TEXT("heave") ? UE_ARRAY_COUNT(HeaveCues) : UE_ARRAY_COUNT(TourCues);
+		: Course == TEXT("heave") ? UE_ARRAY_COUNT(HeaveCues) : Course == TEXT("sink") ? UE_ARRAY_COUNT(SinkCues) : UE_ARRAY_COUNT(TourCues);
 
 	BotHelmSeconds += DeltaSeconds;
 	while (BotHelmCue < CueCount && BotHelmSeconds >= Cues[BotHelmCue].At)
