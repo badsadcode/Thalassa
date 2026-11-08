@@ -14,7 +14,7 @@ If the Blueprint is ever deleted or fails to load, the game falls back to the pl
 
 In `BP_Thalassa`'s Details panel, under **Thalassa | Art**, **Show Greybox** hides the grey boxes, so you can see your art on its own, in the editor and in play.
 
-Only what you see changes. Walking still uses the grey layout's collision. So until a walkable shell exists (see below), your floors must sit where the grey floors are.
+Only what you see changes. Walking uses the walkable shell (below), so your floors must sit where the shell's floors are.
 
 ## The rule your art must keep
 
@@ -65,16 +65,47 @@ You can resize and turn the boxes. Screens, the throttle lever, the full stop bu
 
 The test rig (`-ThalassaTestRig`) always uses the plain C++ ship, so nothing moved in the Blueprint reaches the automated rig tests.
 
+## The walkable shell
+
+What players walk on is **`Content/Ship/Shell/SM_WalkableShell`**, set as **Walkable Shell** in `BP_Thalassa` (Details panel, **Thalassa | Art**). It's one mesh, so it is the ship's one walkable collision component (`INTERIOR_RULES.md`, rule 1). It's never seen in play: Show Collision in the editor viewport draws it.
+
+Its source is **`Art/Ship/WalkableShell.blend`**. Open it in Blender and you'll find two collections:
+
+- **Collision (UBX boxes: what players walk on).** One box per floor, wall, ramp and step, each its own object named `UBX_SM_WalkableShell_000` and so on. Players walk on exactly these.
+- **Shell (reference, not collision).** `SM_WalkableShell`, the same boxes as one solid mesh, so there's something to look at. Unreal needs it, but players never touch it.
+
+It starts as an exact copy of today's grey layout: 179 boxes, ramps included. Every box survived the trip from Blender back into Unreal to within 0.003 cm.
+
+In Blender, 1 unit is 1 m, **+X is forward, -Y is starboard** (Blender mirrors Unreal's Y), and +Z is up.
+
+**To change what players walk on:**
+
+1. In Blender, move, resize, turn, duplicate or delete the `UBX_` boxes. A new box must be named `UBX_SM_WalkableShell_` followed by a new number, and must stay a box: 8 corners, 6 flat faces. Turning it is fine, and that's how the ramps are made. If you like, change the reference mesh too.
+2. Export: in Blender's Scripting tab, open `Scripts/blender/walkable_shell_fbx.py` and press Run Script. It writes `Art/Ship/WalkableShell.fbx` next to the `.blend` with the right settings.
+3. Import: in the Unreal editor, Tools > Execute Python Script, `Scripts/unreal/import_walkable_shell.py`. It replaces `SM_WalkableShell` and prints how many collision boxes it has. That number should match the number of `UBX_` boxes.
+4. Play.
+
+**Why boxes, not the mesh itself:** the first try used the mesh's own triangles as collision. Walkers got stuck climbing out of the sunken mess and the lower bridge tier. Where boxes meet, their hidden inside faces become seams that a capsule catches on when stepping up. Simple boxes don't have that problem, and they're what the grey layout always used.
+
+**Rules still apply:** stairs are ramps (a turned box under 44 degrees), steps under 45 cm, walls down to every floor they enclose, doorways at least 2 m by 2.5 m. The dry compartments (blue boxes, above) must still cover everywhere players can stand.
+
+Starting over from the grey layout: `Scripts/unreal/export_greybox_boxes.py` in Unreal, then `Scripts/blender/make_walkable_shell.py` in Blender. That script never overwrites an existing `.blend` unless you pass `--force`.
+
+Empty the Walkable Shell slot and the ship walks on the grey boxes again.
+
 ## Meshes from Blender
 
 Export as FBX or glTF, import into `Content/Ship/` (or a folder under it), and place as above. Scale is centimetres: 1 Unreal unit is 1 cm. In ship coordinates, +X is forward to the bow, +Y is starboard, and +Z is up. Source art files (`.blend`, `.fbx`) go through Git LFS automatically.
 
 ## Not done yet
 
-- **A walkable shell from your own mesh.** Today the walkable collision is the grey layout's boxes. Next, a simple mesh of your own, made of floors, walls, ramps and steps, can become the one collision component instead, so the art and the walking can change together.
+- **Spots that follow the shell.** Moving a floor in Blender doesn't move the spots (dry compartments, spawns, stations) standing on it. Move them in `BP_Thalassa` to match.
+- **Reimport from the editor's right-click menu** hasn't been tested: use the import script, which has been.
 - **A check for the other rules,** such as steps too tall or doorways too narrow, run on the walkable shell.
 
 ## Tested
+
+- Walkable shell (2026-11-08), first on a throwaway copy of `BP_Thalassa` with the shell set (`run_motion_test.py --vessel`). A first version that used the mesh's triangles as collision left walkers stuck 6 times on the mess and bridge steps. The shell imported from Blender, with box collision: deck tour 1 correction of 0.8 cm, no stuck waypoints, identical sonar charts; helm to 14.4 m/s with 0 corrections; at about 167 ms ping, 0 corrections on the client and no stuck waypoints. The Blender round trip came back exact, to 0.003 cm.
 
 - Gameplay spots as components (2026-11-08): with nothing moved, the deck test had 0 corrections, no stuck waypoints and identical sonar charts. The helmsman drove the Blueprint ship to 14 m/s with 0 corrections, and the rig dive completed (18 corrections, all under 10 cm). In a throwaway copy of the Blueprint, moving `SpawnPoint00` to the bridge made the first player start exactly there.
 

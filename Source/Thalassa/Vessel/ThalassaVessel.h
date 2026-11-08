@@ -6,6 +6,7 @@
 
 class UInstancedStaticMeshComponent;
 class UStaticMeshComponent;
+class UStaticMesh;
 class UMaterialInstanceDynamic;
 class UTextRenderComponent;
 class UThalassaSonarComponent;
@@ -106,6 +107,21 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, Category = "Thalassa|Art")
 	bool bShowGreybox = true;
+
+	/**
+	 * What players walk on: one mesh for every floor, wall, ramp and step aboard. Its collision is the mesh
+	 * itself, and it is never seen. Empty means walk on the grey boxes. Keep docs/INTERIOR_RULES.md: it is
+	 * the ship's one walkable collision component. See docs/SHIP_ART.md.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Thalassa|Art")
+	TObjectPtr<UStaticMesh> WalkableShell;
+
+	/**
+	 * The grey boxes players walk on, as transforms of the engine's 100 cm cube, in ship coordinates.
+	 * Scripts/unreal/export_greybox_boxes.py writes them out to start the walkable shell in Blender.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Thalassa|Editor")
+	static TArray<FTransform> GetGreyboxCollisionTransforms();
 
 	/** World-space spawn point for the Nth player. */
 	FTransform GetSpawnTransform(int32 PlayerIndex) const;
@@ -230,6 +246,10 @@ private:
 	/** All hull collision, and the one movement base. Never rendered. */
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UInstancedStaticMeshComponent> HullCollision;
+
+	/** The walkable shell's collision, used instead of HullCollision when WalkableShell is set. */
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> ShellCollision;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UTextRenderComponent> ConsoleText;

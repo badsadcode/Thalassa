@@ -4,7 +4,7 @@ The grey deck is temporary, and the final interiors will replace it. How to buil
 
 ## Collision
 
-1. **All walkable collision on the ship is one component.** A character's position is sent relative to what they stand on. With several separate pieces under packet loss, other players appeared 16 m away. Detail meshes can be separate, but they must not be walkable or be a movement base.
+1. **All walkable collision on the ship is one component.** A character's position is sent relative to what they stand on. With several separate pieces under packet loss, other players appeared 16 m away. Detail meshes can be separate, but they must not be walkable or be a movement base. That one component is the walkable shell, `SM_WalkableShell`, or the grey boxes when no shell is set. See [SHIP_ART.md](SHIP_ART.md). Its collision is simple boxes (`UBX_`), not its triangles: with triangle collision, walkers got stuck stepping up out of the sunken mess, because the hidden faces where boxes meet become seams a capsule catches on.
 2. **Stairs are walked as a hidden ramp.** The steps you see must not be collision. On real steps, walking downstairs becomes a run of tiny falls, which looks like stumbling and causes corrections. Keep ramps under about 44 degrees, the walkable limit. The current stairs are 32 degrees.
 3. **Steps between floor levels stay under 45 cm.** Characters step up 45 cm on their own. Taller changes need stairs or a ramp.
 4. **Walls must reach every floor they enclose.** A room with a lower floor, like engineering, needs walls down to that floor, or there is a gap out to the sea.

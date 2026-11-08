@@ -338,6 +338,13 @@ AThalassaVessel::AThalassaVessel()
 	HullCollision->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 	HullCollision->SetHiddenInGame(true);
 
+	ShellCollision = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShellCollision"));
+	ShellCollision->SetupAttachment(ShipRoot);
+	ShellCollision->SetMobility(EComponentMobility::Movable);
+	ShellCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShellCollision->SetVisibility(false); // Collision only. "Show Collision" in the editor draws it.
+	ShellCollision->SetCastShadow(false);
+
 	for (const FInteriorLight& Light : Layout.Lights)
 	{
 		UPointLightComponent* Lamp = CreateDefaultSubobject<UPointLightComponent>(Light.Name);
@@ -500,17 +507,39 @@ void AThalassaVessel::OnConstruction(const FTransform& Transform)
 
 	MakeArtVisualOnly();
 
-	// Runs on server and clients alike, so both see identical collision.
-	if (HullCollision->GetInstanceCount() == 0)
+	// Runs on server and clients alike, so both see identical collision. Exactly one of the two is solid.
+	if (WalkableShell)
 	{
-		for (const FHullBox& Box : GetLayout().Boxes)
+		ShellCollision->SetStaticMesh(WalkableShell);
+		ShellCollision->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+		HullCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+	else
+	{
+		ShellCollision->SetStaticMesh(nullptr);
+		ShellCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		HullCollision->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+		if (HullCollision->GetInstanceCount() == 0)
 		{
-			if (Box.bCollision)
+			for (const FTransform& Box : GetGreyboxCollisionTransforms())
 			{
-				HullCollision->AddInstance(FTransform(Box.Rotation, Box.Center, Box.Size / 100.f));
+				HullCollision->AddInstance(Box);
 			}
 		}
 	}
+}
+
+TArray<FTransform> AThalassaVessel::GetGreyboxCollisionTransforms()
+{
+	TArray<FTransform> Transforms;
+	for (const FHullBox& Box : GetLayout().Boxes)
+	{
+		if (Box.bCollision)
+		{
+			Transforms.Add(FTransform(Box.Rotation, Box.Center, Box.Size / 100.f));
+		}
+	}
+	return Transforms;
 }
 
 void AThalassaVessel::PostInitializeComponents()
@@ -1156,6 +1185,10 @@ bool AThalassaVessel::IsInsideHull(const FVector& WorldLocation) const
 
 UPrimitiveComponent* AThalassaVessel::GetMovementBaseComponent() const
 {
+	if (WalkableShell)
+	{
+		return ShellCollision;
+	}
 	return HullCollision;
 }
 
