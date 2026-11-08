@@ -24,7 +24,8 @@ void AThalassaGameMode::InitGameState()
 	// 200 m below the surface (Z = 0), well clear of the test seabed.
 	FVector Start(0.f, 0.f, -20000.f);
 	ThalassaTestConfig::GetShipStartOverride(Start);
-	UClass* ShipClass = VesselClass.IsNull() ? nullptr : VesselClass.LoadSynchronous();
+	// The test rig is a fixture: always the plain C++ ship, so spots moved in the Blueprint never reach it.
+	UClass* ShipClass = (VesselClass.IsNull() || ThalassaTestConfig::UseTestRig()) ? nullptr : VesselClass.LoadSynchronous();
 	if (!ShipClass)
 	{
 		if (!VesselClass.IsNull())

@@ -17,6 +17,23 @@ class UThalassaCameraStationComponent;
 class UThalassaCameraScreenComponent;
 class UThalassaStationComponent;
 class USceneCaptureComponent2D;
+class UThalassaDryCompartmentComponent;
+class UThalassaLadderZoneComponent;
+class UThalassaSpawnPointComponent;
+class UThalassaStationSpotComponent;
+
+/** A box on the ship, in ship coordinates, read from a marker component. It may be turned. */
+struct FShipZone
+{
+	FTransform Transform; // Without scale.
+	FVector Extent = FVector::ZeroVector;
+
+	bool Contains(const FVector& Local, float MarginCm = 0.f) const
+	{
+		const FVector P = Transform.InverseTransformPositionNoScale(Local);
+		return FMath::Abs(P.X) <= Extent.X + MarginCm && FMath::Abs(P.Y) <= Extent.Y + MarginCm && FMath::Abs(P.Z) <= Extent.Z + MarginCm;
+	}
+};
 
 /** Authoritative vessel pose, published by the server and dead-reckoned by clients. */
 USTRUCT()
@@ -73,6 +90,7 @@ public:
 	AThalassaVessel();
 
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -184,6 +202,17 @@ private:
 	 * (docs/INTERIOR_RULES.md, rule 1), or players appear metres from where they are on bad connections.
 	 */
 	void MakeArtVisualOnly();
+
+	/**
+	 * Reads where the gameplay spots are from their marker components: dry compartments, ladders, spawn
+	 * points, station spots, the airlock and the full stop button. Server and clients read the same class,
+	 * so they always agree. See docs/SHIP_ART.md.
+	 */
+	void ReadMarkers();
+
+	/** A component's transform in ship coordinates, wherever it is attached. */
+	FTransform GetShipLocalTransform(const USceneComponent* Component) const;
+	FBox AirlockChamberBox() const;
 	void TickAirlockServer(float DeltaSeconds);
 	void TickAirlockVisuals(float DeltaSeconds);
 	bool IsDoorwayOccupied(float DoorY) const;
@@ -250,6 +279,34 @@ private:
 
 	/** The lever as drawn, eased toward the replicated setting so it moves smoothly between updates. */
 	float ShownThrottle = 0.f;
+
+	/** Spots you can move in the Blueprint. Built from the C++ layout; extra ones added in the Blueprint count too. */
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
+	TArray<TObjectPtr<UThalassaDryCompartmentComponent>> DryCompartments;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
+	TArray<TObjectPtr<UThalassaLadderZoneComponent>> LadderZones;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
+	TArray<TObjectPtr<UThalassaSpawnPointComponent>> SpawnPoints;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
+	TObjectPtr<UThalassaStationSpotComponent> HelmSpot;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
+	TObjectPtr<UThalassaStationSpotComponent> CameraSpot;
+
+	/** The airlock: move this and its doors, water, panel and chamber move with it. Its walls are greybox. */
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
+	TObjectPtr<USceneComponent> Airlock;
+
+	// What ReadMarkers found, in ship coordinates.
+	TArray<FShipZone> DryZones;
+	TArray<FShipZone> LadderZoneShapes;
+	TArray<FVector> SpawnLocals;
+	FVector AirlockLocal = FVector::ZeroVector;
+	FVector FullStopButtonLocal = FVector::ZeroVector;
+	FBox HullBoundsLocal = FBox(ForceInit);
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> AirlockInnerDoor;

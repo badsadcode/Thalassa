@@ -9,6 +9,7 @@
 #include "Vessel/ThalassaCameraStation.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Vessel/ThalassaVesselLayout.h"
+#include "Vessel/ThalassaShipMarkers.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -234,11 +235,6 @@ namespace
 		static const FVesselLayout Layout = ThalassaTestConfig::UseTestRig() ? BuildTestRigLayout() : BuildMainDeckLayout();
 		return Layout;
 	}
-
-	FBox AirlockChamberBox()
-	{
-		return ThalassaVesselLayout::AirlockChamber.ShiftBy(GetLayout().AirlockOffset);
-	}
 }
 
 AThalassaVessel::AThalassaVessel()
@@ -276,14 +272,46 @@ AThalassaVessel::AThalassaVessel()
 		HullPieces.Add(Piece);
 	}
 
+	// Gameplay spots, as components that can be moved in the Blueprint. ReadMarkers reads them back.
+	Airlock = CreateDefaultSubobject<USceneComponent>(TEXT("Airlock"));
+	Airlock->SetupAttachment(ShipRoot);
+	Airlock->SetMobility(EComponentMobility::Movable);
+	Airlock->SetRelativeLocation(Layout.AirlockOffset);
+
+	for (int32 Index = 0; Index < Layout.DryCompartments.Num(); ++Index)
+	{
+		const FBox& Box = Layout.DryCompartments[Index];
+		UThalassaDryCompartmentComponent* Zone = CreateDefaultSubobject<UThalassaDryCompartmentComponent>(FName(*FString::Printf(TEXT("DryCompartment%02d"), Index)));
+		Zone->SetupAttachment(ShipRoot);
+		Zone->SetRelativeLocation(Box.GetCenter());
+		Zone->InitBoxExtent(Box.GetExtent());
+		DryCompartments.Add(Zone);
+	}
+	for (int32 Index = 0; Index < Layout.LadderZones.Num(); ++Index)
+	{
+		const FBox& Box = Layout.LadderZones[Index];
+		UThalassaLadderZoneComponent* Zone = CreateDefaultSubobject<UThalassaLadderZoneComponent>(FName(*FString::Printf(TEXT("LadderZone%02d"), Index)));
+		Zone->SetupAttachment(ShipRoot);
+		Zone->SetRelativeLocation(Box.GetCenter());
+		Zone->InitBoxExtent(Box.GetExtent());
+		LadderZones.Add(Zone);
+	}
+	for (int32 Index = 0; Index < Layout.Spawns.Num(); ++Index)
+	{
+		UThalassaSpawnPointComponent* Spawn = CreateDefaultSubobject<UThalassaSpawnPointComponent>(FName(*FString::Printf(TEXT("SpawnPoint%02d"), Index)));
+		Spawn->SetupAttachment(ShipRoot);
+		Spawn->SetRelativeLocation(Layout.Spawns[Index]);
+		SpawnPoints.Add(Spawn);
+	}
+
 	const auto MakeDoor = [&](const TCHAR* Name, float DoorY)
 	{
 		UStaticMeshComponent* Door = CreateDefaultSubobject<UStaticMeshComponent>(Name);
-		Door->SetupAttachment(ShipRoot);
+		Door->SetupAttachment(Airlock);
 		Door->SetMobility(EComponentMobility::Movable);
 		Door->SetStaticMesh(CubeMesh.Object);
 		Door->SetMaterial(0, TintableMaterial.Object);
-		Door->SetRelativeLocation(Layout.AirlockOffset + FVector(0.f, DoorY, 125.f));
+		Door->SetRelativeLocation(FVector(0.f, DoorY, 125.f));
 		Door->SetRelativeScale3D(ThalassaVesselLayout::DoorSize / 100.f);
 		Door->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 		return Door;
@@ -293,11 +321,11 @@ AThalassaVessel::AThalassaVessel()
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaneMesh(TEXT("/Engine/BasicShapes/Plane.Plane"));
 	AirlockWater = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AirlockWater"));
-	AirlockWater->SetupAttachment(ShipRoot);
+	AirlockWater->SetupAttachment(Airlock);
 	AirlockWater->SetMobility(EComponentMobility::Movable);
 	AirlockWater->SetStaticMesh(PlaneMesh.Object);
 	AirlockWater->SetMaterial(0, TintableMaterial.Object);
-	AirlockWater->SetRelativeLocation(Layout.AirlockOffset + FVector(0.f, 337.f, 0.f));
+	AirlockWater->SetRelativeLocation(FVector(0.f, 337.f, 0.f));
 	AirlockWater->SetRelativeScale3D(FVector(4.f, 1.75f, 1.f));
 	AirlockWater->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AirlockWater->SetCastShadow(false);
@@ -326,12 +354,22 @@ AThalassaVessel::AThalassaVessel()
 	Helm = CreateDefaultSubobject<UThalassaHelmComponent>(TEXT("Helm"));
 	Helm->SeatLocal = Layout.HelmSeatLocation;
 	Helm->bAvailable = Layout.bHasHelm;
+	if (Layout.bHasHelm)
+	{
+		HelmSpot = CreateDefaultSubobject<UThalassaStationSpotComponent>(TEXT("HelmSpot"));
+		HelmSpot->SetupAttachment(ShipRoot);
+		HelmSpot->SetRelativeLocation(Layout.HelmSeatLocation);
+	}
 
 	if (Layout.bHasCameraStation)
 	{
 		CameraStation = CreateDefaultSubobject<UThalassaCameraStationComponent>(TEXT("CameraStation"));
 		CameraStation->SeatLocal = Layout.CameraSeatLocation;
 		CameraStation->bAvailable = true;
+
+		CameraSpot = CreateDefaultSubobject<UThalassaStationSpotComponent>(TEXT("CameraSpot"));
+		CameraSpot->SetupAttachment(ShipRoot);
+		CameraSpot->SetRelativeLocation(Layout.CameraSeatLocation);
 
 		const auto MakeCameraScreen = [&](const TCHAR* Name, const FVector& Location, float SizeCm, bool bShowsAll)
 		{
@@ -405,8 +443,7 @@ AThalassaVessel::AThalassaVessel()
 		SonarScreen->SetRelativeScale3D(FVector(Layout.SonarScreenSizeCm / 100.f));
 
 		SonarPing = CreateDefaultSubobject<UThalassaSonarPingComponent>(TEXT("SonarPing"));
-		SonarPing->SetupAttachment(ShipRoot);
-		SonarPing->SetRelativeLocation(Layout.SonarScreenLocation);
+		SonarPing->SetupAttachment(SonarScreen);
 		SonarScreen->PingSound = SonarPing;
 	}
 
@@ -474,6 +511,85 @@ void AThalassaVessel::OnConstruction(const FTransform& Transform)
 			}
 		}
 	}
+}
+
+void AThalassaVessel::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	ReadMarkers();
+}
+
+FTransform AThalassaVessel::GetShipLocalTransform(const USceneComponent* Component) const
+{
+	if (Component->GetAttachParent() == RootComponent)
+	{
+		return Component->GetRelativeTransform(); // Exact: no round trip through world space.
+	}
+	return Component->GetComponentTransform().GetRelativeTransform(RootComponent->GetComponentTransform());
+}
+
+void AThalassaVessel::ReadMarkers()
+{
+	const auto ReadZone = [this](const UBoxComponent* Box)
+	{
+		FShipZone Zone;
+		Zone.Transform = GetShipLocalTransform(Box);
+		Zone.Extent = Box->GetUnscaledBoxExtent() * Zone.Transform.GetScale3D().GetAbs();
+		Zone.Transform.SetScale3D(FVector::OneVector);
+		return Zone;
+	};
+
+	// Every marker on the ship, including any added in the Blueprint, not just the ones made here.
+	TInlineComponentArray<UThalassaDryCompartmentComponent*> DryMarkers(this);
+	TInlineComponentArray<UThalassaLadderZoneComponent*> LadderMarkers(this);
+	TInlineComponentArray<UThalassaSpawnPointComponent*> SpawnMarkers(this);
+
+	DryZones.Reset();
+	HullBoundsLocal = GetLayout().HullBounds;
+	for (const UThalassaDryCompartmentComponent* Marker : DryMarkers)
+	{
+		const FShipZone Zone = ReadZone(Marker);
+		DryZones.Add(Zone);
+		HullBoundsLocal += FBox::BuildAABB(FVector::ZeroVector, Zone.Extent).TransformBy(Zone.Transform);
+	}
+
+	LadderZoneShapes.Reset();
+	for (const UThalassaLadderZoneComponent* Marker : LadderMarkers)
+	{
+		LadderZoneShapes.Add(ReadZone(Marker));
+	}
+
+	// In name order, so the first player always gets the same spot.
+	SpawnMarkers.Sort([](const UThalassaSpawnPointComponent& A, const UThalassaSpawnPointComponent& B) { return A.GetName() < B.GetName(); });
+	SpawnLocals.Reset();
+	for (const UThalassaSpawnPointComponent* Marker : SpawnMarkers)
+	{
+		SpawnLocals.Add(GetShipLocalTransform(Marker).GetLocation());
+	}
+	if (SpawnLocals.IsEmpty())
+	{
+		SpawnLocals.Add(FVector(0.f, 0.f, 120.f));
+		UE_LOG(LogTemp, Warning, TEXT("THALASSA: the ship has no spawn points, so everyone starts at its centre."));
+	}
+
+	if (HelmSpot)
+	{
+		Helm->SeatLocal = GetShipLocalTransform(HelmSpot).GetLocation();
+	}
+	if (CameraSpot && CameraStation)
+	{
+		CameraStation->SeatLocal = GetShipLocalTransform(CameraSpot).GetLocation();
+	}
+	AirlockLocal = GetShipLocalTransform(Airlock).GetLocation();
+	if (FullStopButton)
+	{
+		FullStopButtonLocal = FullStopButton->GetRelativeLocation();
+	}
+}
+
+FBox AThalassaVessel::AirlockChamberBox() const
+{
+	return ThalassaVesselLayout::AirlockChamber.ShiftBy(AirlockLocal);
 }
 
 void AThalassaVessel::BeginPlay()
@@ -601,7 +717,7 @@ void AThalassaVessel::MakeArtVisualOnly()
 	TInlineComponentArray<UPrimitiveComponent*> Primitives(this);
 	for (UPrimitiveComponent* Primitive : Primitives)
 	{
-		if (Primitive->CreationMethod != EComponentCreationMethod::Native)
+		if (Primitive->CreationMethod != EComponentCreationMethod::Native && !ThalassaShipMarkers::IsMarker(Primitive))
 		{
 			MakeVisualOnly(Primitive);
 		}
@@ -645,7 +761,7 @@ bool AThalassaVessel::HasHelm() const
 
 FVector AThalassaVessel::GetHelmSeatLocal() const
 {
-	return GetLayout().HelmSeatLocation;
+	return Helm->SeatLocal;
 }
 
 UThalassaStationComponent* AThalassaVessel::FindStationOf(const APawn* Pawn) const
@@ -678,7 +794,7 @@ bool AThalassaVessel::TryUseStation(APawn* Who)
 
 FVector AThalassaVessel::GetFullStopButtonLocal() const
 {
-	return GetLayout().FullStopButtonLocation;
+	return FullStopButtonLocal;
 }
 
 void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
@@ -734,7 +850,7 @@ float AThalassaVessel::GetSecondsSinceCollision() const
 
 bool AThalassaVessel::IsHullBlocked(const FVector& Location, const FQuat& Rotation) const
 {
-	const FBox& HullBox = GetLayout().HullBounds;
+	const FBox& HullBox = HullBoundsLocal;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(ThalassaHullOverlap), false);
 	IgnoreShipInQuery(Params);
 	return GetWorld()->OverlapAnyTestByObjectType(Location + Rotation.RotateVector(HullBox.GetCenter()), Rotation,
@@ -756,7 +872,7 @@ FVector AThalassaVessel::ConstrainMove(const FVector& From, const FVector& To, c
 	// The seabed and anything else in the world: sweep the hull's box along the move. Only world
 	// geometry stops the ship, never a swimmer. The box turns with the ship, but a turn on the spot is
 	// not swept: only the move from one place to the next is.
-	const FBox& HullBox = GetLayout().HullBounds;
+	const FBox& HullBox = HullBoundsLocal;
 	const FVector Center = Rotation.RotateVector(HullBox.GetCenter());
 	const FVector Delta = Result - From;
 	if (Delta.IsNearlyZero())
@@ -812,7 +928,7 @@ void AThalassaVessel::TickHelmVisuals(float DeltaSeconds)
 	if (FullStopButton && bFullStop != bShownFullStop)
 	{
 		bShownFullStop = bFullStop;
-		FullStopButton->SetRelativeLocation(GetLayout().FullStopButtonLocation - FVector(0.f, 0.f, bFullStop ? 2.f : 0.f));
+		FullStopButton->SetRelativeLocation(FullStopButtonLocal - FVector(0.f, 0.f, bFullStop ? 2.f : 0.f));
 		if (FullStopButtonMaterial)
 		{
 			FullStopButtonMaterial->SetVectorParameterValue(TEXT("Color"), bFullStop ? ThalassaVesselLayout::FullStopLitColor : ThalassaVesselLayout::FullStopIdleColor);
@@ -1009,8 +1125,8 @@ FTransform AThalassaVessel::GetSpawnTransform(int32 PlayerIndex) const
 {
 	const FVesselLayout& Layout = GetLayout();
 	FVector Local = ThalassaTestConfig::IsSpawnAtAirlock()
-		? Layout.AirlockViewpoint
-		: Layout.Spawns[PlayerIndex % Layout.Spawns.Num()];
+		? AirlockLocal + (Layout.AirlockViewpoint - Layout.AirlockOffset)
+		: SpawnLocals[PlayerIndex % SpawnLocals.Num()];
 	ThalassaTestConfig::GetSpawnOverride(Local);
 	return FTransform(GetActorRotation(), GetActorTransform().TransformPosition(Local));
 }
@@ -1035,7 +1151,7 @@ bool AThalassaVessel::TryPressBeep(const FVector& WorldLocation)
 bool AThalassaVessel::IsInsideHull(const FVector& WorldLocation) const
 {
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	return GetLayout().HullBounds.IsInsideOrOn(Local);
+	return HullBoundsLocal.IsInsideOrOn(Local);
 }
 
 UPrimitiveComponent* AThalassaVessel::GetMovementBaseComponent() const
@@ -1050,9 +1166,9 @@ bool AThalassaVessel::IsInCompartment(const FVector& WorldLocation) const
 	{
 		return true;
 	}
-	for (const FBox& Compartment : GetLayout().DryCompartments)
+	for (const FShipZone& Compartment : DryZones)
 	{
-		if (Compartment.IsInsideOrOn(Local))
+		if (Compartment.Contains(Local))
 		{
 			return true;
 		}
@@ -1075,9 +1191,9 @@ bool AThalassaVessel::IsWaterAt(const FVector& WorldLocation) const
 bool AThalassaVessel::IsLadderAt(const FVector& WorldLocation, float MarginCm) const
 {
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	for (const FBox& Ladder : GetLayout().LadderZones)
+	for (const FShipZone& Ladder : LadderZoneShapes)
 	{
-		if (Ladder.ExpandBy(MarginCm).IsInsideOrOn(Local))
+		if (Ladder.Contains(Local, MarginCm))
 		{
 			return true;
 		}
@@ -1094,7 +1210,7 @@ bool AThalassaVessel::IsDoorwayOccupied(float DoorY) const
 {
 	for (TActorIterator<AThalassaCharacter> It(GetWorld()); It; ++It)
 	{
-		const FVector Local = GetActorTransform().InverseTransformPosition(It->GetActorLocation()) - GetLayout().AirlockOffset;
+		const FVector Local = GetActorTransform().InverseTransformPosition(It->GetActorLocation()) - AirlockLocal;
 		if (FMath::Abs(Local.Y - DoorY) < ThalassaVesselLayout::DoorClearanceCm && FMath::Abs(Local.X) < 130.f)
 		{
 			return true;
@@ -1113,7 +1229,7 @@ bool AThalassaVessel::TryCycleAirlock(const FVector& WorldLocation)
 	}
 
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	if (FVector::DistSquared(Local, AirlockPanelLocation + GetLayout().AirlockOffset) > FMath::Square(AirlockPanelRadius))
+	if (FVector::DistSquared(Local, AirlockPanelLocation + AirlockLocal) > FMath::Square(AirlockPanelRadius))
 	{
 		return false;
 	}
@@ -1184,7 +1300,7 @@ void AThalassaVessel::TickAirlockVisuals(float DeltaSeconds)
 		{
 			Open = FMath::FInterpConstantTo(Open, Target, 1.f, DoorStep);
 		}
-		Door->SetRelativeLocation(GetLayout().AirlockOffset + FVector(0.f, DoorY, 125.f + Open * DoorOpenRaiseCm));
+		Door->SetRelativeLocation(FVector(0.f, DoorY, 125.f + Open * DoorOpenRaiseCm));
 
 		// A door stops being solid as soon as it starts opening. Clients hear about it late, so their
 		// door is always lower than the server's. If it were solid, they would bump into a door the
@@ -1195,7 +1311,7 @@ void AThalassaVessel::TickAirlockVisuals(float DeltaSeconds)
 	MoveDoor(AirlockOuterDoor, AirlockOuterDoorOpen, AirlockState == EAirlockState::OuterOpen, DoorOuterY);
 
 	AirlockWater->SetVisibility(AirlockWaterLevel > 0.f);
-	AirlockWater->SetRelativeLocation(GetLayout().AirlockOffset + FVector(0.f, 337.f, AirlockWaterLevel * AirlockCeilingCm));
+	AirlockWater->SetRelativeLocation(FVector(0.f, 337.f, AirlockWaterLevel * AirlockCeilingCm));
 }
 
 void AThalassaVessel::UpdateConsoleText(float DeltaSeconds)
