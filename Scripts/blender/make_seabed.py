@@ -11,7 +11,7 @@ random seed, so the same script always makes the same seabed, and the sonar alwa
 
 Vertex colours hold sand on the flats and rock on the slopes, for the seabed material.
 
-Run with: blender --background --factory-startup --python make_seabed.py -- <output.fbx>
+Run with: python Scripts/build/blender.py Scripts/blender/make_seabed.py -- <output.fbx>
 """
 import math
 import os

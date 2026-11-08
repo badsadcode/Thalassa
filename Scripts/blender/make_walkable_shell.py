@@ -6,7 +6,7 @@ Input is the JSON written by Scripts/unreal/export_greybox_boxes.py. Every walka
 
 Never overwrites an existing .blend unless given --force: that file is the owner's to change.
 
-Run with: blender --background --factory-startup --python make_walkable_shell.py -- <boxes.json> <Art/Ship folder> [--force]
+Run with: python Scripts/build/blender.py Scripts/blender/make_walkable_shell.py -- <boxes.json> <Art/Ship folder> [--force]
 """
 import json
 import os

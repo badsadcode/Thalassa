@@ -26,6 +26,21 @@ How the ocean floor and the underwater look are built, what exists today, and th
   - 45 lone boulders, 2 to 9 m, thinly spread across the open flats, so the plains stay mostly empty.
 
   Ground traces ignore rocks already placed, so nothing lands on a ledge.
+- **The first biome, dark (2026-11-08):** in the north-east, centred at (1900, 2000) m, 600 m across. `Scripts/blender/make_dark_biome.py` makes six fractured dark boulders (lumps, with crack lines from Voronoi cells) and twelve kinds of life:
+  - sea pens, 0.9 to 1.4 m, feather-like and faintly glowing;
+  - tube-worm clusters, up to 1.9 m, pale tubes with red plumes;
+  - sea whips, 3 to 4.6 m, some branching, with glowing tips;
+  - clusters of stalked glow bulbs.
+
+  `import_dark_biome.py` brings them in and builds `M_Growth`, where vertex colours drive the look. Red is sway: a slow circle up to 14 cm at the tips, each copy on its own beat. Green is glow: cold blue-green, pulsing, emissive only, with no real lights. Blue is red plume.
+
+  Placement, by rules in `create_test_map.py`:
+  - 14 rock clusters (51 boulders, 3 to 14 m), with whips and bulbs at their feet;
+  - four warm seeps ringed by tube worms and glow bulbs;
+  - sea pens in patches on flat ground, and sea whips on slopes, 795 living things in all;
+  - a local grade (`DarkBiome_Gloom`) making the area colder and darker, blending in over 200 m.
+
+  Life is drawn by `AThalassaScatter` (one instanced actor per mesh, saved in the level, no collision, not drawn beyond 150 m). The seep at about (1714, 2369) m, 437 m down, is the best place to look.
 - **Not there yet:** more surface variety: per-region materials, mineral crusts, a fine sediment layer on top of rock ledges. Also missing: more formation families, regions, a water surface, sediment clouds, sound.
 
 ## Biomes, life and light (owner's direction, 2026-11-08)
@@ -43,6 +58,8 @@ Claude's notes:
 - **Light is a budget.** Hundreds of glowing things should be emissive materials, not real lights. Only a few real lights per scene, or the frame rate goes.
 - **Creatures need sound before they need models.** The scariest version of a large animal is a sonar contact and a sound through the hull, long before it's seen. That fits the sonar, the hydrophones and the mysteries already in the design.
 - **Vegetation must sway.** Underwater plants that don't move look plastic. A gentle sway in the material, driven by the region's current, is cheap and sells it.
+
+Next for life: a brighter biome with fluorescent plants and animals; real current direction per region for the sway; creatures, starting with sound and sonar contacts; sediment clouds.
 
 ## The hard technical truths
 

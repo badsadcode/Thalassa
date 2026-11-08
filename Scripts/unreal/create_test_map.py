@@ -244,6 +244,108 @@ for attempt in range(400):
         break
 unreal.log("THALASSA: placed %d scanned rocks, %d of them lone boulders on the flats" % (scans, lone))
 
+# ---- The dark biome: gloomy, nearly lightless, lit only by what lives there. See docs/SEABED.md.
+BIOME = (190000.0, 200000.0)   # North-east, clear of the start, the canyon's middle and every test route.
+BIOME_RADIUS = 60000.0
+life = {}  # mesh name: transforms, for one instanced scatter actor per mesh
+
+
+def in_biome():
+    angle, distance = rng.uniform(0, math.tau), BIOME_RADIUS * math.sqrt(rng.random())
+    return BIOME[0] + math.cos(angle) * distance, BIOME[1] + math.sin(angle) * distance
+
+
+def grow(kind, x, y, scale_low, scale_high, tilt=8.0):
+    """One living thing, rooted in the ground where it stands."""
+    z = ground(x, y)
+    if z is None:
+        return
+    scale = rng.uniform(scale_low, scale_high)
+    name = "SM_%s_%02d" % (kind, rng.randint(1, 3))
+    life.setdefault(name, []).append(unreal.Transform(unreal.Vector(x, y, z - 2.0),
+                                                      unreal.Rotator(roll=rng.uniform(-tilt, tilt), pitch=rng.uniform(-tilt, tilt), yaw=rng.uniform(0, 360)),
+                                                      unreal.Vector(scale, scale, scale)))
+
+
+def slope_at(x, y):
+    h0, hx, hy = ground(x, y), ground(x + 500.0, y), ground(x, y + 500.0)
+    return None if None in (h0, hx, hy) else math.hypot(hx - h0, hy - h0) / 500.0
+
+
+# Rock clusters: a few big fractured boulders with smaller ones around them.
+dark_rocks = 0
+clusters = [in_biome() for _ in range(14)]
+for cx, cy in clusters:
+    for k in range(rng.randint(2, 6)):
+        size = rng.uniform(3.0, 14.0) if k == 0 else rng.uniform(1.5, 6.0)
+        angle, distance = rng.uniform(0, math.tau), (0.0 if k == 0 else rng.uniform(4.0, 14.0) * 100.0)
+        x, y = cx + math.cos(angle) * distance, cy + math.sin(angle) * distance
+        z = lowest(x, y, size * 50.0)
+        if z is None:
+            continue
+        actor = actors.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(x, y, z - size * 15.0),
+                                              unreal.Rotator(roll=rng.uniform(-10, 10), pitch=rng.uniform(-10, 10), yaw=rng.uniform(0, 360)))
+        actor.static_mesh_component.set_static_mesh(unreal.load_asset("/Game/World/DarkBiome/SM_DarkBoulder_%02d" % rng.randint(1, 6)))
+        actor.static_mesh_component.set_mobility(unreal.ComponentMobility.STATIC)
+        actor.set_actor_scale3d(unreal.Vector(size * 0.5, size * 0.5, size * 0.5))  # The meshes are about 2 m across.
+        actor.set_actor_label("DarkBoulder_%d" % dark_rocks)
+        actor.set_folder_path("DarkBiome")
+        rock_actors.append(actor)
+        dark_rocks += 1
+        # Life clings to rock: whips and glowing bulbs at the boulders' feet.
+        for j in range(rng.randint(2, 6)):
+            a2, d2 = rng.uniform(0, math.tau), size * rng.uniform(55.0, 90.0)
+            grow("GlowBulb" if rng.random() < 0.5 else "SeaWhip", x + math.cos(a2) * d2, y + math.sin(a2) * d2, 0.8, 1.5)
+
+# Warm seeps: tube worms crowd around them, with glowing bulbs in the gaps. The brightest places here.
+seeps = [in_biome() for _ in range(4)]
+for sx, sy in seeps:
+    for k in range(rng.randint(8, 14)):
+        angle, distance = rng.uniform(0, math.tau), abs(rng.gauss(0.0, 600.0))
+        grow("TubeWorms", sx + math.cos(angle) * distance, sy + math.sin(angle) * distance, 0.8, 1.6, 5.0)
+    for k in range(rng.randint(25, 45)):
+        angle, distance = rng.uniform(0, math.tau), abs(rng.gauss(0.0, 1500.0))
+        grow("GlowBulb", sx + math.cos(angle) * distance, sy + math.sin(angle) * distance, 0.8, 2.0)
+
+# Sea pens: patches on soft, flat ground. Sea whips: scattered where the ground slopes.
+for patch in range(30):
+    px, py = in_biome()
+    slope = slope_at(px, py)
+    if slope is None or slope > 0.15:
+        continue
+    for k in range(rng.randint(15, 40)):
+        angle, distance = rng.uniform(0, math.tau), BIOME_RADIUS * 0.02 * math.sqrt(rng.random())
+        grow("SeaPen", px + math.cos(angle) * distance, py + math.sin(angle) * distance, 0.7, 1.3)
+for k in range(400):
+    x, y = in_biome()
+    slope = slope_at(x, y)
+    if slope is not None and 0.1 < slope < 0.7:
+        grow("SeaWhip", x, y, 0.7, 1.4)
+
+total_life = 0
+for name, transforms in sorted(life.items()):
+    scatter = actors.spawn_actor_from_class(unreal.ThalassaScatter, unreal.Vector(BIOME[0], BIOME[1], -50000.0))
+    scatter.set_scatter_mesh(unreal.load_asset("/Game/World/DarkBiome/" + name), 15000.0)  # Not drawn beyond 150 m: the murk hides it anyway.
+    scatter.add_world_instances(transforms)
+    scatter.set_actor_label("Life_" + name)
+    scatter.set_folder_path("DarkBiome")
+    total_life += len(transforms)
+
+# The biome's mood: colder and darker than the open seabed, blending in over 200 m.
+gloom = actors.spawn_actor_from_class(unreal.PostProcessVolume, unreal.Vector(BIOME[0], BIOME[1], -40000.0))
+gloom.set_actor_scale3d(unreal.Vector(BIOME_RADIUS / 100.0, BIOME_RADIUS / 100.0, 400.0))  # The default brush is 200 cm across.
+gloom.set_editor_property("blend_radius", 20000.0)
+gloom.set_editor_property("priority", 1.0)
+gs = gloom.get_editor_property("settings")
+for name, value in [("color_gain", unreal.Vector4(0.55, 0.62, 0.72, 0.8)), ("color_saturation", unreal.Vector4(0.8, 0.85, 0.95, 0.8)),
+                    ("vignette_intensity", 0.75)]:
+    gs.set_editor_property("override_" + name, True)
+    gs.set_editor_property(name, value)
+gloom.set_editor_property("settings", gs)
+gloom.set_actor_label("DarkBiome_Gloom")
+gloom.set_folder_path("DarkBiome")
+unreal.log("THALASSA: dark biome: %d boulders, %d living things in %d kinds, %d seeps" % (dark_rocks, total_life, len(life), len(seeps)))
+
 if not level.save_current_level():
     raise RuntimeError("could not save " + MAP_PATH)
 unreal.log("THALASSA: created " + MAP_PATH)

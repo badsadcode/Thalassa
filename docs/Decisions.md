@@ -89,6 +89,8 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 **Biomes, life and bioluminescence (owner's direction, 2026-11-08).** The ocean has zones with their own life and mood: dark and gloomy ones, and a little brighter ones with fluorescent plants and animals, with deep-sea vegetation and creatures. The goal is the feeling of thalassophobia. Generated shapes (Blender rock and tree generators) with scanned CC0 textures. See [SEABED.md](SEABED.md).
 
+**Crew characters: MetaHuman, later (2026-11-08).** The owner asked about MetaHuman for the player characters. It is free for Unreal Engine projects, and its creator is built into the editor from UE 5.6. It needs the owner's Epic account. To plan for: the cost of up to 8 characters (lower detail levels and simpler hair at distance), diving suits and helmets over the body, and an animation setup on top of the existing movement and replication. Scheduled after the world and the ship's interior.
+
 ## Still open
 
 From design document section 26: ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.

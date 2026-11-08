@@ -1,7 +1,7 @@
 """Imports the seabed made by Scripts/blender/make_seabed.py as /Game/World/Seabed/SM_Seabed, with its material.
 
 Replaces the mesh if it exists. The FBX is read from Saved/Seabed/SM_Seabed.fbx; make it first with:
-    blender --background --factory-startup --python Scripts/blender/make_seabed.py -- <project>/Saved/Seabed/SM_Seabed.fbx
+    python Scripts/build/blender.py Scripts/blender/make_seabed.py -- <project>/Saved/Seabed/SM_Seabed.fbx
 
 Collision is the terrain itself (complex as simple): it never moves and nobody stands on it aboard the ship,
 so the walkable-shell rule about boxes does not apply. Drawn with Nanite, for its 720,000 triangles.

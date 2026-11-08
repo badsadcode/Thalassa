@@ -9,7 +9,7 @@ its origin, so it can be sunk into sloping ground without showing a gap. Determi
 per piece, so the same script always makes the same rocks. Vertex colours carry the strata and the mineral
 staining, for the rock material. See docs/SEABED.md.
 
-Run with: blender --background --factory-startup --python make_formations.py -- <output.fbx>
+Run with: python Scripts/build/blender.py Scripts/blender/make_formations.py -- <output.fbx>
 """
 import math
 import os

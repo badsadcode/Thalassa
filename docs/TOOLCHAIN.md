@@ -32,7 +32,7 @@ No third-party plugins.
 
 `.mcp.json` in the project root points Claude Code at it. A Claude Code session started in the project folder while the editor is running can then use the editor's tools: spawning and editing actors, materials, scenes, and running automation tests. Tool calls run one at a time on the editor's game thread. Epic's guide: https://dev.epicgames.com/documentation/unreal-engine/unreal-mcp-in-unreal-editor
 
-Before this, everything ran through ordinary command-line tools and Unreal's own editor Python, and those still work. Compiling C++ still needs the editor closed. No Blender MCP is configured. Blender 5.1 is installed on the development machine but has not been used yet.
+Before this, everything ran through ordinary command-line tools and Unreal's own editor Python, and those still work. Compiling C++ still needs the editor closed. No Blender MCP is configured. Blender runs headless from scripts: `python Scripts/build/blender.py <script> -- <args>` picks the newest Blender installed (5.2.3 LTS on 2026-11-08), or the `BLENDER` environment variable.
 
 ## Machine-specific notes
 

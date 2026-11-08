@@ -1,7 +1,7 @@
 """Imports the rock formations made by Scripts/blender/make_formations.py into /Game/World/Formations.
 
 Reads Saved/Formations/Formations.fbx; make it first with:
-    blender --background --factory-startup --python Scripts/blender/make_formations.py -- <project>/Saved/Formations/Formations.fbx
+    python Scripts/build/blender.py Scripts/blender/make_formations.py -- <project>/Saved/Formations/Formations.fbx
 
 Each object becomes its own static mesh, replacing any that exist. They use the seabed's material, which
 draws their vertex colours: the strata and mineral staining. Drawn with Nanite. Collision is the rock itself
