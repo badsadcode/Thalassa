@@ -12,6 +12,7 @@ Walk to the middle of the console by the bridge's forward window and press **E**
 | A / D | Rudder port / starboard |
 | Space / C | Vertical thrusters: up / down. The ship rises or sinks level. |
 | Q / Z | Planes: bow up (rise) / bow down (dive) |
+| B | **Test boost** (test and development builds only): ×10 top speed and vertical thrust, for crossing the open ocean while testing. Shown on the helm screen. A shipped game has no boost; upgrades may make the ship faster later. |
 | R | Switch between precise and set-and-go |
 | X | Full stop: engines cut, and the ship brakes to a standstill and holds there |
 | E | Stand up |

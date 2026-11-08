@@ -113,6 +113,29 @@ void AThalassaOcean::BeginPlay()
 	}
 	UE_LOG(LogTemp, Display, TEXT("THALASSA: within 20 km: shallowest %.0f m at (%.0f, %.0f) m, deepest %.0f m at (%.0f, %.0f) m"),
 		-High, HighAt.X, HighAt.Y, -Low, LowAt.X, LowAt.Y);
+
+	// The nearest example of each province, for testing and for finding your way.
+	for (int32 Kind = 0; Kind < static_cast<int32>(FThalassaSeabedGenerator::EProvince::Count); ++Kind)
+	{
+		for (int32 Ring = 0; Ring <= 40; ++Ring)
+		{
+			bool bFound = false;
+			for (int32 Step = 0; Step < FMath::Max(1, Ring * 8) && !bFound; ++Step)
+			{
+				const double Angle = Step * (2.0 * PI / FMath::Max(1, Ring * 8));
+				const double X = FMath::Cos(Angle) * Ring * 5000.0, Y = FMath::Sin(Angle) * Ring * 5000.0;
+				FThalassaSeabedGenerator::EProvince Next;
+				double W;
+				if (static_cast<int32>(GetGenerator().ProvinceAt(X, Y, Next, W)) == Kind && W > 0.95)
+				{
+					UE_LOG(LogTemp, Display, TEXT("THALASSA: nearest %s at (%.0f, %.0f) m, seabed %.0f m"),
+						FThalassaSeabedGenerator::ProvinceName(static_cast<FThalassaSeabedGenerator::EProvince>(Kind)), X, Y, -GetGenerator().HeightM(X, Y, 50.0));
+					bFound = true;
+				}
+			}
+			if (bFound) break;
+		}
+	}
 }
 
 void AThalassaOcean::EndPlay(const EEndPlayReason::Type EndPlayReason)

@@ -88,6 +88,9 @@ void AThalassaPlayerController::SetupInputComponent()
 	UInputAction* HelmFullStop = MakeAction(TEXT("HelmFullStop"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(HelmFullStop, EKeys::X);
 
+	UInputAction* HelmBoost = MakeAction(TEXT("HelmBoost"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(HelmBoost, EKeys::B);
+
 	UEnhancedInputComponent* Input = CastChecked<UEnhancedInputComponent>(InputComponent);
 	Input->BindAction(Move, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnMove);
 	Input->BindAction(Move, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnMove); // Zero: let go.
@@ -106,6 +109,7 @@ void AThalassaPlayerController::SetupInputComponent()
 	Input->BindAction(Sprint, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnSprintStop);
 	Input->BindAction(HelmMode, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmMode);
 	Input->BindAction(HelmFullStop, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmFullStop);
+	Input->BindAction(HelmBoost, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmBoost);
 }
 
 void AThalassaPlayerController::BeginPlay()
@@ -356,6 +360,23 @@ void AThalassaPlayerController::RequestHelmFullStop()
 	if (IsAtHelm())
 	{
 		ServerHelmFullStop();
+	}
+}
+
+void AThalassaPlayerController::RequestHelmBoost()
+{
+	if (IsAtHelm())
+	{
+		ServerHelmBoost();
+	}
+}
+
+void AThalassaPlayerController::ServerHelmBoost_Implementation()
+{
+	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
+	if (Vessel && Vessel->GetHelm())
+	{
+		Vessel->GetHelm()->ToggleTestBoost(GetPawn());
 	}
 }
 

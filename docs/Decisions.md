@@ -93,6 +93,8 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 **The ship is modelled last (owner's direction, 2026-11-08).** The final submarine has several decks, an EVA hangar (small 1–3 crew subs, ROVs, the work mech) and every station. The owner will model it once the game's systems and stations exist, so the hull wraps a finished layout instead of being redone. Until then, the grey deck and the walkable shell carry gameplay. The agreed workflow, for when it starts: inside out. Shell blockout first, then interior kit pieces as Packed Level Actors, then the hull modelled around it in ship coordinates with a gap of half a metre or more, and windows cut through hull and interior wall with a shell box over the glass. Players inside and divers outside see each other through windows with no special work, because the ship is one actor in one world. Don't push ship modelling before then.
 
+**The ship's look: hard-surface, faceted, "stealth" (owner's direction, 2026-11-08).** Angular facets and flat panels, which are easier to model and to fit interiors into than a cigar hull, and a big panoramic window at the bow. The owner shared concept art showing this style, with side hangar bays open to the sea. **It's a style reference only, not a blueprint:** its size, deck count and room layout are not decisions. The ship is still modelled last.
+
 ## Still open
 
 From design document section 26: ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.

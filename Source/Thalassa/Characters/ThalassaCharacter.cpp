@@ -273,8 +273,16 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 	}
 
 	// At the helm: a scripted course through both modes. Seconds after sitting down.
-	enum class EPress : uint8 { None, Mode, FullStop, Stand };
+	enum class EPress : uint8 { None, Mode, FullStop, Stand, Boost };
 	struct FCue { float At; float Throttle; float Turn; float Dive; EPress Press; float Heave = 0.f; };
+	// Boost: test boost on, full ahead for 40 s, let go, boost off.
+	static const FCue BoostCues[] =
+	{
+		{ 2.f,  0.f, 0.f, 0.f, EPress::Boost },
+		{ 3.f,  1.f, 0.f, 0.f, EPress::None },
+		{ 43.f, 0.f, 0.f, 0.f, EPress::None },
+		{ 70.f, 0.f, 0.f, 0.f, EPress::Boost },
+	};
 	// Sink: thrusters full down at zero throttle until the seabed stops the ship, then back up.
 	static const FCue SinkCues[] =
 	{
@@ -332,9 +340,9 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		{ 100.f, 0.f,  0.f,  0.f, EPress::Stand },
 	};
 	static const FString Course = ThalassaTestConfig::HelmCourse();
-	const FCue* Cues = Course == TEXT("dive") ? DiveCues : Course == TEXT("rise") ? RiseCues : Course == TEXT("heave") ? HeaveCues : Course == TEXT("sink") ? SinkCues : TourCues;
+	const FCue* Cues = Course == TEXT("dive") ? DiveCues : Course == TEXT("rise") ? RiseCues : Course == TEXT("heave") ? HeaveCues : Course == TEXT("sink") ? SinkCues : Course == TEXT("boost") ? BoostCues : TourCues;
 	const int32 CueCount = Course == TEXT("dive") ? UE_ARRAY_COUNT(DiveCues) : Course == TEXT("rise") ? UE_ARRAY_COUNT(RiseCues)
-		: Course == TEXT("heave") ? UE_ARRAY_COUNT(HeaveCues) : Course == TEXT("sink") ? UE_ARRAY_COUNT(SinkCues) : UE_ARRAY_COUNT(TourCues);
+		: Course == TEXT("heave") ? UE_ARRAY_COUNT(HeaveCues) : Course == TEXT("sink") ? UE_ARRAY_COUNT(SinkCues) : Course == TEXT("boost") ? UE_ARRAY_COUNT(BoostCues) : UE_ARRAY_COUNT(TourCues);
 
 	BotHelmSeconds += DeltaSeconds;
 	while (BotHelmCue < CueCount && BotHelmSeconds >= Cues[BotHelmCue].At)
@@ -344,6 +352,10 @@ void AThalassaCharacter::TickHelmBot(float DeltaSeconds)
 		if (Cue.Press == EPress::Mode)
 		{
 			Helmsman->RequestHelmMode();
+		}
+		if (Cue.Press == EPress::Boost)
+		{
+			Helmsman->RequestHelmBoost();
 		}
 		else if (Cue.Press == EPress::FullStop)
 		{

@@ -34,6 +34,7 @@ void UThalassaHelmComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(UThalassaHelmComponent, Mode);
 	DOREPLIFETIME(UThalassaHelmComponent, Levers);
 	DOREPLIFETIME(UThalassaHelmComponent, bFullStop);
+	DOREPLIFETIME(UThalassaHelmComponent, bTestBoost);
 }
 
 void UThalassaHelmComponent::OnOccupantChanged()
@@ -93,6 +94,16 @@ void UThalassaHelmComponent::ToggleMode(const APawn* From)
 		Mode = Mode == EHelmMode::Precise ? EHelmMode::SetAndGo : EHelmMode::Precise;
 		Commanded = Levers;
 	}
+}
+
+void UThalassaHelmComponent::ToggleTestBoost(const APawn* From)
+{
+#if !UE_BUILD_SHIPPING
+	if (IsOccupant(From))
+	{
+		bTestBoost = !bTestBoost;
+	}
+#endif
 }
 
 void UThalassaHelmComponent::FullStop(const APawn* From)

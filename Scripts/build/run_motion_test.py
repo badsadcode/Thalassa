@@ -43,7 +43,7 @@ def main():
     parser.add_argument("--exe", help="test a packaged build's Thalassa.exe instead of the editor")
     parser.add_argument("--sonar", action="store_true", help="survey with the sonar during the test")
     parser.add_argument("--helm", action="store_true", help="the deck, driven from the helm by the first client instead of the script")
-    parser.add_argument("--helm-course", choices=["tour", "dive", "rise", "cameras", "heave", "sink"], default="tour", help="what the scripted helmsman does")
+    parser.add_argument("--helm-course", choices=["tour", "dive", "rise", "cameras", "heave", "sink", "boost"], default="tour", help="what the scripted helmsman does")
     parser.add_argument("--above-ground", type=float, help="open ocean: start the ship this many metres above the highest ground under its hull")
     parser.add_argument("--ship-at", help="start the ship at X,Y,Z world centimetres")
     parser.add_argument("--deck", action="store_true", help="use the real deck instead of the test rig")

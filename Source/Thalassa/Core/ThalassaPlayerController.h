@@ -33,6 +33,7 @@ public:
 	void SetHelmInput(float Throttle, float Turn, float Dive, float Heave = 0.f);
 	void RequestHelmMode();
 	void RequestHelmFullStop();
+	void RequestHelmBoost();
 
 protected:
 	virtual void BeginPlay() override;
@@ -69,6 +70,9 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerHelmFullStop();
+
+	UFUNCTION(Server, Reliable)
+	void ServerHelmBoost();
 
 	virtual void PlayerTick(float DeltaTime) override;
 

@@ -61,6 +61,11 @@ public:
 	bool TryPressFullStopButton(const APawn* Who);
 
 	bool IsFullStop() const { return bFullStop; }
+
+	/** Test builds only: ten times the speed, for crossing the open ocean while testing. Never in a shipped game. */
+	void ToggleTestBoost(const APawn* From);
+	bool IsTestBoost() const { return bTestBoost; }
+	static constexpr float TestBoostFactor = 10.f;
 	FVector GetFullStopButtonWorldLocation() const;
 
 	EHelmMode GetMode() const { return Mode; }
@@ -78,6 +83,9 @@ private:
 
 	UPROPERTY(Replicated)
 	bool bFullStop = false;
+
+	UPROPERTY(Replicated)
+	bool bTestBoost = false;
 
 	void EngageFullStop();
 

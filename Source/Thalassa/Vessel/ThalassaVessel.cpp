@@ -1004,8 +1004,10 @@ void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
 		return;
 	}
 
-	const float Thrust = Levers.Throttle * (Levers.Throttle >= 0.f ? HelmAheadAccelMS2 : HelmAsternAccelMS2);
-	const float Drag = HelmQuadraticDrag * Speed * FMath::Abs(Speed) + HelmLinearDrag * Speed;
+	// Test boost: ten times the top speed in about the same time, so it still feels like the same heavy ship.
+	const float Boost = Helm->IsTestBoost() ? UThalassaHelmComponent::TestBoostFactor : 1.f;
+	const float Thrust = Boost * Levers.Throttle * (Levers.Throttle >= 0.f ? HelmAheadAccelMS2 : HelmAsternAccelMS2);
+	const float Drag = HelmQuadraticDrag / Boost * Speed * FMath::Abs(Speed) + HelmLinearDrag * Speed;
 	Speed += (Thrust - Drag) * DeltaSeconds;
 	if (Levers.Throttle == 0.f && FMath::Abs(Speed) < 0.02f)
 	{
@@ -1021,8 +1023,8 @@ void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
 	TargetRoll = 0.f;
 
 	// The vertical thrusters: the ship rises or sinks level, slowly, and keeps drifting after you let go.
-	const float TargetHeave = Levers.Heave * HelmMaxHeaveMS;
-	VerticalSpeedCmS = FMath::FInterpConstantTo(VerticalSpeedCmS / 100.f, TargetHeave, DeltaSeconds, HelmHeaveAccelMS2) * 100.f;
+	const float TargetHeave = Levers.Heave * HelmMaxHeaveMS * Boost;
+	VerticalSpeedCmS = FMath::FInterpConstantTo(VerticalSpeedCmS / 100.f, TargetHeave, DeltaSeconds, HelmHeaveAccelMS2 * Boost) * 100.f;
 
 	// At the surface the planes and thrusters cannot lift the ship any further, so it levels off.
 	if (IsSurfaced())

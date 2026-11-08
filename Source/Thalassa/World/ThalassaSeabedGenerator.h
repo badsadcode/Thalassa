@@ -19,7 +19,7 @@ class THALASSA_API FThalassaSeabedGenerator
 {
 public:
 	/** Bump whenever the generator's output changes. Saved worlds record it. */
-	static constexpr int32 Revision = 1;
+	static constexpr int32 Revision = 2; // 2: provinces with their own character, outcrops, a shelf around the start.
 
 	explicit FThalassaSeabedGenerator(uint64 InSeed);
 
@@ -49,6 +49,20 @@ private:
 
 	/** Seamounts: isolated undersea mountains, at most one per lattice cell. Height in metres added. */
 	double Seamounts(double XM, double YM) const;
+
+	/** Small volcanic cones, densely, for volcanic provinces. Height in metres added. */
+	double Cones(double XM, double YM) const;
+
+public:
+	/** What kind of landscape a province is. Each 40 km cell of the ocean picks one from its hash. */
+	enum class EProvince : uint8 { Plains, Hills, Plateaus, Ridges, Canyons, Volcanic, Count };
+
+	/** The province at a point, and how far into it (1 deep inside, 0.5 on the border with the next). */
+	EProvince ProvinceAt(double XM, double YM, EProvince& OutNeighbour, double& OutWeight) const;
+
+	static const TCHAR* ProvinceName(EProvince Province);
+
+private:
 
 	uint64 Seed;
 };
