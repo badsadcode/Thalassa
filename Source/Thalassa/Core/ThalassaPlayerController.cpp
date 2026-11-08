@@ -16,6 +16,7 @@
 #include "Vessel/ThalassaSonarComponent.h"
 #include "Vessel/ThalassaVessel.h"
 #include "World/ThalassaMarineSnow.h"
+#include "AudioMixerBlueprintLibrary.h"
 #include "Misc/App.h"
 
 UInputAction* AThalassaPlayerController::MakeAction(const TCHAR* Name, EInputActionValueType ValueType)
@@ -274,6 +275,29 @@ void AThalassaPlayerController::ServerSelectCamera_Implementation(int32 Step)
 	}
 }
 
+void AThalassaPlayerController::TickAudioRecording(float DeltaTime)
+{
+	float Seconds = 0.f;
+	FString Name;
+	if (AudioRecordStage == 2 || !ThalassaTestConfig::GetRecordAudio(Seconds, Name))
+	{
+		return;
+	}
+	AudioRecordClock += DeltaTime;
+	if (AudioRecordStage == 0 && AudioRecordClock > 5.f)
+	{
+		UAudioMixerBlueprintLibrary::StartRecordingOutput(this, Seconds);
+		AudioRecordStage = 1;
+		UE_LOG(LogTemp, Display, TEXT("THALASSA: recording %.0f s of sound"), Seconds);
+	}
+	else if (AudioRecordStage == 1 && AudioRecordClock > 5.f + Seconds)
+	{
+		UAudioMixerBlueprintLibrary::StopRecordingOutput(this, EAudioRecordingExportType::WavFile, Name, FString());
+		AudioRecordStage = 2;
+		UE_LOG(LogTemp, Display, TEXT("THALASSA: saved sound recording %s"), *Name);
+	}
+}
+
 void AThalassaPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
@@ -282,6 +306,7 @@ void AThalassaPlayerController::PlayerTick(float DeltaTime)
 	{
 		return;
 	}
+	TickAudioRecording(DeltaTime);
 
 	// Scripted helmsmen send their own input.
 	const bool bAtHelm = IsAtHelm();

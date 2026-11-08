@@ -86,5 +86,10 @@ private:
 	FVector SentHelmInput = FVector::ZeroVector;
 	bool bWasAtHelm = false;
 	int32 LastCameraStep = 0;
+
+	/** Test recording of this machine's sound output (-ThalassaRecordAudio). */
+	void TickAudioRecording(float DeltaTime);
+	float AudioRecordClock = 0.f;
+	int32 AudioRecordStage = 0; // 0 waiting, 1 recording, 2 done.
 	bool bStationViewExpanded = false;
 };

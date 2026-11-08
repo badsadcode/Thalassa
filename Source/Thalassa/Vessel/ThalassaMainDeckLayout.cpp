@@ -214,6 +214,9 @@ FVesselLayout BuildMainDeckLayout()
 		B.Box(FVector(Table.X - 200.f, Table.Y - 80.f, -50.f), FVector(Table.X + 200.f, Table.Y + 80.f, 25.f), HullColor);
 	}
 
+	// The machinery is heard from the middle of the engineering hall.
+	Layout.MachineryLocation = FVector(-11250.f, 0.f, -150.f);
+
 	// The holotable: in the sunken centre, between the mess tables, where the crew gather. See docs/HOLOTABLE.md.
 	Layout.bHasHoloTable = true;
 	Layout.HoloTableLocation = FVector(-1950.f, -450.f, 40.f);

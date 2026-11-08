@@ -182,6 +182,17 @@ namespace ThalassaTestConfig
 		return Value;
 	}
 
+	bool GetRecordAudio(float& OutSeconds, FString& OutName)
+	{
+		if (!FParse::Value(FCommandLine::Get(), TEXT("ThalassaRecordAudio="), OutSeconds))
+		{
+			return false;
+		}
+		OutName = TEXT("ThalassaAudio");
+		FParse::Value(FCommandLine::Get(), TEXT("ThalassaRecordAudioName="), OutName);
+		return true;
+	}
+
 	float LookPitch()
 	{
 		float Value = 0.f;

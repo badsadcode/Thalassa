@@ -72,6 +72,9 @@ struct FVesselLayout
 	float CameraGridSizeCm = 0.f;
 	TArray<FHullCamera> HullCameras;
 
+	/** Where the engine room's machinery is heard from. */
+	FVector MachineryLocation = FVector(-1500.f, 0.f, 150.f);
+
 	/** The holotable: the centre of its top. No table means none. */
 	bool bHasHoloTable = false;
 	FVector HoloTableLocation = FVector::ZeroVector;

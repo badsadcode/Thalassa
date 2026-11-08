@@ -50,6 +50,7 @@ def main():
     parser.add_argument("--no-jump", action="store_true", help="walkers never jump")
     parser.add_argument("--sprint", action="store_true", help="walkers sprint everywhere")
     parser.add_argument("--slide", action="store_true", help="walkers sprint, and slide every few seconds")
+    parser.add_argument("--record-audio", type=float, help="the host plays with sound on and records this many seconds of it to Saved/BouncedWavFiles/<name>.wav")
     parser.add_argument("--survey-slot", help="the host loads and saves the sonar chart in this save slot")
     parser.add_argument("--vessel", help="ship Blueprint class to spawn instead of the configured one, e.g. /Game/Ship/BP_X.BP_X_C")
     parser.add_argument("--art-probe", action="store_true", help="attach a solid crate to the ship in the walkers' path")
@@ -108,11 +109,17 @@ def main():
 
     def launch(role, url, extra):
         target = [args.exe] if args.exe else [str(editor), str(project)]
-        command = [*target, url, *common, *extra,
+        flags = [f for f in common if not (args.record_audio and role == "host" and f == "-nosound")]
+        command = [*target, url, *flags, *extra,
                    f"-ThalassaTelemetry={out / (role + '.csv')}", f"-abslog={out / (role + '.log')}"]
         return subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    processes = {"host": launch("host", f"{MAP}?listen?port={args.port}", [
+    host_extra = []
+    if args.record_audio:
+        # A headless game never has focus, and Unreal mutes unfocused games by default.
+        host_extra = [f"-ThalassaRecordAudio={args.record_audio}", f"-ThalassaRecordAudioName={args.name}",
+                      "-ini:Engine:[Audio]:UnfocusedVolumeMultiplier=1.0"]
+    processes = {"host": launch("host", f"{MAP}?listen?port={args.port}", [*host_extra,
         f"-ThalassaExpectPlayers={args.clients + 1}", f"-port={args.port}",
         *([] if args.solo_walker or args.no_walkers else ["-ThalassaBot"]),
         *(["-ThalassaDiver"] if args.eva_all else [])])}

@@ -11,6 +11,9 @@
 #include "Vessel/ThalassaVesselLayout.h"
 #include "Vessel/ThalassaShipMarkers.h"
 #include "Vessel/ThalassaHoloTable.h"
+#include "Vessel/ThalassaShipAudio.h"
+#include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -424,6 +427,15 @@ AThalassaVessel::AThalassaVessel()
 		HoloTable->Points = HoloPoints;
 	}
 
+	// Sound: the engine room, the hull around each listener, and the hull striking things.
+	MachinerySound = CreateDefaultSubobject<UThalassaMachineryComponent>(TEXT("MachinerySound"));
+	MachinerySound->SetupAttachment(ShipRoot);
+	MachinerySound->SetRelativeLocation(Layout.MachineryLocation);
+	HullAmbience = CreateDefaultSubobject<UThalassaHullAmbienceComponent>(TEXT("HullAmbience"));
+	HullAmbience->SetupAttachment(ShipRoot);
+	ImpactSound = CreateDefaultSubobject<UThalassaImpactComponent>(TEXT("ImpactSound"));
+	ImpactSound->SetupAttachment(ShipRoot);
+
 	Sonar = CreateDefaultSubobject<UThalassaSonarComponent>(TEXT("Sonar"));
 	Helm = CreateDefaultSubobject<UThalassaHelmComponent>(TEXT("Helm"));
 	Helm->SeatLocal = Layout.HelmSeatLocation;
@@ -456,6 +468,8 @@ AThalassaVessel::AThalassaVessel()
 			return Screen;
 		};
 		CameraScreen = MakeCameraScreen(TEXT("CameraScreen"), Layout.CameraScreenLocation, Layout.CameraScreenSizeCm, false);
+		CameraBleep = CreateDefaultSubobject<UThalassaBleepComponent>(TEXT("CameraBleep"));
+		CameraBleep->SetupAttachment(CameraScreen);
 		CameraGrid = MakeCameraScreen(TEXT("CameraGrid"), Layout.CameraGridLocation, Layout.CameraGridSizeCm, true);
 
 		int32 Index = 0;
@@ -483,6 +497,8 @@ AThalassaVessel::AThalassaVessel()
 		HelmScreen->SetRelativeLocation(Layout.HelmScreenLocation);
 		HelmScreen->SetRelativeRotation(UThalassaConsoleScreenComponent::FacingRotation(Layout.HelmScreenFacing));
 		HelmScreen->SetRelativeScale3D(FVector(Layout.HelmScreenSizeCm / 100.f));
+		HelmBleep = CreateDefaultSubobject<UThalassaBleepComponent>(TEXT("HelmBleep"));
+		HelmBleep->SetupAttachment(HelmScreen);
 
 		HelmLeverPivot = CreateDefaultSubobject<USceneComponent>(TEXT("HelmLeverPivot"));
 		HelmLeverPivot->SetupAttachment(ShipRoot);
@@ -519,6 +535,8 @@ AThalassaVessel::AThalassaVessel()
 		SonarPing = CreateDefaultSubobject<UThalassaSonarPingComponent>(TEXT("SonarPing"));
 		SonarPing->SetupAttachment(SonarScreen);
 		SonarScreen->PingSound = SonarPing;
+		SonarBleep = CreateDefaultSubobject<UThalassaBleepComponent>(TEXT("SonarBleep"));
+		SonarBleep->SetupAttachment(SonarScreen);
 	}
 
 	ConsoleText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("ConsoleText"));
@@ -775,7 +793,79 @@ void AThalassaVessel::Tick(float DeltaSeconds)
 
 	TickAirlockVisuals(DeltaSeconds);
 	TickHelmVisuals(DeltaSeconds);
+	TickSound(DeltaSeconds);
 	UpdateConsoleText(DeltaSeconds);
+}
+
+void AThalassaVessel::TickSound(float DeltaSeconds)
+{
+	if (GetNetMode() == NM_DedicatedServer || !HullAmbience)
+	{
+		return;
+	}
+
+	// The hull as this machine's player hears it: inside or out in the water, and how the ship is moving.
+	float Inside = 1.f;
+	if (const APlayerController* Local = UGameplayStatics::GetPlayerController(this, 0))
+	{
+		if (const APawn* Pawn = Local->GetPawn())
+		{
+			Inside = IsWaterAt(Pawn->GetActorLocation()) ? 0.f : 1.f;
+		}
+	}
+	HullAmbience->SetState(Inside, GetSpeedMetersPerSecond(), GetDepthMeters(), FMath::RadiansToDegrees(Snapshot.RotationRate.Size()));
+	if (MachinerySound)
+	{
+		MachinerySound->SetLoad(Helm ? FMath::Max(FMath::Abs(Helm->GetLevers().Throttle), GetSpeedMetersPerSecond() / 14.f) : 0.f);
+	}
+
+	// Events, noticed as changes in replicated state. The first look only remembers, so joining is silent.
+	const auto Changed = [](int32& Heard, int32 Now)
+	{
+		const bool bChanged = Heard >= 0 && Heard != Now;
+		Heard = Now;
+		return bChanged;
+	};
+	const int32 Collisions = GetCollisionCount();
+	if (HeardCollisions >= 0 && Collisions > HeardCollisions && ImpactSound)
+	{
+		ImpactSound->Strike();
+	}
+	HeardCollisions = Collisions;
+
+	if (Helm && HelmBleep)
+	{
+		const int32 Occupied = Helm->GetOccupant() ? 1 : 0;
+		if (Changed(HeardHelmOccupied, Occupied))
+		{
+			HelmBleep->Bleep(Occupied ? EThalassaBleep::On : EThalassaBleep::Off);
+		}
+		if (Changed(HeardHelmMode, static_cast<int32>(Helm->GetMode())))
+		{
+			HelmBleep->Bleep(EThalassaBleep::Click);
+		}
+		const int32 FullStop = Helm->IsFullStop() ? 1 : 0;
+		if (Changed(HeardFullStop, FullStop) && FullStop)
+		{
+			HelmBleep->Bleep(EThalassaBleep::Alarm);
+		}
+	}
+	if (CameraStation && CameraBleep)
+	{
+		const int32 Occupied = CameraStation->GetOccupant() ? 1 : 0;
+		if (Changed(HeardCameraOccupied, Occupied))
+		{
+			CameraBleep->Bleep(Occupied ? EThalassaBleep::On : EThalassaBleep::Off);
+		}
+	}
+	if (Sonar && SonarBleep)
+	{
+		const int32 On = Sonar->IsSurveying() ? 1 : 0;
+		if (Changed(HeardSonar, On))
+		{
+			SonarBleep->Bleep(On ? EThalassaBleep::On : EThalassaBleep::Off);
+		}
+	}
 }
 
 void AThalassaVessel::StartProfile()

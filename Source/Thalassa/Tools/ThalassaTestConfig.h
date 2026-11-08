@@ -86,6 +86,12 @@ namespace ThalassaTestConfig
 	/** -ThalassaLookYaw=degrees: initial view direction relative to the ship, for screenshots. */
 	float LookYaw();
 
+	/**
+	 * -ThalassaRecordAudio=<seconds> [-ThalassaRecordAudioName=<file>]: record this process's sound output to a
+	 * WAV in Saved/BouncedWavFiles, starting 5 s in. For checking sounds without hearing them.
+	 */
+	bool GetRecordAudio(float& OutSeconds, FString& OutName);
+
 	/** -ThalassaLookPitch=degrees: initial view pitch, up positive, for screenshots. */
 	float LookPitch();
 

@@ -24,6 +24,10 @@ class UThalassaSpawnPointComponent;
 class UThalassaStationSpotComponent;
 class USpotLightComponent;
 class UThalassaHoloTableComponent;
+class UThalassaMachineryComponent;
+class UThalassaHullAmbienceComponent;
+class UThalassaBleepComponent;
+class UThalassaImpactComponent;
 class UInstancedStaticMeshComponent;
 
 /** A box on the ship, in ship coordinates, read from a marker component. It may be turned. */
@@ -211,6 +215,9 @@ private:
 	/** True if the hull, posed like this, would be inside the seabed or anything else in the world. */
 	bool IsHullBlocked(const FVector& Location, const FQuat& Rotation) const;
 	void TickHelmVisuals(float DeltaSeconds);
+
+	/** Each machine plays its own sounds from replicated state: no sound is replicated. See docs/SOUND.md. */
+	void TickSound(float DeltaSeconds);
 	void UpdateClockFromSnapshot();
 	void GetExtrapolatedPose(double Time, FVector& OutPosition, FQuat& OutRotation) const;
 	void UpdateConsoleText(float DeltaSeconds);
@@ -322,6 +329,32 @@ private:
 	/** The airlock: move this and its doors, water, panel and chamber move with it. Its walls are greybox. */
 	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
 	TObjectPtr<USceneComponent> Airlock;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Sound")
+	TObjectPtr<UThalassaMachineryComponent> MachinerySound;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Sound")
+	TObjectPtr<UThalassaHullAmbienceComponent> HullAmbience;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Sound")
+	TObjectPtr<UThalassaImpactComponent> ImpactSound;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Sound")
+	TObjectPtr<UThalassaBleepComponent> HelmBleep;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Sound")
+	TObjectPtr<UThalassaBleepComponent> CameraBleep;
+
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Sound")
+	TObjectPtr<UThalassaBleepComponent> SonarBleep;
+
+	// What the sounds last saw, to notice changes: -1 means not seen yet, so nothing plays on joining.
+	int32 HeardCollisions = -1;
+	int32 HeardHelmOccupied = -1;
+	int32 HeardCameraOccupied = -1;
+	int32 HeardHelmMode = -1;
+	int32 HeardFullStop = -1;
+	int32 HeardSonar = -1;
 
 	/** The holotable in the mess: a hologram of the charted seabed. Move it in the Blueprint to move the table. */
 	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
