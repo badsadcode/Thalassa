@@ -84,6 +84,12 @@ private:
 	void SyncDense();
 	void BuildLocalChart();
 
+	/**
+	 * Which world a chart belongs to: the map's name and the seabed's generation. A saved chart from any other
+	 * world is not loaded, or the old seabed would be drawn over the new one.
+	 */
+	FString GetWorldStamp() const;
+
 	/** Server: the save slot to use, or empty for none. Real play uses one; tests only if asked. */
 	FString GetSaveSlot() const;
 	void LoadSurvey();

@@ -177,6 +177,8 @@ namespace ThalassaVesselLayout
 	const float HelmFullSteerageMS = 6.f;      // The rudder needs water flowing past it to bite,
 	const float HelmMinSteerage = 0.15f;       // but a little turning is possible at rest.
 	const float HelmMaxPitchDeg = 12.f;
+	const float HelmMaxHeaveMS = 1.5f;        // Vertical thrusters at full: the ship rises or sinks level.
+	const float HelmHeaveAccelMS2 = 0.12f;    // Heavy: about 12 s to full vertical speed, and a long drift after.
 	const float HelmLeverSwingDeg = 35.f;
 	const float HelmTestSeconds = 160.f;
 
@@ -994,6 +996,7 @@ void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
 	{
 		// Engines astern, rudder and planes against the motion: the ship stops where it is and stays there.
 		SpeedCmS = FMath::FInterpConstantTo(Speed, 0.f, DeltaSeconds, FullStopDecelMS2) * 100.f;
+		VerticalSpeedCmS = FMath::FInterpConstantTo(VerticalSpeedCmS / 100.f, 0.f, DeltaSeconds, FullStopDecelMS2) * 100.f;
 		TargetYawRate = 0.f;
 		CurrentRate.Yaw = FMath::FInterpConstantTo(static_cast<float>(CurrentRate.Yaw), 0.f, DeltaSeconds, HelmYawAccelDegS2 * 2.f);
 		TargetPitch = 0.f;
@@ -1017,10 +1020,15 @@ void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
 	TargetPitch = Levers.Planes * HelmMaxPitchDeg;
 	TargetRoll = 0.f;
 
-	// At the surface the planes cannot lift the ship any further, so it levels off.
+	// The vertical thrusters: the ship rises or sinks level, slowly, and keeps drifting after you let go.
+	const float TargetHeave = Levers.Heave * HelmMaxHeaveMS;
+	VerticalSpeedCmS = FMath::FInterpConstantTo(VerticalSpeedCmS / 100.f, TargetHeave, DeltaSeconds, HelmHeaveAccelMS2) * 100.f;
+
+	// At the surface the planes and thrusters cannot lift the ship any further, so it levels off.
 	if (IsSurfaced())
 	{
 		TargetPitch = FMath::Min(TargetPitch, 0.f);
+		VerticalSpeedCmS = FMath::Min(VerticalSpeedCmS, 0.f);
 	}
 }
 
@@ -1197,7 +1205,7 @@ void AThalassaVessel::TickServer(float DeltaSeconds)
 		bHit = true;
 	}
 
-	FVector NewPosition = OldPosition + PoseRotation.Vector() * SpeedCmS * DeltaSeconds;
+	FVector NewPosition = OldPosition + (PoseRotation.Vector() * SpeedCmS + FVector::UpVector * VerticalSpeedCmS) * DeltaSeconds;
 	if (bConstrained)
 	{
 		NewPosition = ConstrainMove(OldPosition, NewPosition, PoseRotation.Quaternion(), bHit);
@@ -1209,6 +1217,10 @@ void AThalassaVessel::TickServer(float DeltaSeconds)
 		++CollisionCount;
 		LastCollisionTime = GetWorld()->GetTimeSeconds();
 		UE_LOG(LogTemp, Display, TEXT("SHIPCOLLISION %d at %s depth %.1f m"), CollisionCount, *NewPosition.ToString(), -NewPosition.Z / 100.0);
+	}
+	if (bHit)
+	{
+		VerticalSpeedCmS = 0.f; // Pressed against rock or the surface: the drift stops.
 	}
 	bTouching = bHit;
 	const FVector Velocity = DeltaSeconds > 0.f ? (NewPosition - OldPosition) / DeltaSeconds : FVector::ZeroVector;

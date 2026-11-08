@@ -62,6 +62,11 @@ void AThalassaPlayerController::SetupInputComponent()
 	MapAxisKey(SwimVertical, EKeys::SpaceBar, false, false);
 	MapAxisKey(SwimVertical, EKeys::C, true, false);
 
+	// At the helm, Space and C are the vertical thrusters, and Q and Z tip the bow up and down with the planes.
+	UInputAction* HelmPlanes = MakeAction(TEXT("HelmPlanes"), EInputActionValueType::Axis1D);
+	MapAxisKey(HelmPlanes, EKeys::Q, false, false);
+	MapAxisKey(HelmPlanes, EKeys::Z, true, false);
+
 	UInputAction* InteractAction = MakeAction(TEXT("InteractAction"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(InteractAction, EKeys::E);
 
@@ -89,6 +94,8 @@ void AThalassaPlayerController::SetupInputComponent()
 	Input->BindAction(Look, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnLook);
 	Input->BindAction(SwimVertical, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnSwimVertical);
 	Input->BindAction(SwimVertical, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnSwimVertical);
+	Input->BindAction(HelmPlanes, ETriggerEvent::Triggered, this, &AThalassaPlayerController::OnHelmPlanes);
+	Input->BindAction(HelmPlanes, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnHelmPlanes);
 	Input->BindAction(JumpAction, ETriggerEvent::Started, this, &AThalassaPlayerController::OnJumpStart);
 	Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnJumpStop);
 	Input->BindAction(InteractAction, ETriggerEvent::Started, this, &AThalassaPlayerController::OnInteract);
@@ -175,6 +182,11 @@ void AThalassaPlayerController::OnLook(const FInputActionValue& Value)
 	const FVector2D Axis = Value.Get<FVector2D>();
 	AddYawInput(Axis.X);
 	AddPitchInput(-Axis.Y);
+}
+
+void AThalassaPlayerController::OnHelmPlanes(const FInputActionValue& Value)
+{
+	PlanesAxis = Value.Get<float>();
 }
 
 void AThalassaPlayerController::OnSwimVertical(const FInputActionValue& Value)
@@ -312,22 +324,22 @@ void AThalassaPlayerController::PlayerTick(float DeltaTime)
 	const bool bAtHelm = IsAtHelm();
 	if (bAtHelm && !ThalassaTestConfig::IsHelmBot())
 	{
-		SetHelmInput(MoveAxis.Y, MoveAxis.X, VerticalAxis);
+		SetHelmInput(MoveAxis.Y, MoveAxis.X, PlanesAxis, VerticalAxis);
 	}
 	else if (!bAtHelm && bWasAtHelm)
 	{
-		SentHelmInput = FVector::ZeroVector; // The server forgets it too when you stand up.
+		SentHelmInput = FVector4(0, 0, 0, 0); // The server forgets it too when you stand up.
 	}
 	bWasAtHelm = bAtHelm;
 }
 
-void AThalassaPlayerController::SetHelmInput(float Throttle, float Turn, float Dive)
+void AThalassaPlayerController::SetHelmInput(float Throttle, float Turn, float Dive, float Heave)
 {
-	const FVector Wanted(Throttle, Turn, Dive);
-	if (!Wanted.Equals(SentHelmInput, 0.01f))
+	const FVector4 Wanted(Throttle, Turn, Dive, Heave);
+	if (!(Wanted - SentHelmInput).IsNearlyZero3(0.01f) || !FMath::IsNearlyEqual(Wanted.W, SentHelmInput.W, 0.01f))
 	{
 		SentHelmInput = Wanted;
-		ServerSetHelmInput(Throttle, Turn, Dive);
+		ServerSetHelmInput(Throttle, Turn, Dive, Heave);
 	}
 }
 
@@ -365,12 +377,12 @@ void AThalassaPlayerController::ServerToggleSonar_Implementation()
 	}
 }
 
-void AThalassaPlayerController::ServerSetHelmInput_Implementation(float Throttle, float Turn, float Dive)
+void AThalassaPlayerController::ServerSetHelmInput_Implementation(float Throttle, float Turn, float Dive, float Heave)
 {
 	const AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld());
 	if (Vessel && Vessel->GetHelm())
 	{
-		Vessel->GetHelm()->SetInput(GetPawn(), Throttle, Turn, Dive);
+		Vessel->GetHelm()->SetInput(GetPawn(), Throttle, Turn, Dive, Heave);
 	}
 }
 

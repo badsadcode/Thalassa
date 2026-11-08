@@ -22,7 +22,7 @@ Both ran the full manoeuvre profile with walkers aboard. Walking was unaffected.
 
 ## Saving
 
-The host saves the chart every 30 seconds and when the game closes, and loads it on start, so it reaches everyone who joins afterwards. It lives in `Saved/SaveGames/ShipSurvey.sav` in the project, or in the packaged game's folder. Delete that file to start a fresh chart. The file records its version and grid, and a chart from a different grid is not loaded.
+The host saves the chart every 30 seconds and when the game closes, and loads it on start, so it reaches everyone who joins afterwards. It lives in `Saved/SaveGames/ShipSurvey.sav` in the project, or in the packaged game's folder. Delete that file to start a fresh chart. The file records its version, its grid and its **world**: the map's name and a seabed generation number (`ThalassaSonar::SeabedGeneration`). A chart from another grid or another world is not loaded. That's how a chart surveyed over the old pillar grid ended up drawn over the new seabed as rows of squares, on 2026-11-08. **Bump `SeabedGeneration` whenever the seabed, rocks or anything else solid out there changes shape.**
 
 Tests never touch that file: with telemetry on, nothing is saved unless a test names its own slot. `python Scripts/build/test_survey_persistence.py` checks the whole loop. A game surveyed 36 cells and quit. A new game, with the sonar off, loaded the same 36 cells, and a client who joined afterwards received an identical chart.
 

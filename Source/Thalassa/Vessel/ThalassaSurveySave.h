@@ -6,8 +6,8 @@
 #include "ThalassaSurveySave.generated.h"
 
 /**
- * The ship's sonar chart on disk. Versioned, and stamped with the grid it was made on, so a chart
- * from a different grid is never loaded into the wrong cells.
+ * The ship's sonar chart on disk. Versioned, and stamped with the grid and the world it was made in, so
+ * a chart is never loaded into the wrong cells or over a different seabed.
  */
 UCLASS()
 class THALASSA_API UThalassaSurveySave : public USaveGame
@@ -15,7 +15,7 @@ class THALASSA_API UThalassaSurveySave : public USaveGame
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 CurrentVersion = 1;
+	static constexpr int32 CurrentVersion = 2; // 2: added World.
 
 	UPROPERTY()
 	int32 Version = CurrentVersion;
@@ -25,6 +25,10 @@ public:
 
 	UPROPERTY()
 	float CellSizeCm = 0.f;
+
+	/** The map and seabed generation the chart was surveyed in. See UThalassaSonarComponent::GetWorldStamp. */
+	UPROPERTY()
+	FString World;
 
 	UPROPERTY()
 	TArray<FSonarCell> Cells;

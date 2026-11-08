@@ -87,6 +87,7 @@ namespace ThalassaHelmDisplay
 			FString::Printf(TEXT("THROTTLE  %s"), *Percent(Levers.Throttle, TEXT("ahead"), TEXT("astern"))),
 			FString::Printf(TEXT("RUDDER    %s"), *Percent(Levers.Rudder, TEXT("starboard"), TEXT("port"))),
 			FString::Printf(TEXT("PLANES    %s"), *Percent(Levers.Planes, TEXT("rise"), TEXT("dive"))),
+			FString::Printf(TEXT("THRUST    %s"), *Percent(Levers.Heave, TEXT("up"), TEXT("down"))),
 			TEXT(""),
 			FString::Printf(TEXT("SPEED     %.1f m/s  %.0f kn"), Speed, Speed * 1.944f),
 			FString::Printf(TEXT("HEADING   %03.0f"), FRotator::ClampAxis(Vessel.GetActorRotation().Yaw)),

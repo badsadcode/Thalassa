@@ -61,6 +61,24 @@ Claude's notes:
 
 Next for life: a brighter biome with fluorescent plants and animals; real current direction per region for the sway; creatures, starting with sound and sonar contacts; sediment clouds.
 
+## A much bigger ocean (owner's direction, 2026-11-08)
+
+The 6 km test region feels small, and the real ocean must be much bigger. The owner's other project, Thornwake (Godot, C#, `badsadcode/Thornwake_Rewrite`), already generates and streams worlds up to 4,096 × 4,096 km. Unreal can hold that: Large World Coordinates give double precision far beyond it. The streaming has to be ours, though: World Partition streams authored levels, and nobody authors 16 million km². The plan, from what Thornwake shows works:
+
+- **Two tiers.** A coarse whole-ocean plan built once from the seed (basins, ridges, trenches, seamounts, regions and biomes, as rasters and vector features). Then a pure, thread-safe `SampleSeabed(x, y, minWavelength)` that gives the exact height anywhere, in doubles. Every machine builds the identical ocean from the seed alone.
+- **Tiles in nested rings** around each viewer: 64 m tiles near, doubling outward. Distant tiles leave out wavelengths finer than their vertex spacing, rather than resampling. Skirts hide seams. Tiles are built on worker threads and committed under a per-frame time budget, and old tiles stay until their replacements exist. Underwater visibility is short, so far fewer rings are needed than on land.
+- **Placement on world-aligned lattice cells.** Each kind of rock, formation or life has its own cell size. A cell's hash decides whether something is there, where, and how big, against the region's rules. An object's identity is its cell, so nothing moves when detail changes. Today's placement rules in `create_test_map.py` become this per-cell generator, drawn as instances.
+- **Determinism is a feature to protect.** Deterministic maths (no platform `sin`/`exp`), integer hashing, a generator revision number, and frozen fingerprint tests.
+- **Saves hold the seed and changes only.**
+- **Points of interest are authored and blended in.** Stations, wrecks and rare landmark formations are placed by hand or by rules, and the seabed generator shapes itself around them (foundations flattened, sediment piled against a wreck). This is the same idea the owner has for Thornwake's towns.
+
+What Thalassa needs that Thornwake doesn't:
+- **The host generates collision around every player and vessel,** not only its own player: divers, EVA craft and the ship can be kilometres apart. Collision comes from one fixed detail level, so host and clients agree, with an analytic height query for anything far away.
+- **The sonar asks the height function directly,** so it can chart far beyond the loaded tiles. The chart becomes pages keyed by tile, not one 6.4 km grid.
+- **Overhangs and caves** don't fit a height function. They need placed meshes, or a separate volume generator later.
+
+This is a project of its own, worth doing before the world fills with hand-placed content. Thornwake's `Game/WorldGen/` and `Game/Rewrite/WorldStreamer.cs` are the reference.
+
 ## The hard technical truths
 
 1. **A heightmap can't make most of the vision.** Arches, overhangs, caves, mushroom rocks, stacked slabs and cathedral caverns all fold back over themselves, and a heightfield can't. The terrain stays a heightfield for the broad shape (plains, basins, canyons, seamounts, escarpments). Everything vertical or hollow is **meshes placed on it**: Nanite static meshes, any number of triangles, sunk into the ground so the joins don't show.

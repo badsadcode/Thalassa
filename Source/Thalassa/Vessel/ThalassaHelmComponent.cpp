@@ -10,10 +10,12 @@ namespace ThalassaHelm
 	constexpr float ThrottleLeverPerSecond = 0.8f;
 	constexpr float RudderLeverPerSecond = 1.2f;
 	constexpr float PlanesLeverPerSecond = 1.f;
+	constexpr float HeaveLeverPerSecond = 1.f;
 
 	// In set-and-go, holding a key moves the setting this fast.
 	constexpr float SetThrottlePerSecond = 0.4f;
 	constexpr float SetPlanesPerSecond = 0.5f;
+	constexpr float SetHeavePerSecond = 0.5f;
 
 	// How close you must stand to press the full stop button.
 	constexpr float ButtonReachCm = 130.f;
@@ -40,17 +42,18 @@ void UThalassaHelmComponent::OnOccupantChanged()
 	Input = FHelmLevers();
 }
 
-void UThalassaHelmComponent::SetInput(const APawn* From, float Throttle, float Turn, float Dive)
+void UThalassaHelmComponent::SetInput(const APawn* From, float Throttle, float Turn, float Dive, float Heave)
 {
 	if (IsOccupant(From))
 	{
 		Input.Throttle = FMath::Clamp(Throttle, -1.f, 1.f);
 		Input.Rudder = FMath::Clamp(Turn, -1.f, 1.f);
 		Input.Planes = FMath::Clamp(Dive, -1.f, 1.f);
+		Input.Heave = FMath::Clamp(Heave, -1.f, 1.f);
 
 		// Taking the controls again is what ends a full stop.
 		using namespace ThalassaHelm;
-		if (bFullStop && (FMath::Abs(Input.Throttle) > ResumeInput || FMath::Abs(Input.Rudder) > ResumeInput || FMath::Abs(Input.Planes) > ResumeInput))
+		if (bFullStop && (FMath::Abs(Input.Throttle) > ResumeInput || FMath::Abs(Input.Rudder) > ResumeInput || FMath::Abs(Input.Planes) > ResumeInput || FMath::Abs(Input.Heave) > ResumeInput))
 		{
 			bFullStop = false;
 			Commanded = FHelmLevers();
@@ -125,10 +128,12 @@ void UThalassaHelmComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 	{
 		Commanded.Throttle = FMath::Clamp(Commanded.Throttle + Input.Throttle * SetThrottlePerSecond * DeltaTime, -1.f, 1.f);
 		Commanded.Planes = FMath::Clamp(Commanded.Planes + Input.Planes * SetPlanesPerSecond * DeltaTime, -1.f, 1.f);
+		Commanded.Heave = FMath::Clamp(Commanded.Heave + Input.Heave * SetHeavePerSecond * DeltaTime, -1.f, 1.f);
 		Commanded.Rudder = Input.Rudder; // The rudder always centres itself when let go.
 	}
 
 	Levers.Throttle = FMath::FInterpConstantTo(Levers.Throttle, Commanded.Throttle, DeltaTime, ThrottleLeverPerSecond);
 	Levers.Rudder = FMath::FInterpConstantTo(Levers.Rudder, Commanded.Rudder, DeltaTime, RudderLeverPerSecond);
 	Levers.Planes = FMath::FInterpConstantTo(Levers.Planes, Commanded.Planes, DeltaTime, PlanesLeverPerSecond);
+	Levers.Heave = FMath::FInterpConstantTo(Levers.Heave, Commanded.Heave, DeltaTime, HeaveLeverPerSecond);
 }

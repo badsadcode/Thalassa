@@ -10,7 +10,8 @@ Walk to the middle of the console by the bridge's forward window and press **E**
 |---|---|
 | W / S | Throttle ahead / astern |
 | A / D | Rudder port / starboard |
-| Space / C | Planes: rise / dive |
+| Space / C | Vertical thrusters: up / down. The ship rises or sinks level. |
+| Q / Z | Planes: bow up (rise) / bow down (dive) |
 | R | Switch between precise and set-and-go |
 | X | Full stop: engines cut, and the ship brakes to a standstill and holds there |
 | E | Stand up |
@@ -18,7 +19,7 @@ Walk to the middle of the console by the bridge's forward window and press **E**
 Mouse look still works. Only one person can be at the helm, and anyone pushed more than 3 m from it, or who disconnects, leaves it.
 
 - **Precise:** the ship answers only while you hold a key. Let go, and the levers return to neutral.
-- **Set and go:** holding W or S moves the throttle up or down, and it stays where you leave it. Space and C do the same for the planes. The rudder always centres itself when you let go, in both modes.
+- **Set and go:** holding W or S moves the throttle up or down, and it stays where you leave it. Space and C do the same for the vertical thrusters, and Q and Z for the planes. The rudder always centres itself when you let go, in both modes.
 
 Switching mode never lurches the ship: the new mode starts from wherever the levers are.
 
@@ -41,6 +42,7 @@ The ship is heavy, though this isn't a submarine simulator. Thrust works against
 - Astern is weaker, topping out around 5 m/s.
 - The rudder needs water flowing past it: full turning rate, 4 degrees per second, from 6 m/s. Below that it fades, down to 15% at rest. Going astern, the rudder turns the other way.
 - The planes pitch the ship up to 12 degrees, so the ship changes depth by moving along its own nose.
+- **Vertical thrusters (2026-11-08, owner's request)** lift or sink the ship level, without tipping it. They reach 1.5 m/s after about 12 s, and the ship keeps drifting for a while after you let go. They can't lift the ship past the surface, contact with rock or the surface stops the drift, and full stop brings them to rest. The helm screen shows THRUST.
 
 The numbers are constants at the top of `ThalassaVessel.cpp`, gathered so upgrades can change them later. The scripted motion test still uses its own fixed profile, so older results stay comparable.
 
@@ -77,6 +79,8 @@ The limits, at LAN ping:
 | `helm_rise`, starting at 60 m | Full ahead, full rise. The ship reached 15 m after 40 seconds, levelled off and stayed there. No collisions, no corrections. |
 
 Two faults were found and fixed along the way. The collision count went up every frame while the hull stayed pressed against the seabed, and a pinned ship shuddered by 4 cm twice a second, creeping in and being pulled back out. A frame confirmed the helm screen shows SURFACED. The COLLISION warning has not been seen in a frame. Frames confirmed the screen is the right way up and the lever is visible. The front of the bridge was too dark to see either, so it got its own lamp.
+
+| `heave` (2026-11-08) | Zero throttle. Thrusters down for 25 s, let go, thrusters up for 30 s, let go. The ship sank from 200 m to 237.5 m and rose to 192.5 m, reaching 1.5 m/s and drifting on after each release, with the pitch at exactly 0.0 throughout. No corrections for the walkers aboard. |
 
 ## Not done yet
 

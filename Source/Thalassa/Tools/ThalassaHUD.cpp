@@ -117,7 +117,7 @@ void AThalassaHUD::DrawHUD()
 		const float Size = FMath::Min(Canvas->ClipX, Canvas->ClipY) * 0.42f;
 		const FVector2D TopLeft(40.f, Canvas->ClipY - Size - 70.f);
 		ThalassaHelmDisplay::Draw(Canvas, TopLeft, Size, *Vessel);
-		DrawText(TEXT("AT THE HELM   W/S throttle   A/D rudder   SPACE/C planes   R precise or set-and-go   X full stop   E stand up"),
+		DrawText(TEXT("AT THE HELM   W/S throttle   A/D rudder   SPACE/C thrusters up/down   Q/Z planes   R precise or set-and-go   X full stop   E stand up"),
 			FLinearColor(0.91f, 0.73f, 0.45f), TopLeft.X, TopLeft.Y + Size + 12.f, GEngine->GetSmallFont(), 1.3f);
 	}
 

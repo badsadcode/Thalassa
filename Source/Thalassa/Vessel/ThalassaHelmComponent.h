@@ -22,6 +22,9 @@ struct FHelmLevers
 	UPROPERTY() float Throttle = 0.f;
 	UPROPERTY() float Rudder = 0.f;
 	UPROPERTY() float Planes = 0.f;
+
+	/** Vertical thrusters: up positive. They lift or sink the ship level, without tipping it. */
+	UPROPERTY() float Heave = 0.f;
 };
 
 /**
@@ -43,7 +46,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	/** Server: what the helmsman is pressing, each from -1 to 1. Ignored from anyone else. */
-	void SetInput(const APawn* From, float Throttle, float Turn, float Dive);
+	void SetInput(const APawn* From, float Throttle, float Turn, float Dive, float Heave = 0.f);
 
 	/** Server: switch between precise and set-and-go. */
 	void ToggleMode(const APawn* From);

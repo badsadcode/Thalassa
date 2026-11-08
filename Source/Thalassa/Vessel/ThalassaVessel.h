@@ -424,6 +424,7 @@ private:
 
 	// Server motion state. Targets come from the helm or from the motion profile.
 	float SpeedCmS = 0.f;
+	float VerticalSpeedCmS = 0.f; // Server, under the helm: the vertical thrusters' contribution, up positive.
 	float TargetSpeedCmS = 0.f;
 	FRotator CurrentRate = FRotator::ZeroRotator;
 	FRotator PoseRotation = FRotator::ZeroRotator;

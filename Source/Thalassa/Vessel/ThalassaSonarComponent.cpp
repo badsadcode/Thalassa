@@ -20,6 +20,10 @@ namespace ThalassaSonar
 	constexpr float SaveIntervalSeconds = 30.f; // Autosave, so a crash loses at most this much survey.
 	const TCHAR* DefaultSaveSlot = TEXT("ShipSurvey");
 
+	// Bump this whenever the test map's seabed, rocks or anything else solid out there changes shape, so old
+	// charts are not drawn over the new world. 2: the generated seabed, formations and dark biome (2026-11-08).
+	constexpr int32 SeabedGeneration = 2;
+
 	constexpr float RangeCm = 80000.f;          // 800 m: reaches the seabed at a slant from 300 m above it.
 
 }
@@ -75,10 +79,11 @@ void UThalassaSonarComponent::LoadSurvey()
 	}
 
 	const UThalassaSurveySave* Saved = Cast<UThalassaSurveySave>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-	if (!Saved || Saved->Version != UThalassaSurveySave::CurrentVersion || Saved->GridSize != GridSize || Saved->CellSizeCm != CellSizeCm)
+	if (!Saved || Saved->Version != UThalassaSurveySave::CurrentVersion || Saved->GridSize != GridSize || Saved->CellSizeCm != CellSizeCm
+		|| Saved->World != GetWorldStamp())
 	{
-		// Keep the old file rather than overwrite it: it may be worth recovering by hand.
-		UE_LOG(LogThalassa, Warning, TEXT("Sonar: chart in slot %s is unreadable or from a different grid; starting a new one"), *Slot);
+		UE_LOG(LogThalassa, Warning, TEXT("Sonar: chart in slot %s is unreadable, from a different grid or from a different world (%s, now %s); starting a new one"),
+			*Slot, Saved ? *Saved->World : TEXT("?"), *GetWorldStamp());
 		return;
 	}
 
@@ -95,6 +100,12 @@ void UThalassaSonarComponent::LoadSurvey()
 	UE_LOG(LogThalassa, Display, TEXT("Sonar: loaded %d surveyed cells from slot %s"), Cells.Num(), *Slot);
 }
 
+FString UThalassaSonarComponent::GetWorldStamp() const
+{
+	const FString Map = GetWorld() ? UWorld::RemovePIEPrefix(GetWorld()->GetOutermost()->GetName()) : FString();
+	return FString::Printf(TEXT("%s#%d"), *Map, ThalassaSonar::SeabedGeneration);
+}
+
 void UThalassaSonarComponent::SaveSurvey()
 {
 	const FString Slot = GetSaveSlot();
@@ -106,6 +117,7 @@ void UThalassaSonarComponent::SaveSurvey()
 	UThalassaSurveySave* Save = Cast<UThalassaSurveySave>(UGameplayStatics::CreateSaveGameObject(UThalassaSurveySave::StaticClass()));
 	Save->GridSize = GridSize;
 	Save->CellSizeCm = CellSizeCm;
+	Save->World = GetWorldStamp();
 	Save->Cells = Cells;
 	if (UGameplayStatics::SaveGameToSlot(Save, Slot, 0))
 	{

@@ -30,7 +30,7 @@ public:
 	void RequestCameraStep(int32 Step) { ServerSelectCamera(Step); }
 
 	/** What the helmsman is pressing, each from -1 to 1. Sent to the server only when it changes. */
-	void SetHelmInput(float Throttle, float Turn, float Dive);
+	void SetHelmInput(float Throttle, float Turn, float Dive, float Heave = 0.f);
 	void RequestHelmMode();
 	void RequestHelmFullStop();
 
@@ -45,6 +45,7 @@ private:
 	void OnMove(const FInputActionValue& Value);
 	void OnLook(const FInputActionValue& Value);
 	void OnSwimVertical(const FInputActionValue& Value);
+	void OnHelmPlanes(const FInputActionValue& Value);
 	void OnJumpStart();
 	void OnSprintStart();
 	void OnSprintStop();
@@ -58,7 +59,7 @@ private:
 	void ServerToggleSonar();
 
 	UFUNCTION(Server, Reliable)
-	void ServerSetHelmInput(float Throttle, float Turn, float Dive);
+	void ServerSetHelmInput(float Throttle, float Turn, float Dive, float Heave);
 
 	UFUNCTION(Server, Reliable)
 	void ServerHelmMode();
@@ -83,7 +84,8 @@ private:
 	// At the helm, the movement keys drive the ship instead of the character.
 	FVector2D MoveAxis = FVector2D::ZeroVector;
 	float VerticalAxis = 0.f;
-	FVector SentHelmInput = FVector::ZeroVector;
+	FVector4 SentHelmInput = FVector4(0, 0, 0, 0);
+	float PlanesAxis = 0.f; // Q and Z at the helm: the diving planes.
 	bool bWasAtHelm = false;
 	int32 LastCameraStep = 0;
 
