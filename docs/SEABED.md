@@ -13,7 +13,12 @@ How the ocean floor and the underwater look are built, what exists today, and th
   - a cold grade, a vignette, light grain and slight colour fringing.
 - **Floodlights:** five spotlights on the hull (`Floodlights` in `BP_Thalassa`). Two at the bow light the water ahead of the bridge window, and three under the keel point at the seabed. They cast no shadows. Move or retune them in the Blueprint.
 - **Marine snow:** `AThalassaMarineSnow`, 1,200 specks around each player's camera. They're fixed in the water, drifting and sinking slowly, so they stream past when the ship moves. They're lit like everything else, so they mostly show in the lamp beams, and they're hidden inside the ship's dry compartments.
-- **Not there yet:** rocks, formations, overhangs, regions, a water surface, sediment clouds, sound.
+- **First formations (2026-11-08):** `Scripts/blender/make_formations.py` makes one family and a landmark, imported by `Scripts/unreal/import_formations.py` into `Content/World/Formations`. There are six slab towers (15 to 24 m tall), five broken slab fragments, and `SM_Monolith_Bent`: about 300 m tall, bending as it rises, with strata of varying thickness that dip across it, worn-back soft layers, vertical fractures, and rust and pale mineral streaks. They're Nanite, with collision as their real shape, and use the seabed material for their vertex colours.
+- **Placement by rules** (in `create_test_map.py`, same result every time):
+  - **The monolith** stands alone on the flat basin floor at (-500, -420) m, 650 m astern of the start and clear of every test route, with five huge fallen blocks of its broken top at its foot, on the side it leans toward.
+  - **The slab towers,** fourteen of them, stand only on moderate slopes (12 to 60%) in the south-west, at least 70 m apart and away from the map's rim. Each has 5 to 11 broken plates scattered around its feet.
+  - **Sinking:** every piece is sunk to the lowest ground under its footprint, so nothing floats.
+- **Not there yet:** surface detail. Geometry alone gives either facets or clay: the plates' ribbed edges help at a distance, but close up rock needs scanned textures (Megascans, below). Also missing: more formation families, regions, a water surface, sediment clouds, sound.
 
 ## The hard technical truths
 
@@ -49,7 +54,7 @@ These go beyond the reference. Take them or leave them.
 
 1. **Done:** terrain, water, floodlights, marine snow.
 2. **Done:** the sonar's look (`SONAR.md`), and a first holotable showing the charted seabed in 3D (`HOLOTABLE.md`).
-3. **A first formation family, made in Blender:** layered slab towers and broken slabs, sunk into the terrain by hand, plus one monolith: the bent 300 m pillar, placed on a flat stretch of plain.
+3. **Done:** a first formation family (slab towers and fragments) and the bent 300 m monolith, made in Blender and placed by rules.
 4. **A seabed material that changes with the ground:** sediment, sand, gravel and rock, from Megascans once licences are checked, blended by slope, height and curvature in place of today's vertex colours.
 5. **PCG rules for one region type,** probably the Broken Shelf: slabs, angular boulders and scree, oriented and sized by rules, then baked.
 6. **Sediment clouds** when the hull touches or skims the seabed.
