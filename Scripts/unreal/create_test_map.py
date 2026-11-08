@@ -86,12 +86,13 @@ import math
 import random
 
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+rock_actors = []  # Everything placed so far: ground traces ignore it, so nothing lands on a ledge.
 
 
 def ground(x, y):
     """The seabed's height at a world X and Y, in centimetres, found by a trace straight down."""
     hit = unreal.SystemLibrary.line_trace_single(world, unreal.Vector(x, y, 0.0), unreal.Vector(x, y, -100000.0),
-                                                 unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, True, [], unreal.DrawDebugTrace.NONE, True)
+                                                 unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, True, rock_actors, unreal.DrawDebugTrace.NONE, True)
     if hit is None:
         return None
     values = hit.to_tuple()
@@ -113,6 +114,7 @@ def place(mesh_name, x, y, z, yaw, scale, pitch=0.0, roll=0.0, label=None):
     actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
     actor.set_actor_label(label or mesh_name)
     actor.set_folder_path("Formations")
+    rock_actors.append(actor)
     return actor
 
 
@@ -169,6 +171,78 @@ for gx, gy in candidates:
     if len(towers) >= 14:
         break
 unreal.log("THALASSA: placed %d formation pieces, %d slab towers" % (placed, len(towers)))
+
+# ---- Scanned CC0 rocks (Poly Haven, Scripts/unreal/import_rock_models.py), at many sizes: a scan has no scale.
+ROCK_MESHES = {
+    # name: (asset path, real largest dimension in cm)
+    "moon_01": ("/Game/World/Rocks/moon_rock_01/moon_rock_01/StaticMeshes/moon_rock_01_LOD0", 21.0),
+    "moon_03": ("/Game/World/Rocks/moon_rock_03/moon_rock_03/StaticMeshes/moon_rock_03", 11.0),
+    "moon_05": ("/Game/World/Rocks/moon_rock_05/moon_rock_05/StaticMeshes/moon_rock_05", 8.0),
+    "rock_07": ("/Game/World/Rocks/rock_07/rock_07/StaticMeshes/rock_07", 32.0),
+    "rock_09": ("/Game/World/Rocks/rock_09/rock_09/StaticMeshes/rock_09", 14.0),
+    "boulder_03": ("/Game/World/Rocks/namaqualand_boulder_03/namaqualand_boulder_03/StaticMeshes/namaqualand_boulder_03", 307.0),
+    "boulder_05": ("/Game/World/Rocks/namaqualand_boulder_05/namaqualand_boulder_05/StaticMeshes/namaqualand_boulder_05", 136.0),
+    "coast_05": ("/Game/World/Rocks/coast_rocks_05/coast_rocks_05/StaticMeshes/coast_rocks_05", 404.0),
+}
+SMALL_SCANS = ["moon_01", "moon_03", "moon_05", "rock_07", "rock_09"]
+scans = 0
+
+
+def scan(key, x, y, size_cm, label):
+    """Places a scanned rock scaled so its largest dimension is size_cm, sunk into the ground."""
+    global scans
+    path, real = ROCK_MESHES[key]
+    mesh = unreal.load_asset(path)
+    if not mesh:
+        raise RuntimeError("THALASSA: no rock mesh at " + path)
+    z = lowest(x, y, size_cm * 0.5)
+    if z is None:
+        return
+    scale = size_cm / real
+    actor = actors.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(x, y, z - 0.12 * size_cm),
+                                          unreal.Rotator(roll=rng.uniform(-12, 12), pitch=rng.uniform(-12, 12), yaw=rng.uniform(0, 360)))
+    actor.static_mesh_component.set_static_mesh(mesh)
+    actor.static_mesh_component.set_mobility(unreal.ComponentMobility.STATIC)
+    actor.set_actor_scale3d(unreal.Vector(scale, scale, scale * rng.uniform(0.8, 1.1)))
+    actor.set_actor_label(label)
+    actor.set_folder_path("Formations/Scanned")
+    rock_actors.append(actor)
+    scans += 1
+
+
+# Boulders around each slab tower: fallen and weathered pieces, 1 to 5 m.
+for index, (tx, ty) in enumerate(towers):
+    for k in range(rng.randint(4, 8)):
+        angle, distance = rng.uniform(0, math.tau), rng.uniform(1200.0, 3500.0)
+        scan(rng.choice(SMALL_SCANS), tx + math.cos(angle) * distance, ty + math.sin(angle) * distance, rng.uniform(100.0, 500.0), "TowerBoulder_%d_%d" % (index, k))
+
+# The monolith's foot: a heap of rubble on its leaning side, and big boulders around it.
+for k in range(12):
+    angle = math.radians(35.0 + rng.uniform(-70.0, 70.0))
+    distance = rng.uniform(3000.0, 7000.0)
+    scan(rng.choice(SMALL_SCANS + ["boulder_03"]), MONOLITH[0] + math.cos(angle) * distance, MONOLITH[1] + math.sin(angle) * distance,
+         rng.uniform(200.0, 900.0), "MonolithRubble_%d" % k)
+for k in range(2):
+    angle = math.radians(35.0 + rng.uniform(-30.0, 30.0))
+    scan("coast_05", MONOLITH[0] + math.cos(angle) * 4500.0, MONOLITH[1] + math.sin(angle) * 4500.0, rng.uniform(1800.0, 2800.0), "MonolithHeap_%d" % k)
+
+# Medium landmarks: the coastal rock mass, 16 to 32 m across, on a few south-west slopes.
+for index, (tx, ty) in enumerate(towers[:5]):
+    angle = rng.uniform(0, math.tau)
+    scan("coast_05", tx + math.cos(angle) * 9000.0, ty + math.sin(angle) * 9000.0, rng.uniform(1600.0, 3200.0), "RockMass_%d" % index)
+
+# The open flats: mostly empty on purpose, with the occasional lone boulder, 2 to 9 m.
+lone = 0
+for attempt in range(400):
+    x, y = rng.uniform(-260000.0, 260000.0), rng.uniform(-260000.0, 260000.0)
+    h0, hx, hy = ground(x, y), ground(x + 1000.0, y), ground(x, y + 1000.0)
+    if None in (h0, hx, hy) or math.hypot(hx - h0, hy - h0) / 1000.0 > 0.08:
+        continue
+    scan(rng.choice(["boulder_03", "boulder_05", "moon_01", "rock_07"]), x, y, rng.uniform(200.0, 900.0), "LoneBoulder_%d" % lone)
+    lone += 1
+    if lone >= 45:
+        break
+unreal.log("THALASSA: placed %d scanned rocks, %d of them lone boulders on the flats" % (scans, lone))
 
 if not level.save_current_level():
     raise RuntimeError("could not save " + MAP_PATH)

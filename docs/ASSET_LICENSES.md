@@ -10,9 +10,17 @@ Everything that ships with the game or the site and was not written for this pro
 | `Content/World/Textures/dark_rock_02/*` (Dark Rock 02) | [Poly Haven](https://polyhaven.com/a/dark_rock_02) | CC0 1.0 | 2K colour, normal, AO/roughness. Normal flipped from OpenGL on import. Used by `M_Rock`. |
 | `Content/World/Textures/coral_gravel/*` (Coral Gravel) | [Poly Haven](https://polyhaven.com/a/coral_gravel) | CC0 1.0 | 2K colour, normal, AO/roughness. Used by `M_SeabedGround` on slopes. |
 | `Content/World/Textures/damp_beach_sand/*` (Damp Beach Sand) | [Poly Haven](https://polyhaven.com/a/damp_beach_sand) | CC0 1.0 | 2K colour, normal, AO/roughness. Imported, not used yet. |
+| `Content/World/Rocks/moon_rock_01/*` | [Poly Haven](https://polyhaven.com/a/moon_rock_01) | CC0 1.0 | Scanned rock, 2K textures. Scattered at many sizes. |
+| `Content/World/Rocks/moon_rock_03/*` | [Poly Haven](https://polyhaven.com/a/moon_rock_03) | CC0 1.0 | Scanned rock, 2K textures. |
+| `Content/World/Rocks/moon_rock_05/*` | [Poly Haven](https://polyhaven.com/a/moon_rock_05) | CC0 1.0 | Scanned rock, 2K textures. |
+| `Content/World/Rocks/rock_07/*` | [Poly Haven](https://polyhaven.com/a/rock_07) | CC0 1.0 | Scanned rock, 2K textures. |
+| `Content/World/Rocks/rock_09/*` | [Poly Haven](https://polyhaven.com/a/rock_09) | CC0 1.0 | Scanned flat stone, 2K textures. |
+| `Content/World/Rocks/namaqualand_boulder_03/*` | [Poly Haven](https://polyhaven.com/a/namaqualand_boulder_03) | CC0 1.0 | Scanned boulder, 2K textures. |
+| `Content/World/Rocks/namaqualand_boulder_05/*` | [Poly Haven](https://polyhaven.com/a/namaqualand_boulder_05) | CC0 1.0 | Scanned boulder, 2K textures. |
+| `Content/World/Rocks/coast_rocks_05/*` | [Poly Haven](https://polyhaven.com/a/coast_rocks_05) | CC0 1.0 | Scanned coastal rock mass, 2K textures. Used at 16 to 32 m as medium landmarks. |
 | `Content/World/Textures/Ground093C/*` (Ground 093 C) | [ambientCG](https://ambientcg.com/view?id=Ground093C) | CC0 1.0 | 2K colour, DirectX normal, roughness. Used by `M_SeabedGround` on the flats. |
 
-The CC0 sources are fetched into `Saved/Textures/` (not in git) by `Scripts/build/fetch_textures.py`, and imported by `Scripts/unreal/create_ocean_materials.py`. CC0 needs no attribution. The sites are credited here as a courtesy.
+The CC0 sources are fetched into `Saved/Textures/` and `Saved/Models/` (not in git) by `Scripts/build/fetch_textures.py`. They're imported by `Scripts/unreal/create_ocean_materials.py` and `Scripts/unreal/import_rock_models.py`. The rock models' colours are cooled on import (BaseColorFactor). CC0 needs no attribution. The sites are credited here as a courtesy.
 
 ## Devlog site
 

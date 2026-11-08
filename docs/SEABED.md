@@ -19,6 +19,13 @@ How the ocean floor and the underwater look are built, what exists today, and th
   - **The slab towers,** fourteen of them, stand only on moderate slopes (12 to 60%) in the south-west, at least 70 m apart and away from the map's rim. Each has 5 to 11 broken plates scattered around its feet.
   - **Sinking:** every piece is sunk to the lowest ground under its footprint, so nothing floats.
 - **Scanned surfaces (2026-11-08):** CC0 textures from Poly Haven and ambientCG (`docs/ASSET_LICENSES.md`). `M_Rock` (dark layered rock, tinted by each rock's vertex-colour strata and streaks) is on every formation. `M_SeabedGround` (rippled sediment on the flats, coral gravel on slopes over about 25 degrees, with a wandering edge) is on the seabed. Both project textures by world position, since the meshes have no texture layouts. Each texture is mixed with itself at three times the size by large-scale noise, which hid an obvious 6 m repeat. Built by `Scripts/unreal/create_ocean_materials.py`. Megascans may still come later for more variety.
+- **Scanned rock models (2026-11-08):** nine CC0 scans from Poly Haven (`Content/World/Rocks`), imported with Nanite and real-shape collision. A scan has no scale, so they're placed at many sizes, scaled by their largest dimension. There are 145 in all:
+  - 4 to 8 boulders, 1 to 5 m, around each slab tower;
+  - a rubble heap and big blocks, 2 to 9 m, on the monolith's leaning side, plus two 18 to 28 m rock masses at its foot;
+  - five 16 to 32 m rock masses as medium landmarks on the south-west slopes;
+  - 45 lone boulders, 2 to 9 m, thinly spread across the open flats, so the plains stay mostly empty.
+
+  Ground traces ignore rocks already placed, so nothing lands on a ledge.
 - **Not there yet:** more surface variety: per-region materials, mineral crusts, a fine sediment layer on top of rock ledges. Also missing: more formation families, regions, a water surface, sediment clouds, sound.
 
 ## The hard technical truths
@@ -57,10 +64,11 @@ These go beyond the reference. Take them or leave them.
 2. **Done:** the sonar's look (`SONAR.md`), and a first holotable showing the charted seabed in 3D (`HOLOTABLE.md`).
 3. **Done:** a first formation family (slab towers and fragments) and the bent 300 m monolith, made in Blender and placed by rules.
 4. **Done, first version:** scanned CC0 surfaces on the rocks and seabed, blended by slope. Next: blend by height and curvature too, sediment settling on ledges, and per-region palettes.
-5. **PCG rules for one region type,** probably the Broken Shelf: slabs, angular boulders and scree, oriented and sized by rules, then baked.
-6. **Sediment clouds** when the hull touches or skims the seabed.
-7. **Sonar substrate and finer local resolution.**
-8. **Regions and World Partition,** once one region looks right.
+5. **Small-scale detail for EVA:** real-size pebbles and stones near where divers go.
+6. **PCG rules for one region type,** probably the Broken Shelf: slabs, angular boulders and scree, oriented and sized by rules, then baked.
+7. **Sediment clouds** when the hull touches or skims the seabed.
+8. **Sonar substrate and finer local resolution.**
+9. **Regions and World Partition,** once one region looks right.
 
 ## Tuning the look
 
