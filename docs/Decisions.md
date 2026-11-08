@@ -83,6 +83,10 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 - **A camera station:** cameras mounted on the hull, showing what is to port, to starboard and around the ship. The station shows them all together and one at a time on a bigger screen, and may later have several monitors. This fits section 6.1: an external camera helps, as long as the player stays a crew member rather than a detached overhead camera.
 - **Other stations** will have monitors for the ship's systems as those systems arrive.
 
+**A holotable aboard (owner's idea, 2026-11-08).** A table with a 3D hologram of the terrain below and around the ship, a little simplified, moving as the ship moves: a place where the crew gather and decide what to do next. First version in the mess hall. See [HOLOTABLE.md](HOLOTABLE.md).
+
+**The seabed follows the owner's environment reference (2026-11-08).** Varied at every scale, shaped by geology, mostly natural, sometimes alien, often deliberately empty. The reference is private (`docs/THALASSA_Seabed_Environment_Reference.md`, not in git). How it is built, and Claude's notes, are in [SEABED.md](SEABED.md).
+
 ## Still open
 
 From design document section 26: ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.

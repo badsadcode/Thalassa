@@ -50,6 +50,7 @@ def main():
     parser.add_argument("--no-jump", action="store_true", help="walkers never jump")
     parser.add_argument("--sprint", action="store_true", help="walkers sprint everywhere")
     parser.add_argument("--slide", action="store_true", help="walkers sprint, and slide every few seconds")
+    parser.add_argument("--survey-slot", help="the host loads and saves the sonar chart in this save slot")
     parser.add_argument("--vessel", help="ship Blueprint class to spawn instead of the configured one, e.g. /Game/Ship/BP_X.BP_X_C")
     parser.add_argument("--art-probe", action="store_true", help="attach a solid crate to the ship in the walkers' path")
     parser.add_argument("--out", help="result folder's parent; defaults to the system temp folder")
@@ -96,6 +97,8 @@ def main():
         common.append("-ThalassaSlide")
     if args.art_probe:
         common.append("-ThalassaArtProbe")
+    if args.survey_slot:
+        common.append(f"-ThalassaSurveySlot={args.survey_slot}")
     if args.vessel:
         common.append(f"-ini:Game:[/Script/Thalassa.ThalassaGameMode]:VesselClass={args.vessel}")
     if args.static_ship:

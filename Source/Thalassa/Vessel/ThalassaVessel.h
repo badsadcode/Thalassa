@@ -22,6 +22,9 @@ class UThalassaDryCompartmentComponent;
 class UThalassaLadderZoneComponent;
 class UThalassaSpawnPointComponent;
 class UThalassaStationSpotComponent;
+class USpotLightComponent;
+class UThalassaHoloTableComponent;
+class UInstancedStaticMeshComponent;
 
 /** A box on the ship, in ship coordinates, read from a marker component. It may be turned. */
 struct FShipZone
@@ -319,6 +322,20 @@ private:
 	/** The airlock: move this and its doors, water, panel and chamber move with it. Its walls are greybox. */
 	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
 	TObjectPtr<USceneComponent> Airlock;
+
+	/** The holotable in the mess: a hologram of the charted seabed. Move it in the Blueprint to move the table. */
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Spots")
+	TObjectPtr<UThalassaHoloTableComponent> HoloTable;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UInstancedStaticMeshComponent> HoloPoints;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UStaticMeshComponent> HoloTableBase;
+
+	/** Lamps on the outside of the hull, lighting the water around the ship. Move or retune them in the Blueprint. */
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Art")
+	TArray<TObjectPtr<USpotLightComponent>> Floodlights;
 
 	// What ReadMarkers found, in ship coordinates.
 	TArray<FShipZone> DryZones;

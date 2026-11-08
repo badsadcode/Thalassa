@@ -47,8 +47,26 @@ public:
 
 	int32 GetSurveyedCellCount() const { return Cells.Num(); }
 
-	/** The chart as a texture: one pixel per cell, unknown cells dark. Rebuilt when the survey changes. */
-	UTexture2D* GetChartTexture();
+	/**
+	 * The chart around a point, as a texture, north up: ViewCells across plus a margin, smoothed between
+	 * cells, hill-shaded, with depth contours and a glow on freshly surveyed ground. Built locally from the
+	 * replicated survey, at most ten times a second. OutUV0 and OutUVSize crop it to ViewCells across,
+	 * centred on the point, so the picture scrolls smoothly between rebuilds.
+	 */
+	UTexture2D* GetLocalChart(const FVector& WorldCentre, int32 ViewCells, FVector2D& OutUV0, float& OutUVSize);
+
+	/** The surveyed seabed height at a world location, smoothed between cell centres, in metres. False if unmeasured. */
+	bool SampleHeightM(const FVector& WorldLocation, float& OutHeightM);
+
+	/** The surveyed seabed height under a world location, in metres, if that cell has been measured. */
+	bool GetSurveyedHeightM(const FVector& WorldLocation, float& OutHeightM);
+
+	/** The chart's colour for a seabed height, in metres, within a range: deep navy through teal to pale aqua. */
+	static FLinearColor DepthColour(float HeightM, float DeepM, float ShallowM);
+
+	/** The heights the local chart's colours span: whatever is in view, at least 60 m. */
+	float GetChartDeepM() const { return LocalDeepM; }
+	float GetChartShallowM() const { return LocalShallowM; }
 
 	/** Where a world location falls on the survey grid, 0..1 along world X and world Y. */
 	FVector2D WorldToChart(const FVector& WorldLocation) const;
@@ -62,7 +80,9 @@ public:
 private:
 	void SweepServer();
 	void RecordHit(const FVector& WorldHit);
-	void RebuildTexture();
+	/** Brings the dense copy of the survey up to date, noting when each cell last changed. */
+	void SyncDense();
+	void BuildLocalChart();
 
 	/** Server: the save slot to use, or empty for none. Real play uses one; tests only if asked. */
 	FString GetSaveSlot() const;
@@ -81,8 +101,20 @@ private:
 	/** Server: cell index to position in Cells, so a cell is updated, never duplicated. */
 	TMap<int32, int32> CellLookup;
 
+	// The survey as a full grid, for drawing: heights, which cells are known, and when each last changed here.
+	TArray<int16> DenseHeight;
+	TArray<bool> DenseKnown;
+	TArray<float> DenseChanged;
+	bool bDenseSeeded = false;
+
 	UPROPERTY(Transient)
-	TObjectPtr<UTexture2D> ChartTexture;
+	TObjectPtr<UTexture2D> LocalChart;
+	FIntPoint LocalOrigin = FIntPoint(0, 0);   // The cell at the image's south-west corner.
+	int32 LocalCells = 0;                      // Cells across the image.
+	double LocalBuiltAt = -1.0;
+	float LocalDeepM = -700.f;
+	float LocalShallowM = -100.f;
+	static constexpr int32 PixelsPerCell = 6;
 
 	bool bTextureDirty = true;
 	bool bUnsavedChanges = false;

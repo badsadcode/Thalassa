@@ -72,6 +72,10 @@ struct FVesselLayout
 	float CameraGridSizeCm = 0.f;
 	TArray<FHullCamera> HullCameras;
 
+	/** The holotable: the centre of its top. No table means none. */
+	bool bHasHoloTable = false;
+	FVector HoloTableLocation = FVector::ZeroVector;
+
 	/** Added to the airlock's own coordinates, which assume a corridor along Y = 0 and the sea to starboard. */
 	FVector AirlockOffset = FVector::ZeroVector;
 

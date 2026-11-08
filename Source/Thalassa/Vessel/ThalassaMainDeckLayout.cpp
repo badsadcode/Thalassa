@@ -214,6 +214,10 @@ FVesselLayout BuildMainDeckLayout()
 		B.Box(FVector(Table.X - 200.f, Table.Y - 80.f, -50.f), FVector(Table.X + 200.f, Table.Y + 80.f, 25.f), HullColor);
 	}
 
+	// The holotable: in the sunken centre, between the mess tables, where the crew gather. See docs/HOLOTABLE.md.
+	Layout.bHasHoloTable = true;
+	Layout.HoloTableLocation = FVector(-1950.f, -450.f, 40.f);
+
 	// Side rooms: uneven on each side, so the two halves of the ring do not look alike.
 	B.WallY(-3200.f, -2500.f, -1700.f, CrewColor);
 	B.WallY(-1600.f, -2500.f, -1700.f, CrewColor);

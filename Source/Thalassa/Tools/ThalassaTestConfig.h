@@ -86,6 +86,9 @@ namespace ThalassaTestConfig
 	/** -ThalassaLookYaw=degrees: initial view direction relative to the ship, for screenshots. */
 	float LookYaw();
 
+	/** -ThalassaLookPitch=degrees: initial view pitch, up positive, for screenshots. */
+	float LookPitch();
+
 	/** -ThalassaTimeout=seconds: hard stop for a test process. */
 	double TimeoutSeconds();
 }

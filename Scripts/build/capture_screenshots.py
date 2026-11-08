@@ -8,6 +8,8 @@ A view whose name starts with "airlock" begins in the corridor, in front of the 
 A view whose name starts with "sonar" switches the sonar on and opens the station view.
 A view whose name starts with "screen" switches the sonar on and leaves the view clear, to see the bridge screen.
 Add @X,Y,Z to a view to start there, in ship coordinates: bridge=0@10300,-300,120
+Arguments starting with "-" go to the game as they are, for every view: -ThalassaSurveySlot=demo loads a saved chart.
+Add /pitch after the yaw to look up (positive) or down (negative): seabed=0/-30@13300,0,120
 """
 import subprocess
 import sys
@@ -23,19 +25,22 @@ def main():
     out = Path(sys.argv[1]).resolve()
     out.mkdir(parents=True, exist_ok=True)
     failed = False
-    for view in sys.argv[2:]:
+    passthrough = [arg for arg in sys.argv[2:] if arg.startswith("-")]
+    for view in [arg for arg in sys.argv[2:] if not arg.startswith("-")]:
         name, setting = view.split("=")
         yaw, _, spawn = setting.partition("@")
+        yaw, _, pitch = yaw.partition("/")
         target = out / f"{name}.png"
         target.unlink(missing_ok=True)
         subprocess.run(
             [str(EDITOR), str(ROOT / "Thalassa.uproject"), MAP, "-game", "-windowed", "-ResX=1280", "-ResY=720",
-             "-nosound", "-unattended", "-nosplash", f"-ThalassaScreenshot={target}", f"-ThalassaLookYaw={yaw}",
+             "-nosound", "-unattended", "-nosplash", f"-ThalassaScreenshot={target}", f"-ThalassaLookYaw={yaw}", f"-ThalassaLookPitch={pitch or 0}",
              f"-abslog={out / (name + '.log')}",
              *(["-ThalassaSpawnAtAirlock"] if name.startswith("airlock") else []),
              *([f"-ThalassaSpawnAt={spawn}"] if spawn else []),
              *(["-ThalassaSonar", "-ThalassaStationView"] if name.startswith("sonar") else []),
-             *(["-ThalassaSonar"] if name.startswith("screen") else [])],
+             *(["-ThalassaSonar"] if name.startswith("screen") else []),
+             *passthrough],
             timeout=TIMEOUT_SECONDS, check=False)
         exists = target.exists()
         print(f"{name}: {'saved ' + str(target) if exists else 'NO IMAGE'}")

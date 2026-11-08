@@ -22,9 +22,6 @@ namespace ThalassaSonar
 
 	constexpr float RangeCm = 80000.f;          // 800 m: reaches the seabed at a slant from 300 m above it.
 
-	// Chart colours run from deep to shallow: deep blue up to pale cyan.
-	constexpr float DeepZ = -50000.f;
-	constexpr float ShallowZ = -30000.f;
 }
 
 UThalassaSonarComponent::UThalassaSonarComponent()
@@ -244,48 +241,265 @@ void UThalassaSonarComponent::OnRep_Cells()
 	bTextureDirty = true;
 }
 
-UTexture2D* UThalassaSonarComponent::GetChartTexture()
+FLinearColor UThalassaSonarComponent::DepthColour(float HeightM, float DeepM, float ShallowM)
 {
-	if (!ChartTexture)
-	{
-		ChartTexture = UTexture2D::CreateTransient(GridSize, GridSize, PF_B8G8R8A8);
-		if (!ChartTexture)
-		{
-			return nullptr;
-		}
-		ChartTexture->Filter = TF_Nearest; // Hard-edged cells: you can see what was measured and what was not.
-		ChartTexture->SRGB = true;
-		bTextureDirty = true;
-	}
-	if (bTextureDirty)
-	{
-		RebuildTexture();
-	}
-	return ChartTexture;
+	// Deep navy, blue, teal, aqua, pale: the shallower, the brighter.
+	static const FLinearColor Stops[] = {
+		FLinearColor(0.008f, 0.02f, 0.09f), FLinearColor(0.02f, 0.10f, 0.32f), FLinearColor(0.03f, 0.33f, 0.50f),
+		FLinearColor(0.18f, 0.68f, 0.70f), FLinearColor(0.80f, 0.98f, 0.88f) };
+	const float T = FMath::Clamp((HeightM - DeepM) / FMath::Max(ShallowM - DeepM, 1.f), 0.f, 1.f) * (UE_ARRAY_COUNT(Stops) - 1);
+	const int32 I = FMath::Min(FMath::FloorToInt(T), int32(UE_ARRAY_COUNT(Stops)) - 2);
+	return FMath::Lerp(Stops[I], Stops[I + 1], T - I);
 }
 
-void UThalassaSonarComponent::RebuildTexture()
+void UThalassaSonarComponent::SyncDense()
 {
-	using namespace ThalassaSonar;
-
 	bTextureDirty = false;
-
-	TArray<FColor> Pixels;
-	Pixels.Init(FColor(6, 19, 29, 255), GridSize * GridSize); // Unknown: the same near-black as the deep.
+	const int32 Total = GridSize * GridSize;
+	if (DenseHeight.Num() != Total)
+	{
+		DenseHeight.Init(0, Total);
+		DenseKnown.Init(false, Total);
+		DenseChanged.Init(-1000.f, Total);
+	}
+	// The first time, nothing glows: a chart loaded or received on joining is not news.
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	for (const FSonarCell& Cell : Cells)
 	{
-		const float Depth = FMath::Clamp((Cell.HeightM * 100.f - DeepZ) / (ShallowZ - DeepZ), 0.f, 1.f);
-		const FLinearColor Deep(0.02f, 0.10f, 0.35f);
-		const FLinearColor Shallow(0.55f, 0.95f, 0.92f);
-		// Laid out like a chart: world +X (north at zero heading) up the image, world +Y to the right.
-		const int32 WorldX = Cell.Index % GridSize;
-		const int32 WorldY = Cell.Index / GridSize;
-		Pixels[(GridSize - 1 - WorldX) * GridSize + WorldY] = FMath::Lerp(Deep, Shallow, Depth).ToFColor(true);
+		if (!DenseHeight.IsValidIndex(Cell.Index))
+		{
+			continue;
+		}
+		if (!DenseKnown[Cell.Index] || DenseHeight[Cell.Index] != Cell.HeightM)
+		{
+			DenseKnown[Cell.Index] = true;
+			DenseHeight[Cell.Index] = Cell.HeightM;
+			DenseChanged[Cell.Index] = bDenseSeeded ? Now : -1000.f;
+		}
+	}
+	bDenseSeeded = true;
+}
+
+bool UThalassaSonarComponent::GetSurveyedHeightM(const FVector& WorldLocation, float& OutHeightM)
+{
+	if (bTextureDirty)
+	{
+		SyncDense();
+	}
+	const FVector2D Chart = WorldToChart(WorldLocation) * GridSize;
+	const int32 X = FMath::FloorToInt(Chart.X), Y = FMath::FloorToInt(Chart.Y);
+	if (X < 0 || Y < 0 || X >= GridSize || Y >= GridSize || !DenseKnown.IsValidIndex(Y * GridSize + X) || !DenseKnown[Y * GridSize + X])
+	{
+		return false;
+	}
+	OutHeightM = DenseHeight[Y * GridSize + X];
+	return true;
+}
+
+bool UThalassaSonarComponent::SampleHeightM(const FVector& WorldLocation, float& OutHeightM)
+{
+	if (bTextureDirty)
+	{
+		SyncDense();
+	}
+	if (DenseKnown.Num() == 0)
+	{
+		return false;
+	}
+	const FVector2D Chart = WorldToChart(WorldLocation) * GridSize - FVector2D(0.5f);
+	const int32 X0 = FMath::FloorToInt(Chart.X), Y0 = FMath::FloorToInt(Chart.Y);
+	const float FX = Chart.X - X0, FY = Chart.Y - Y0;
+	float Sum = 0.f, Weight = 0.f;
+	for (int32 DX = 0; DX < 2; ++DX)
+	{
+		for (int32 DY = 0; DY < 2; ++DY)
+		{
+			const int32 X = X0 + DX, Y = Y0 + DY;
+			if (X >= 0 && Y >= 0 && X < GridSize && Y < GridSize && DenseKnown[Y * GridSize + X])
+			{
+				const float Wt = (DX ? FX : 1.f - FX) * (DY ? FY : 1.f - FY);
+				Sum += DenseHeight[Y * GridSize + X] * Wt;
+				Weight += Wt;
+			}
+		}
+	}
+	if (Weight < 0.3f)
+	{
+		return false;
+	}
+	OutHeightM = Sum / Weight;
+	return true;
+}
+
+UTexture2D* UThalassaSonarComponent::GetLocalChart(const FVector& WorldCentre, int32 ViewCells, FVector2D& OutUV0, float& OutUVSize)
+{
+	if (bTextureDirty)
+	{
+		SyncDense();
 	}
 
-	FTexture2DMipMap& Mip = ChartTexture->GetPlatformData()->Mips[0];
-	void* Data = Mip.BulkData.Lock(LOCK_READ_WRITE);
+	// Continuous cell coordinates of the centre: X along world X, Y along world Y.
+	const FVector2D Centre = WorldToChart(WorldCentre) * GridSize;
+	const int32 Across = ViewCells + 8; // A margin, so the crop can follow the ship between rebuilds.
+	const FIntPoint Wanted(FMath::FloorToInt(Centre.X) - Across / 2, FMath::FloorToInt(Centre.Y) - Across / 2);
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	const bool bMoved = LocalCells != Across || FMath::Abs(Wanted.X - LocalOrigin.X) > 3 || FMath::Abs(Wanted.Y - LocalOrigin.Y) > 3;
+	if (bMoved || !LocalChart || Now - LocalBuiltAt >= 0.1)
+	{
+		if (bMoved)
+		{
+			LocalOrigin = Wanted;
+			LocalCells = Across;
+		}
+		LocalBuiltAt = Now;
+		BuildLocalChart();
+	}
+
+	// North up: world +X runs up the image, world +Y to the right.
+	const float Width = LocalCells * PixelsPerCell;
+	const float CentreU = (Centre.Y - LocalOrigin.Y) * PixelsPerCell;
+	const float CentreV = (LocalOrigin.X + LocalCells - Centre.X) * PixelsPerCell;
+	const float Half = ViewCells * 0.5f * PixelsPerCell;
+	OutUV0 = FVector2D((CentreU - Half) / Width, (CentreV - Half) / Width);
+	OutUVSize = ViewCells * PixelsPerCell / Width;
+	return LocalChart;
+}
+
+void UThalassaSonarComponent::BuildLocalChart()
+{
+	const int32 W = LocalCells * PixelsPerCell;
+	if (!LocalChart || LocalChart->GetSizeX() != W)
+	{
+		LocalChart = UTexture2D::CreateTransient(W, W, PF_B8G8R8A8);
+		if (!LocalChart)
+		{
+			return;
+		}
+		LocalChart->Filter = TF_Bilinear;
+		LocalChart->SRGB = true;
+		LocalChart->UpdateResource();
+	}
+
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	const float PixelM = CellSizeCm / 100.f / PixelsPerCell;
+	const auto CellAt = [this](int32 X, int32 Y) { return (X >= 0 && Y >= 0 && X < GridSize && Y < GridSize) ? Y * GridSize + X : -1; };
+
+	// Pass 1: heights, smoothed between cell centres. Unmeasured cells take no part.
+	TArray<float> Heights;
+	Heights.Init(TNumericLimits<float>::Max(), W * W);
+	for (int32 V = 0; V < W; ++V)
+	{
+		const float CellX = LocalOrigin.X + LocalCells - (V + 0.5f) / PixelsPerCell - 0.5f;
+		const int32 X0 = FMath::FloorToInt(CellX);
+		const float FX = CellX - X0;
+		for (int32 U = 0; U < W; ++U)
+		{
+			const float CellY = LocalOrigin.Y + (U + 0.5f) / PixelsPerCell - 0.5f;
+			const int32 Y0 = FMath::FloorToInt(CellY);
+			const float FY = CellY - Y0;
+			float Sum = 0.f, Weight = 0.f;
+			for (int32 DX = 0; DX < 2; ++DX)
+			{
+				for (int32 DY = 0; DY < 2; ++DY)
+				{
+					const int32 Index = CellAt(X0 + DX, Y0 + DY);
+					if (Index >= 0 && DenseKnown[Index])
+					{
+						const float Wt = (DX ? FX : 1.f - FX) * (DY ? FY : 1.f - FY);
+						Sum += DenseHeight[Index] * Wt;
+						Weight += Wt;
+					}
+				}
+			}
+			if (Weight > 0.3f)
+			{
+				Heights[V * W + U] = Sum / Weight;
+			}
+		}
+	}
+
+	// Colours span what is in view, like a chart plotter: a gentle plain still shows its shape.
+	float Low = TNumericLimits<float>::Max(), High = -TNumericLimits<float>::Max();
+	for (const float H : Heights)
+	{
+		if (H != TNumericLimits<float>::Max())
+		{
+			Low = FMath::Min(Low, H);
+			High = FMath::Max(High, H);
+		}
+	}
+	if (Low <= High)
+	{
+		const float Middle = (Low + High) * 0.5f;
+		const float HalfSpan = FMath::Max((High - Low) * 0.5f, 30.f);
+		LocalDeepM = Middle - HalfSpan;
+		LocalShallowM = Middle + HalfSpan;
+	}
+	// Contours: 10 m and 50 m over gentle ground, 20 m and 100 m over steep.
+	const float Minor = LocalShallowM - LocalDeepM > 150.f ? 20.f : 10.f;
+	const float Major = Minor * 5.f;
+
+	// Pass 2: colour, light from the north-west, contours, and the glow of news.
+	const FVector Light = FVector(0.6f, -0.6f, 0.55f).GetSafeNormal();
+	constexpr float Exaggeration = 6.f;
+	TArray<FColor> Pixels;
+	Pixels.SetNumUninitialized(W * W);
+	for (int32 V = 0; V < W; ++V)
+	{
+		const float CellX = LocalOrigin.X + LocalCells - (V + 0.5f) / PixelsPerCell;
+		for (int32 U = 0; U < W; ++U)
+		{
+			const float CellY = LocalOrigin.Y + (U + 0.5f) / PixelsPerCell;
+			const float H = Heights[V * W + U];
+			if (H == TNumericLimits<float>::Max())
+			{
+				// Unknown water: near black, with a faint 100 m grid fixed to the world.
+				const bool bGrid = FMath::Fmod(CellX, 4.f) < 1.f / PixelsPerCell || FMath::Fmod(CellY, 4.f) < 1.f / PixelsPerCell;
+				Pixels[V * W + U] = bGrid ? FColor(8, 20, 27) : FColor(3, 8, 12);
+				continue;
+			}
+			const auto At = [&](int32 PU, int32 PV)
+			{
+				PU = FMath::Clamp(PU, 0, W - 1);
+				PV = FMath::Clamp(PV, 0, W - 1);
+				const float Value = Heights[PV * W + PU];
+				return Value == TNumericLimits<float>::Max() ? H : Value;
+			};
+			// Up the image is world +X.
+			const float SlopeX = (At(U, V - 1) - At(U, V + 1)) / (2.f * PixelM);
+			const float SlopeY = (At(U + 1, V) - At(U - 1, V)) / (2.f * PixelM);
+			const FVector Normal = FVector(-SlopeX * Exaggeration, -SlopeY * Exaggeration, 1.f).GetSafeNormal();
+			const float Shade = FMath::Max(0.f, FVector::DotProduct(Normal, Light));
+			FLinearColor Colour = DepthColour(H, LocalDeepM, LocalShallowM) * (0.3f + 0.95f * Shade);
+
+			const float Right = At(U + 1, V), Below = At(U, V + 1);
+			if (FMath::FloorToInt(H / Major) != FMath::FloorToInt(Right / Major) || FMath::FloorToInt(H / Major) != FMath::FloorToInt(Below / Major))
+			{
+				Colour = FMath::Lerp(Colour, FLinearColor(0.75f, 1.f, 0.95f), 0.6f);
+			}
+			else if (FMath::FloorToInt(H / Minor) != FMath::FloorToInt(Right / Minor) || FMath::FloorToInt(H / Minor) != FMath::FloorToInt(Below / Minor))
+			{
+				Colour = FMath::Lerp(Colour, FLinearColor(0.55f, 0.95f, 0.9f), 0.22f);
+			}
+
+			const int32 Nearest = CellAt(FMath::FloorToInt(CellX), FMath::FloorToInt(CellY));
+			if (Nearest >= 0)
+			{
+				const float Glow = FMath::Exp(-(Now - DenseChanged[Nearest]) / 1.2f);
+				Colour += FLinearColor(0.3f, 0.85f, 0.8f) * Glow * 0.7f;
+			}
+			Pixels[V * W + U] = Colour.ToFColor(true);
+		}
+	}
+
+	// Upload without stalling: the renderer frees the copy when it is done with it.
+	uint8* Data = static_cast<uint8*>(FMemory::Malloc(Pixels.Num() * sizeof(FColor)));
 	FMemory::Memcpy(Data, Pixels.GetData(), Pixels.Num() * sizeof(FColor));
-	Mip.BulkData.Unlock();
-	ChartTexture->UpdateResource();
+	FUpdateTextureRegion2D* Region = new FUpdateTextureRegion2D(0, 0, 0, 0, W, W);
+	LocalChart->UpdateTextureRegions(0, 1, Region, W * sizeof(FColor), sizeof(FColor), Data,
+		[](uint8* SrcData, const FUpdateTextureRegion2D* Regions)
+		{
+			FMemory::Free(SrcData);
+			delete Regions;
+		});
 }

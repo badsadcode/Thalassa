@@ -182,6 +182,13 @@ namespace ThalassaTestConfig
 		return Value;
 	}
 
+	float LookPitch()
+	{
+		float Value = 0.f;
+		FParse::Value(FCommandLine::Get(), TEXT("ThalassaLookPitch="), Value);
+		return Value;
+	}
+
 	double TimeoutSeconds()
 	{
 		double Value = 600.0;

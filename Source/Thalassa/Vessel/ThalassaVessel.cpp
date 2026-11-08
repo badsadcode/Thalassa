@@ -10,9 +10,11 @@
 #include "Components/SceneCaptureComponent2D.h"
 #include "Vessel/ThalassaVesselLayout.h"
 #include "Vessel/ThalassaShipMarkers.h"
+#include "Vessel/ThalassaHoloTable.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/SpotLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/CollisionProfile.h"
@@ -96,6 +98,7 @@ namespace ThalassaVesselLayout
 		{ TEXT("LightAirlock"),     FVector(0, 340, 310),   FColor(255, 240, 200) },
 	};
 	const float InteriorLightIntensity = 12000.f;
+	const float FloodlightCandelas = 60000.f;
 	const float InteriorLightRadius = 1400.f;
 
 	// Everything outside these ship-frame boxes is sea. Inner and outer door thickness belongs to the
@@ -355,6 +358,70 @@ AThalassaVessel::AThalassaVessel()
 		Lamp->SetIntensity(ThalassaVesselLayout::InteriorLightIntensity);
 		Lamp->SetAttenuationRadius(ThalassaVesselLayout::InteriorLightRadius);
 		Lamp->SetCastShadows(false);
+	}
+
+	// Floodlights outside the hull: two at the bow lighting ahead of the bridge window, three under the keel
+	// lighting the seabed. Placed from the hull's bounds, so they follow the deck plan.
+	{
+		struct FLamp { const TCHAR* Name; FVector Location; FRotator Aim; };
+		const FBox& Hull = Layout.HullBounds;
+		const float Below = Hull.Min.Z - 60.f;
+		const FLamp Lamps[] = {
+			{ TEXT("FloodBowPort"),      FVector(Hull.Max.X + 40.f, -700.f, -60.f), FRotator(-20.f, -8.f, 0.f) },
+			{ TEXT("FloodBowStarboard"), FVector(Hull.Max.X + 40.f,  700.f, -60.f), FRotator(-20.f,  8.f, 0.f) },
+			{ TEXT("FloodKeelFore"),     FVector(Hull.Max.X * 0.6f, 0.f, Below),     FRotator(-80.f, 0.f, 0.f) },
+			{ TEXT("FloodKeelMid"),      FVector(Hull.GetCenter().X, 0.f, Below),    FRotator(-90.f, 0.f, 0.f) },
+			{ TEXT("FloodKeelAft"),      FVector(Hull.Min.X * 0.6f, 0.f, Below),     FRotator(-100.f, 0.f, 0.f) },
+		};
+		for (const FLamp& Spec : Lamps)
+		{
+			USpotLightComponent* Lamp = CreateDefaultSubobject<USpotLightComponent>(Spec.Name);
+			Lamp->SetupAttachment(ShipRoot);
+			Lamp->SetMobility(EComponentMobility::Movable);
+			Lamp->SetRelativeLocationAndRotation(Spec.Location, Spec.Aim);
+			Lamp->SetIntensityUnits(ELightUnits::Candelas);
+			Lamp->SetIntensity(ThalassaVesselLayout::FloodlightCandelas);
+			Lamp->SetAttenuationRadius(12000.f);
+			Lamp->SetInnerConeAngle(10.f);
+			Lamp->SetOuterConeAngle(26.f);
+			Lamp->SetLightColor(FLinearColor(0.75f, 0.9f, 1.f)); // Cool white: warm light looks sickly green through the water.
+			Lamp->SetVolumetricScatteringIntensity(1.5f);
+			Lamp->SetCastShadows(false); // Each points away from the hull; shadows would cost more than they show.
+			Floodlights.Add(Lamp);
+		}
+	}
+
+	if (Layout.bHasHoloTable)
+	{
+		static ConstructorHelpers::FObjectFinder<UMaterialInterface> HoloMaterial(TEXT("/Game/Ship/Holo/M_HoloPoint.M_HoloPoint"));
+
+		HoloTable = CreateDefaultSubobject<UThalassaHoloTableComponent>(TEXT("HoloTable"));
+		HoloTable->SetupAttachment(ShipRoot);
+		HoloTable->SetRelativeLocation(Layout.HoloTableLocation);
+
+		// The table itself: scenery for now, so players pass through it (docs/HOLOTABLE.md).
+		HoloTableBase = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HoloTableBase"));
+		HoloTableBase->SetupAttachment(HoloTable);
+		HoloTableBase->SetMobility(EComponentMobility::Movable);
+		HoloTableBase->SetStaticMesh(CubeMesh.Object);
+		HoloTableBase->SetMaterial(0, TintableMaterial.Object);
+		HoloTableBase->SetRelativeLocation(FVector(0.f, 0.f, -45.f));
+		HoloTableBase->SetRelativeScale3D(FVector(2.3f, 2.3f, 0.9f));
+		HoloTableBase->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		HoloPoints = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("HoloPoints"));
+		HoloPoints->SetupAttachment(HoloTable);
+		HoloPoints->SetMobility(EComponentMobility::Movable);
+		HoloPoints->SetStaticMesh(CubeMesh.Object);
+		if (HoloMaterial.Succeeded())
+		{
+			HoloPoints->SetMaterial(0, HoloMaterial.Object);
+		}
+		HoloPoints->NumCustomDataFloats = 3;
+		HoloPoints->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		HoloPoints->SetCastShadow(false);
+		HoloPoints->SetCanEverAffectNavigation(false);
+		HoloTable->Points = HoloPoints;
 	}
 
 	Sonar = CreateDefaultSubobject<UThalassaSonarComponent>(TEXT("Sonar"));

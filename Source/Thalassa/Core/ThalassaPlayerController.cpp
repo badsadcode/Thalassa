@@ -15,6 +15,8 @@
 #include "Vessel/ThalassaCameraStation.h"
 #include "Vessel/ThalassaSonarComponent.h"
 #include "Vessel/ThalassaVessel.h"
+#include "World/ThalassaMarineSnow.h"
+#include "Misc/App.h"
 
 UInputAction* AThalassaPlayerController::MakeAction(const TCHAR* Name, EInputActionValueType ValueType)
 {
@@ -110,6 +112,14 @@ void AThalassaPlayerController::BeginPlay()
 		}
 		SetInputMode(FInputModeGameOnly());
 		bStationViewExpanded = FParse::Param(FCommandLine::Get(), TEXT("ThalassaStationView"));
+
+		// Each player's own drifting specks in the water. Nothing to draw in a headless test.
+		if (FApp::CanEverRender())
+		{
+			FActorSpawnParameters Params;
+			Params.Owner = this;
+			GetWorld()->SpawnActor<AThalassaMarineSnow>(Params);
+		}
 	}
 }
 

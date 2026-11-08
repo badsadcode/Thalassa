@@ -43,7 +43,7 @@ void AThalassaHUD::TickScreenshotRequest()
 	// Face the requested way ahead of the capture: a rotation set now only reaches the camera next frame.
 	if (APlayerController* Controller = GetOwningPlayerController())
 	{
-		Controller->SetControlRotation(FRotator(0.f, ThalassaTestConfig::LookYaw(), 0.f));
+		Controller->SetControlRotation(FRotator(ThalassaTestConfig::LookPitch(), ThalassaTestConfig::LookYaw(), 0.f));
 	}
 
 	if (!bScreenshotRequested && ScreenshotClock > SettleSeconds)
