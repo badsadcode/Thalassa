@@ -1,7 +1,7 @@
 ---
 title: "Real Surfaces"
 date: 2026-11-08
-summary: "The rocks and the seabed now wear scanned textures of real rock, sediment and gravel, all free to use."
+summary: "The rocks and the seabed now wear scanned textures of real rock, sediment and gravel, and real scanned boulders lie scattered across the seabed. All of it is free to use."
 category: "Engineering"
 tags: ["prototype", "world", "art"]
 status: "prototype"
@@ -31,9 +31,15 @@ Under the keel floodlight, the seabed now looks like this:
 
 ![The seabed from just under the ship: a rippled sediment floor lit by a cone of light from above, fading into the dark.](/Thalassa/images/devlog/0015-sediment.jpg)
 
+## Real boulders
+
+Textures are skins: they don't add any rocks. So I also brought in nine scanned rock models from Poly Haven, under the same free licence. A scanned rock has no fixed size: a 20-centimetre stone, scaled up, makes a convincing five-metre boulder. Now there are boulders around every slab tower, rubble and big blocks at the foot of the monolith, a few large rock masses on the slopes, and the occasional lone boulder on the open plains. The plains stay mostly empty, on purpose.
+
+![Two scanned boulders half-buried in rippled sediment, with real cracks and chipped edges, in murky blue-green water.](/Thalassa/images/devlog/0015-boulders.jpg)
+
 ## What this does not prove
 
-These are still frames, taken close to things. I haven't steered around it yet. Every rock wears the same texture. Regions with their own character, sediment settling on ledges, and crusts of minerals are all still to come. Megascans may follow for more variety.
+These are still frames, taken close to things. I haven't steered around it yet. Every generated rock wears the same texture, and one of the scanned boulders catches the light with an odd shine. Regions with their own character, sediment settling on ledges, and crusts of minerals are all still to come. Megascans may follow for more variety.
 
 ## Next dive
 
