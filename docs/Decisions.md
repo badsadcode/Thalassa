@@ -91,6 +91,8 @@ Concrete decisions as prototypes settle them. Newest first. Anything here can be
 
 **Crew characters: MetaHuman, later (2026-11-08).** The owner asked about MetaHuman for the player characters. It is free for Unreal Engine projects, and its creator is built into the editor from UE 5.6. It needs the owner's Epic account. To plan for: the cost of up to 8 characters (lower detail levels and simpler hair at distance), diving suits and helmets over the body, and an animation setup on top of the existing movement and replication. Scheduled after the world and the ship's interior.
 
+**The ship is modelled last (owner's direction, 2026-11-08).** The final submarine has several decks, an EVA hangar (small 1–3 crew subs, ROVs, the work mech) and every station. The owner will model it once the game's systems and stations exist, so the hull wraps a finished layout instead of being redone. Until then, the grey deck and the walkable shell carry gameplay. The agreed workflow, for when it starts: inside out. Shell blockout first, then interior kit pieces as Packed Level Actors, then the hull modelled around it in ship coordinates with a gap of half a metre or more, and windows cut through hull and interior wall with a shell box over the glass. Players inside and divers outside see each other through windows with no special work, because the ship is one actor in one world. Don't push ship modelling before then.
+
 ## Still open
 
 From design document section 26: ship size, companion name, and the rest of that table. Source-code licence is the owner's choice and has not been made.

@@ -58,6 +58,9 @@ All of this is recorded in `Decisions.md`.
 
 ## Suggested next steps
 
+**Where the roadmap stands (2026-11-08):** design document section 23, Phase 2 (the *Beep. Bloop.* sensory prototype). Done: sonar of real terrain, physical console plus expanded HUD, persistent chart, deep murky water. Missing: sound (machinery idle loop, acoustic environment, console bleeps, hull impact thud), sunlit and twilight conditions by depth, a waypoint marker, the hydrophone station, Standard/Attitude AI alerts, and creatures (one peaceful, one territorial, one ambiguous distant signal). The owner models the ship last (`Decisions.md`).
+
+
 The owner's direction on movement: smooth and fluid like Titanfall (see `Decisions.md`). Next for the art (see `SHIP_ART.md`): the owner reshaping the walkable shell in Blender and building a first real room on it. Spots don't follow the shell yet: when floors move, move the markers too. Not yet checked: a packaged build with the shell, and reimporting from the editor's right-click menu instead of the import script. The Unreal MCP should help. Also: something to do when the ship hits the seabed (a bump everyone feels the same, a sound), hull floodlights for the cameras, more monitors, or internet play with playit.gg.
 
 ## How to work here
