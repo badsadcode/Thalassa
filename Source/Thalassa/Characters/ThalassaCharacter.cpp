@@ -15,6 +15,7 @@
 #include "Vessel/ThalassaHelmComponent.h"
 #include "Vessel/ThalassaStationComponent.h"
 #include "Vessel/ThalassaCameraStation.h"
+#include "Vessel/ThalassaShipDamage.h"
 #include "Vessel/ThalassaVessel.h"
 
 namespace ThalassaCrew
@@ -481,6 +482,10 @@ void AThalassaCharacter::ServerInteract_Implementation()
 			return;
 		}
 		if ((Vessel->GetHelm() && Vessel->GetHelm()->TryPressFullStopButton(this)) || Vessel->TryUseStation(this))
+		{
+			return;
+		}
+		if (Vessel->GetDamage() && Vessel->GetDamage()->TryStartRepair(this))
 		{
 			return;
 		}

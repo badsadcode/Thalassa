@@ -15,6 +15,7 @@
 #include "Vessel/ThalassaHelmDisplay.h"
 #include "Vessel/ThalassaCameraStation.h"
 #include "Vessel/ThalassaSonarDisplay.h"
+#include "Vessel/ThalassaShipDamage.h"
 #include "Vessel/ThalassaVessel.h"
 
 void AThalassaHUD::DrawLines(const TArray<FString>& Lines, float X, float Y, const FLinearColor& Color, float Scale)
@@ -109,9 +110,10 @@ void AThalassaHUD::DrawHUD()
 			AirlockNames[static_cast<int32>(Vessel->GetAirlockState())], Vessel->GetAirlockWaterLevel() * 100.f,
 			Vessel->IsAirlockDoorwayBlocked() ? TEXT("   DOORWAY BLOCKED") : TEXT("")),
 		TEXT("WASD/mouse move   SHIFT sprint   C crouch (sprinting: slide)   SPACE jump/up   E use helm, console or airlock   TAB station view"),
-		TEXT("N sonar   F sonar ping   G test sonar grade   P run motion test"),
+		TEXT("N sonar   F sonar ping   G test sonar grade   K test damage   P run motion test"),
 	};
 	DrawLines(Diagnostics, 16.f, 16.f, FLinearColor(0.35f, 0.84f, 0.83f), 1.f);
+	DrawDamagePanel(Vessel, Crew);
 
 	if (Controller->IsAtHelm())
 	{
@@ -154,5 +156,62 @@ void AThalassaHUD::DrawHUD()
 		};
 		DrawLines(Station, 40.f, Canvas->ClipY * 0.5f - 90.f, FLinearColor(0.91f, 0.73f, 0.45f), 2.f);
 		DrawSonarChart(Vessel);
+	}
+}
+
+void AThalassaHUD::DrawDamagePanel(const AThalassaVessel* Vessel, const APawn* Crew)
+{
+	const UThalassaShipDamageComponent* Damage = Vessel ? Vessel->GetDamage() : nullptr;
+	if (!Damage)
+	{
+		return;
+	}
+
+	// What's broken and what's flooding: shown while anything is, top right.
+	TArray<FString> Lines;
+	for (int32 Index = 0; Index < static_cast<int32>(EShipSystem::Count); ++Index)
+	{
+		const EShipSystem System = static_cast<EShipSystem>(Index);
+		const float Health = Damage->GetHealth(System);
+		if (Health < 1.f)
+		{
+			const int32 Bars = FMath::RoundToInt(Health * 10.f);
+			Lines.Add(FString::Printf(TEXT("%-9s %s%s %3.0f%%%s"), UThalassaShipDamageComponent::SystemName(System), *FString::ChrN(Bars, TEXT('|')),
+				*FString::ChrN(10 - Bars, TEXT('.')), Health * 100.f, System == EShipSystem::Sonar && !Damage->IsSonarWorking() ? TEXT("  OUT") : TEXT("")));
+		}
+	}
+	for (const FShipBreach& Breach : Damage->GetBreaches())
+	{
+		Lines.Add(FString::Printf(TEXT("BREACH    %s, %.0f%%"), *Damage->CompartmentName(Breach.Compartment), Breach.Severity * 100.f));
+	}
+	for (int32 Index = 0; Index < Vessel->GetCompartmentCount(); ++Index)
+	{
+		const float Level = Damage->GetFloodLevel(Index);
+		if (Level > 0.005f)
+		{
+			Lines.Add(FString::Printf(TEXT("FLOODING  %s, %.0f%%"), *Damage->CompartmentName(Index), Level * 100.f));
+		}
+	}
+	if (Lines.Num() > 0)
+	{
+		Lines.Insert(TEXT("DAMAGE CONTROL"), 0);
+		DrawLines(Lines, Canvas->ClipX - 430.f, 16.f, FLinearColor(1.f, 0.45f, 0.3f), 1.2f);
+	}
+
+	// What you're repairing, or could repair from here.
+	FString Name;
+	float Done = 0.f;
+	const int32 Working = Damage->GetRepairTarget(Crew);
+	if (Working >= 0 && Damage->DescribeTarget(Working, Name, Done))
+	{
+		DrawText(FString::Printf(TEXT("REPAIRING %s   %.0f%%   (stay close; E to stop)"), *Name, Done * 100.f), FLinearColor(1.f, 0.85f, 0.4f),
+			Canvas->ClipX * 0.5f - 220.f, Canvas->ClipY * 0.62f, GEngine->GetSmallFont(), 1.5f);
+		return;
+	}
+	const int32 Nearby = Damage->FindRepairTarget(Crew);
+	if (Nearby >= 0 && Damage->DescribeTarget(Nearby, Name, Done))
+	{
+		DrawText(FString::Printf(TEXT("E  repair %s   (%.0f%%)"), *Name, Done * 100.f), FLinearColor(1.f, 0.85f, 0.4f),
+			Canvas->ClipX * 0.5f - 160.f, Canvas->ClipY * 0.62f, GEngine->GetSmallFont(), 1.5f);
 	}
 }

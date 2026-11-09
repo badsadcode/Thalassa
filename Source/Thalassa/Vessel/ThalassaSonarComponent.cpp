@@ -10,6 +10,7 @@
 #include "Tools/ThalassaPerf.h"
 #include "Tools/ThalassaTestConfig.h"
 #include "Vessel/ThalassaSonarPingComponent.h"
+#include "Vessel/ThalassaShipDamage.h"
 #include "Vessel/ThalassaSurveySave.h"
 #include "Vessel/ThalassaVessel.h"
 #include "Engine/World.h"
@@ -282,6 +283,11 @@ bool UThalassaSonarComponent::TryPing()
 	{
 		return false;
 	}
+	const AThalassaVessel* Owner = Cast<AThalassaVessel>(Ship);
+	if (Owner && Owner->GetDamage() && !Owner->GetDamage()->IsSonarWorking())
+	{
+		return false; // Too badly damaged to ping.
+	}
 
 	Pulse.Origin = Ship->GetActorLocation();
 	Pulse.StartTime = GetServerTime();
@@ -439,6 +445,11 @@ void UThalassaSonarComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		return;
 	}
 
+	const AThalassaVessel* Owner = Cast<AThalassaVessel>(GetOwner());
+	if (Owner && Owner->GetDamage() && !Owner->GetDamage()->IsSonarWorking())
+	{
+		return; // Too badly damaged to survey.
+	}
 	SweepTimer -= DeltaTime;
 	if (SweepTimer <= 0.f)
 	{

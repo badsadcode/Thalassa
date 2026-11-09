@@ -28,6 +28,7 @@ class UThalassaMachineryComponent;
 class UThalassaHullAmbienceComponent;
 class UThalassaBleepComponent;
 class UThalassaImpactComponent;
+class UThalassaShipDamageComponent;
 class UInstancedStaticMeshComponent;
 
 /** A box on the ship, in ship coordinates, read from a marker component. It may be turned. */
@@ -188,6 +189,19 @@ public:
 
 	FVector GetWorldVelocity() const { return Snapshot.Velocity; }
 	UThalassaSonarComponent* GetSonar() const { return Sonar; }
+
+	/** Damage and repairs: systems' health, breaches, flooding. See docs/HUNT.md. */
+	UThalassaShipDamageComponent* GetDamage() const { return Damage; }
+
+	/** The compartments (spaces with air in them), in ship coordinates. */
+	int32 GetCompartmentCount() const { return DryZones.Num(); }
+	const FShipZone& GetCompartment(int32 Index) const { return DryZones[Index]; }
+	FBox GetHullBoundsLocal() const { return HullBoundsLocal; }
+	const TArray<TObjectPtr<USpotLightComponent>>& GetFloodlights() const { return Floodlights; }
+	const UStaticMeshComponent* GetAirlockWaterComponent() const { return AirlockWater; }
+
+	/** On this machine: the thud of a hit (unless the ship's own collision just played it), and the alarm. */
+	void PlayDamageAlarm();
 	EAirlockState GetAirlockState() const { return AirlockState; }
 	float GetAirlockWaterLevel() const { return AirlockWaterLevel; }
 	bool IsAirlockDoorwayBlocked() const { return bAirlockDoorwayBlocked; }
@@ -266,6 +280,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UThalassaSonarComponent> Sonar;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UThalassaShipDamageComponent> Damage;
 
 	/** The chart on the bridge, and the ping heard from it. Absent on ships without a sonar station. */
 	UPROPERTY(VisibleAnywhere)

@@ -61,6 +61,11 @@ private:
 
 	void OnSonarPing();
 	void OnSonarGrade();
+	void OnTestDamage();
+
+	/** Test builds: knock the ship somewhere at random, to try out damage and repairs. */
+	UFUNCTION(Server, Reliable)
+	void ServerTestDamage();
 
 	UFUNCTION(Server, Reliable)
 	void ServerSonarPing();

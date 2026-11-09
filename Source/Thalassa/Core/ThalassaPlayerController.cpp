@@ -14,6 +14,7 @@
 #include "Vessel/ThalassaHelmComponent.h"
 #include "Vessel/ThalassaCameraStation.h"
 #include "Vessel/ThalassaSonarComponent.h"
+#include "Vessel/ThalassaShipDamage.h"
 #include "Vessel/ThalassaVessel.h"
 #include "World/ThalassaMarineSnow.h"
 #include "AudioMixerBlueprintLibrary.h"
@@ -79,6 +80,8 @@ void AThalassaPlayerController::SetupInputComponent()
 	MappingContext->MapKey(SonarPing, EKeys::F);
 	UInputAction* SonarGrade = MakeAction(TEXT("SonarGrade"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(SonarGrade, EKeys::G);
+	UInputAction* TestDamage = MakeAction(TEXT("TestDamage"), EInputActionValueType::Boolean);
+	MappingContext->MapKey(TestDamage, EKeys::K);
 
 	UInputAction* StartProfile = MakeAction(TEXT("StartProfile"), EInputActionValueType::Boolean);
 	MappingContext->MapKey(StartProfile, EKeys::P);
@@ -111,6 +114,7 @@ void AThalassaPlayerController::SetupInputComponent()
 	Input->BindAction(ToggleSonar, ETriggerEvent::Started, this, &AThalassaPlayerController::OnToggleSonar);
 	Input->BindAction(SonarPing, ETriggerEvent::Started, this, &AThalassaPlayerController::OnSonarPing);
 	Input->BindAction(SonarGrade, ETriggerEvent::Started, this, &AThalassaPlayerController::OnSonarGrade);
+	Input->BindAction(TestDamage, ETriggerEvent::Started, this, &AThalassaPlayerController::OnTestDamage);
 	Input->BindAction(Sprint, ETriggerEvent::Started, this, &AThalassaPlayerController::OnSprintStart);
 	Input->BindAction(Sprint, ETriggerEvent::Completed, this, &AThalassaPlayerController::OnSprintStop);
 	Input->BindAction(HelmMode, ETriggerEvent::Started, this, &AThalassaPlayerController::RequestHelmMode);
@@ -412,6 +416,24 @@ void AThalassaPlayerController::ServerSonarPing_Implementation()
 	{
 		Vessel->GetSonar()->TryPing();
 	}
+}
+
+void AThalassaPlayerController::OnTestDamage()
+{
+	ServerTestDamage();
+}
+
+void AThalassaPlayerController::ServerTestDamage_Implementation()
+{
+#if !UE_BUILD_SHIPPING
+	if (AThalassaVessel* Vessel = AThalassaVessel::Find(GetWorld()))
+	{
+		if (Vessel->GetDamage())
+		{
+			Vessel->GetDamage()->ApplyTestImpact();
+		}
+	}
+#endif
 }
 
 void AThalassaPlayerController::ServerSonarGrade_Implementation()

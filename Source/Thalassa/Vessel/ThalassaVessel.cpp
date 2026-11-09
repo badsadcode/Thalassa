@@ -1,5 +1,6 @@
 #include "Vessel/ThalassaVessel.h"
 
+#include "Vessel/ThalassaShipDamage.h"
 #include "Vessel/ThalassaSonarComponent.h"
 #include "Engine/StaticMeshActor.h"
 #include "Vessel/ThalassaSonarDisplay.h"
@@ -446,6 +447,7 @@ AThalassaVessel::AThalassaVessel()
 	ImpactSound->SetupAttachment(ShipRoot);
 
 	Sonar = CreateDefaultSubobject<UThalassaSonarComponent>(TEXT("Sonar"));
+	Damage = CreateDefaultSubobject<UThalassaShipDamageComponent>(TEXT("Damage"));
 	SonarPulse = CreateDefaultSubobject<UThalassaSonarPingComponent>(TEXT("SonarPulse"));
 	SonarPulse->SetupAttachment(ShipRoot);
 	SonarPulse->MakeActivePulse();
@@ -1038,7 +1040,9 @@ void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
 
 	// Test boost: ten times the top speed in about the same time, so it still feels like the same heavy ship.
 	const float Boost = Helm->IsTestBoost() ? UThalassaHelmComponent::TestBoostFactor : 1.f;
-	const float Thrust = Boost * Levers.Throttle * (Levers.Throttle >= 0.f ? HelmAheadAccelMS2 : HelmAsternAccelMS2);
+	const float EngineFactor = Damage ? Damage->GetEngineFactor() : 1.f;
+	const float SteeringFactor = Damage ? Damage->GetSteeringFactor() : 1.f;
+	const float Thrust = Boost * EngineFactor * Levers.Throttle * (Levers.Throttle >= 0.f ? HelmAheadAccelMS2 : HelmAsternAccelMS2);
 	const float Drag = HelmQuadraticDrag / Boost * Speed * FMath::Abs(Speed) + HelmLinearDrag * Speed;
 	Speed += (Thrust - Drag) * DeltaSeconds;
 	if (Levers.Throttle == 0.f && FMath::Abs(Speed) < 0.02f)
@@ -1049,9 +1053,9 @@ void AThalassaVessel::TickHelmMotion(float DeltaSeconds)
 
 	// Going astern, the rudder turns the other way, as it does on a real ship.
 	const float Steerage = FMath::Clamp(FMath::Abs(Speed) / HelmFullSteerageMS, HelmMinSteerage, 1.f) * (Speed < -0.05f ? -1.f : 1.f);
-	TargetYawRate = Levers.Rudder * HelmMaxYawRateDegS * Steerage;
+	TargetYawRate = Levers.Rudder * HelmMaxYawRateDegS * Steerage * SteeringFactor;
 	CurrentRate.Yaw = FMath::FInterpConstantTo(static_cast<float>(CurrentRate.Yaw), TargetYawRate, DeltaSeconds, HelmYawAccelDegS2);
-	TargetPitch = Levers.Planes * HelmMaxPitchDeg;
+	TargetPitch = Levers.Planes * HelmMaxPitchDeg * SteeringFactor;
 	TargetRoll = 0.f;
 
 	// The vertical thrusters: the ship rises or sinks level, slowly, and keeps drifting after you let go.
@@ -1251,6 +1255,14 @@ void AThalassaVessel::TickServer(float DeltaSeconds)
 	{
 		++CollisionCount;
 		LastCollisionTime = GetWorld()->GetTimeSeconds();
+		if (Damage)
+		{
+			// Where it hit: the point of the hull furthest along the way it was going.
+			const FVector Moving = FVector(SpeedCmS, 0.f, 0.f) + GetActorTransform().InverseTransformVectorNoScale(FVector::UpVector * VerticalSpeedCmS);
+			const float ImpactMS = Moving.Size() / 100.f;
+			const FVector Ahead = HullBoundsLocal.GetCenter() + Moving.GetSafeNormal() * 1.0e6f;
+			Damage->ApplyImpact(HullBoundsLocal.GetClosestPointTo(Ahead), FMath::Clamp((ImpactMS - 0.5f) / 5.f, 0.05f, 1.f), TEXT("collision"));
+		}
 		UE_LOG(LogTemp, Display, TEXT("SHIPCOLLISION %d at %s depth %.1f m"), CollisionCount, *NewPosition.ToString(), -NewPosition.Z / 100.0);
 	}
 	if (bHit)
@@ -1421,8 +1433,24 @@ bool AThalassaVessel::IsWaterAt(const FVector& WorldLocation) const
 	}
 
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
-	return AirlockChamberBox().IsInsideOrOn(Local)
-		&& Local.Z < AirlockWaterLevel * ThalassaVesselLayout::AirlockCeilingCm;
+	if (AirlockChamberBox().IsInsideOrOn(Local))
+	{
+		return Local.Z < AirlockWaterLevel * ThalassaVesselLayout::AirlockCeilingCm;
+	}
+	// A flooded compartment: water up to its level.
+	if (Damage)
+	{
+		for (int32 Index = 0; Index < DryZones.Num(); ++Index)
+		{
+			const FShipZone& Zone = DryZones[Index];
+			if (Zone.Contains(Local))
+			{
+				const float Level = Damage->GetFloodLevel(Index);
+				return Level > 0.f && Zone.Transform.InverseTransformPositionNoScale(Local).Z < -Zone.Extent.Z + Level * 2.f * Zone.Extent.Z;
+			}
+		}
+	}
+	return false;
 }
 
 bool AThalassaVessel::IsLadderAt(const FVector& WorldLocation, float MarginCm) const
@@ -1570,4 +1598,18 @@ void AThalassaVessel::UpdateConsoleText(float DeltaSeconds)
 		TEXT("BEEP %d\nDEPTH %.0f m  SPD %.1f m/s\nHDG %03.0f"),
 		BeepCount, GetDepthMeters(), GetSpeedMetersPerSecond(),
 		FRotator::ClampAxis(GetActorRotation().Yaw))));
+}
+
+void AThalassaVessel::PlayDamageAlarm()
+{
+	// A collision has already thudded through the hull (TickSound); anything else that hits the ship thuds here.
+	const float SinceCollision = GetSecondsSinceCollision();
+	if (ImpactSound && (SinceCollision < 0.f || SinceCollision > 0.6f))
+	{
+		ImpactSound->Strike();
+	}
+	if (HelmBleep)
+	{
+		HelmBleep->Bleep(EThalassaBleep::Alarm);
+	}
 }

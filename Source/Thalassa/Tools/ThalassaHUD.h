@@ -23,5 +23,7 @@ private:
 	bool bScreenshotRequested = false;
 
 	void DrawSonarChart(const class AThalassaVessel* Vessel);
+	/** Damage control: what is broken and flooding, and what you are repairing or could repair from here. */
+	void DrawDamagePanel(const class AThalassaVessel* Vessel, const class APawn* Crew);
 	void DrawLines(const TArray<FString>& Lines, float X, float Y, const FLinearColor& Color, float Scale);
 };
