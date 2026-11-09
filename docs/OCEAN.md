@@ -28,12 +28,39 @@ The owner's direction (2026-11-08): the world must be far bigger than the 6 km t
 - **Test boost:** B at the helm, in test and development builds only, gives ×10 top speed (150 m/s ahead) and ×10 on the vertical thrusters, in about the same time to speed. The helm screen shows TEST BOOST. See `HELM.md`.
 - **Tools:** `run_motion_test.py --map /Game/Maps/L_Ocean`, `--above-ground <m>` (starts the ship that far above the highest ground under its hull) and `--helm-course sink` (thrusters full down into the seabed) and `capture_screenshots.py ... /Game/Maps/L_Ocean` play the ocean. From Git Bash, set `MSYS_NO_PATHCONV=1`, or `/Game/...` gets rewritten into a Windows path.
 
+## Clutter (2026-11-09)
+
+`UThalassaOceanClutter` (`Source/Thalassa/World/ThalassaOceanClutter.*`), a component of the ocean, places rocks by rules from the seed. Nothing is sent over the network: every machine places the same rocks.
+
+- **Layers, each on its own world-aligned lattice.** A cell's hash decides whether something is there, where, how big, and which mesh. An object's identity is its cell, so nothing moves or pops when you come back.
+  - Stones, 0.3 to 2 m, per 8 m cell, drawn to 250 m.
+  - Boulders, 1.5 to 7.5 m (mostly small), per 32 m cell, often with a few broken pieces around them; drawn to 800 m.
+  - Rock masses, 10 to 28 m, per 128 m cell; drawn to 2 km.
+  - Slab tower clusters (one to three towers, fragments, and boulders at their feet), per 256 m cell, on level ground only; drawn to 2.5 km.
+- **Rules.** Each province has its own density per layer: the plains stay almost empty, ridges and volcanic fields are strewn with rock, plateaus get most of the towers. Stones and boulders gather on slopes (scree), up to about 3.5 times more, but none on cliffs over about 55 degrees. A 128 m clumping field makes some stretches strewn and others nearly bare. Province borders are dithered, so they never show as a line. Volcanic ground uses the dark fractured boulders; elsewhere, the Poly Haven scans.
+- **Settling.** Each rock is sunk to the lowest ground under it, by 15% of its size (20% for masses), and leans halfway with the slope, with a little random tilt.
+- **Solid or not.** Boulders of 3 m and more, masses and towers block (BlockAll), so the ship, divers and the sonar meet them. Smaller stones are scenery. No shadows (the floodlights cast none).
+- **Streaming.** 256 m patches: stones within one patch of the camera, everything bigger within three. The host also keeps the solid layers around every pawn and the ship. Patches are placed on worker threads (at most 8 at once) and added within 3 ms per frame as instanced meshes, one component per mesh per patch. A patch goes only when it is more than one patch beyond where it is wanted. On the first frame, the solid patches are placed at once.
+- **Switch:** `-ThalassaNoClutter` turns it off, for comparisons.
+- **Measured:** adding a patch costs at most about 1 ms. Helm tests with two players at the start and 12 m over the ridges: no frames over 50 ms, no corrections, the ship in step within 3 cm at the start (34 cm at worst over the ridges).
+
+## Province looks (2026-11-09)
+
+The ocean uses its own material, `M_OceanGround` (`create_ocean_materials.py`), and `AThalassaOcean::BuildMesh` writes each province's look into the visible tiles' vertex colours, blended across borders:
+
+- red: volcanic, black sand and near-black basalt on slopes;
+- green: pale, light fine ooze, with less gravel showing (plains fully, plateaus about half);
+- blue: rocky, bare dark stone from about 15 degrees (ridges fully, canyons 70%, plateaus 60%);
+- black: the plain look, as `M_SeabedGround` (hills).
+
+The test map keeps `M_SeabedGround`. Collision tiles carry no colours.
+
 ## Not done yet
 
 - ~~The sonar chart is one 6.4 km grid.~~ Fixed 2026-11-08: the chart covers the whole ocean, in pages, and the active ping charts the area around the ship. See `SONAR.md`.
-- **No formations, rocks or life in the open ocean.** On purpose, until the terrain looks right. They return as per-cell placement rules (`SEABED.md`).
+- ~~No formations, rocks or life in the open ocean.~~ Rocks done 2026-11-09 (see Clutter above). Still no life, no big landmark formations, and no other formation families.
 - **A coarse whole-ocean plan.** Today's large shapes are noise. The Thornwake way is a plan raster with vector features (trenches, ridge lines, regions and biomes), built once from the seed.
-- **The terrain's character, further.** Revision 2 gives each province a clear look, but every province still wears the same seabed material and the same colours. The province shapes also come from noise, not from a whole-ocean plan.
+- **The terrain's character, further.** ~~Every province wears the same seabed material.~~ Since 2026-11-09 each province has its own ground (see Province looks above), but only from four texture sets, blended by slope. The province shapes also come from noise, not from a whole-ocean plan.
 - **A thin straight line** showed in one frame along X = 0, a tile boundary. It may be a lighting seam between tiles. Not investigated yet.
 - **Overhangs and caves** don't fit a height function.
 - **Performance and memory** have not been measured with players far apart.

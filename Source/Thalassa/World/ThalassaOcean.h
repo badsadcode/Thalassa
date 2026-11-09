@@ -7,6 +7,7 @@
 
 class UProceduralMeshComponent;
 class UMaterialInterface;
+class UThalassaOceanClutter;
 
 /** A seabed tile's address: its detail level and its column and row on that level's grid. */
 struct FOceanTileKey
@@ -26,6 +27,7 @@ struct FOceanTileMesh
 	TArray<FVector> Vertices;
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
+	TArray<FColor> Colors; // Visible tiles: the province's look, for M_OceanGround (red volcanic, green pale, blue rocky).
 };
 
 /**
@@ -71,6 +73,10 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Thalassa|Ocean")
 	TObjectPtr<UMaterialInterface> SeabedMaterial;
+
+	/** Rocks on the seabed, placed by rules from the seed. */
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Ocean")
+	TObjectPtr<UThalassaOceanClutter> Clutter;
 
 	static constexpr double TileM = 256.0;       // Level 0.
 	static constexpr int32 Quads = 64;            // Per tile side: 4 m apart at level 0.

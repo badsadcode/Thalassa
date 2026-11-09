@@ -11,6 +11,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Vessel/ThalassaVessel.h"
+#include "World/ThalassaOceanClutter.h"
 
 namespace ThalassaOceanStream
 {
@@ -29,8 +30,9 @@ AThalassaOcean::AThalassaOcean()
 	bReplicates = false; // Every machine builds the same ocean from the seed.
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	RootComponent->SetMobility(EComponentMobility::Static);
+	Clutter = CreateDefaultSubobject<UThalassaOceanClutter>(TEXT("Clutter"));
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Ground(TEXT("/Game/World/Materials/M_SeabedGround.M_SeabedGround"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Ground(TEXT("/Game/World/Materials/M_OceanGround.M_OceanGround"));
 	SeabedMaterial = Ground.Object;
 }
 
@@ -147,6 +149,31 @@ void AThalassaOcean::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+/**
+ * Each province's look, as M_OceanGround reads it from the vertex colours: red volcanic (black sand, basalt),
+ * green pale (light ooze), blue rocky (bare stone on slopes). Black is the plain look. Blended across borders.
+ */
+static FColor ProvinceLook(const FThalassaSeabedGenerator& Gen, double XM, double YM)
+{
+	using P = FThalassaSeabedGenerator::EProvince;
+	static const FVector Looks[] =
+	{
+		FVector(0.0, 1.0, 0.0),    // Plains: pale ooze.
+		FVector(0.0, 0.0, 0.0),    // Hills: the plain look.
+		FVector(0.0, 0.55, 0.6),   // Plateaus: pale tops, stone edges.
+		FVector(0.0, 0.0, 1.0),    // Ridges: bare rock.
+		FVector(0.0, 0.0, 0.7),    // Canyons: stone walls.
+		FVector(1.0, 0.0, 0.0),    // Volcanic.
+	};
+	static_assert(UE_ARRAY_COUNT(Looks) == static_cast<int32>(P::Count), "A look for every province");
+	P Neighbour;
+	double Weight;
+	const P Here = Gen.ProvinceAt(XM, YM, Neighbour, Weight);
+	const FVector Look = Looks[static_cast<int32>(Here)] * Weight + Looks[static_cast<int32>(Neighbour)] * (1.0 - Weight);
+	return FColor(static_cast<uint8>(FMath::RoundToInt(Look.X * 255.0)), static_cast<uint8>(FMath::RoundToInt(Look.Y * 255.0)),
+		static_cast<uint8>(FMath::RoundToInt(Look.Z * 255.0)), 255);
+}
+
 FOceanTileMesh AThalassaOcean::BuildMesh(const FThalassaSeabedGenerator& Gen, const FOceanTileKey& Key, bool bCollision)
 {
 	const double SizeM = TileSizeM(Key.Level);
@@ -172,6 +199,7 @@ FOceanTileMesh AThalassaOcean::BuildMesh(const FThalassaSeabedGenerator& Gen, co
 	Mesh.bCollision = bCollision;
 	Mesh.Vertices.Reserve(N * N + 4 * N);
 	Mesh.Normals.Reserve(N * N + 4 * N);
+	Mesh.Colors.Reserve(bCollision ? 0 : N * N + 4 * N);
 	for (int32 J = 0; J < N; ++J)
 	{
 		for (int32 I = 0; I < N; ++I)
@@ -179,6 +207,10 @@ FOceanTileMesh AThalassaOcean::BuildMesh(const FThalassaSeabedGenerator& Gen, co
 			Mesh.Vertices.Add(FVector(I * SpacingM, J * SpacingM, At(I, J)) * 100.0);
 			const FVector Normal(At(I - 1, J) - At(I + 1, J), At(I, J - 1) - At(I, J + 1), 2.0 * SpacingM);
 			Mesh.Normals.Add(Normal.GetSafeNormal());
+			if (!bCollision)
+			{
+				Mesh.Colors.Add(ProvinceLook(Gen, OriginX + I * SpacingM, OriginY + J * SpacingM));
+			}
 		}
 	}
 	// Two triangles per quad, wound to face up.
@@ -204,8 +236,10 @@ FOceanTileMesh AThalassaOcean::BuildMesh(const FThalassaSeabedGenerator& Gen, co
 				const int32 Top = Edge(K);
 				const FVector Above = Mesh.Vertices[Top]; // Copied first: adding to an array from itself is unsafe.
 				const FVector Normal = Mesh.Normals[Top];
+				const FColor Look = Mesh.Colors[Top];
 				Mesh.Vertices.Add(Above - FVector(0.0, 0.0, DropCm));
 				Mesh.Normals.Add(Normal);
+				Mesh.Colors.Add(Look);
 			}
 			for (int32 K = 0; K < Quads; ++K)
 			{
@@ -266,7 +300,7 @@ void AThalassaOcean::Commit(FOceanTileMesh&& Mesh)
 	// Each tile sits at its own corner, so its vertices stay small numbers however far out the ocean goes.
 	Tile->SetRelativeLocation(FVector(Mesh.Key.X * SizeM, Mesh.Key.Y * SizeM, 0.0) * 100.0);
 	Tile->RegisterComponent();
-	Tile->CreateMeshSection(0, Mesh.Vertices, Mesh.Triangles, Mesh.Normals, {}, {}, {}, Mesh.bCollision);
+	Tile->CreateMeshSection(0, Mesh.Vertices, Mesh.Triangles, Mesh.Normals, {}, Mesh.Colors, {}, Mesh.bCollision);
 	if (Mesh.bCollision)
 	{
 		Tile->SetVisibility(false);

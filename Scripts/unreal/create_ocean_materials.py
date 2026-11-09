@@ -4,6 +4,7 @@
   /Game/World/Materials/M_Rock         dark layered rock, tinted by the strata and mineral streaks painted
                                         into each rock's vertex colours. For formations.
   /Game/World/Materials/M_SeabedGround rippled sediment on the flats, coral gravel on slopes.
+  /Game/World/Materials/M_OceanGround  the open ocean's floor: the same, changed by province (vertex colours).
 
 Both glow where the sonar's active ping passes (MPC_SonarPulse, made by create_sonar_pulse.py, which must run
 first): a bright ring at the wave front, and height contours fading out behind it.
@@ -255,9 +256,86 @@ def make_seabed():
     return m
 
 
+def make_ocean_ground():
+    """The open ocean's floor: the seabed's look, changed by province.
+
+    The ocean writes each province's character into the seabed's vertex colours (AThalassaOcean::BuildMesh),
+    blended across the borders: red volcanic, green pale sediment, blue exposed rock. Black is the plain look,
+    the same as M_SeabedGround.
+    """
+    m = fresh_material("M_OceanGround")
+    m.set_editor_property("used_with_nanite", False)
+    g = Graph(m)
+    sand_c = g.two_scales(tex("T_Ground093C_C", "Ground093C"), 700.0)
+    sand_n = g.two_scales(tex("T_Ground093C_N", "Ground093C"), 700.0, normal=True)
+    sand_r = g.two_scales(tex("T_Ground093C_R", "Ground093C"), 700.0)
+    fine_c = g.two_scales(tex("T_DampSand_C", "damp_beach_sand"), 500.0)
+    fine_n = g.two_scales(tex("T_DampSand_N", "damp_beach_sand"), 500.0, normal=True)
+    grav_c = g.two_scales(tex("T_CoralGravel_C", "coral_gravel"), 350.0)
+    grav_n = g.two_scales(tex("T_CoralGravel_N", "coral_gravel"), 350.0, normal=True)
+    grav_a = g.two_scales(tex("T_CoralGravel_ARM", "coral_gravel"), 350.0)
+    rock_c = g.two_scales(tex("T_DarkRock02_C", "dark_rock_02"), 600.0)
+    rock_n = g.two_scales(tex("T_DarkRock02_N", "dark_rock_02"), 600.0, normal=True)
+    rock_a = g.two_scales(tex("T_DarkRock02_ARM", "dark_rock_02"), 600.0)
+
+    vertex = g.node(unreal.MaterialExpressionVertexColor)
+    volcanic = g.channel(vertex, r=True)
+    pale = g.channel(vertex, g=True)
+    rocky = g.channel(vertex, b=True)
+
+    up = g.node(unreal.MaterialExpressionVertexNormalWS)
+    up_z = g.node(unreal.MaterialExpressionComponentMask, -500, r=False, g=False, b=True, a=False)
+    g.link(up, up_z)
+    steep = g.node(unreal.MaterialExpressionOneMinus, -450)
+    g.link(up_z, steep)
+    wobble = g.macro(0.003, 0.6, 1.4)
+
+    def saturate(e):
+        s = g.node(unreal.MaterialExpressionSaturate, -250)
+        g.link(e, s)
+        return s
+
+    # Gravel on slopes from about 25 degrees, as on the test map; bare rock shows from about 15 degrees where
+    # the province is rocky, so ridges and plateau edges read as stone.
+    slope = saturate(g.mul(g.mul(steep, g.node(unreal.MaterialExpressionConstant, r=9.0)), wobble))
+    bare = saturate(g.mul(g.mul(steep, g.node(unreal.MaterialExpressionConstant, r=16.0)), wobble))
+
+    def colour(e, r, gg, b):
+        return g.mul(e, g.node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(r, gg, b, 1)))
+
+    # The plain look: grey-brown sediment, gravel on slopes.
+    base = g.lerp(colour(sand_c, 0.62, 0.62, 0.60), colour(grav_c, 0.55, 0.55, 0.55), slope)
+    normal = g.lerp(sand_n, grav_n, slope)
+    rough = g.lerp(g.channel(sand_r, r=True), g.channel(grav_a, g=True), slope)
+    # Pale: fine, light ooze that drapes the plains and plateau tops, with less gravel showing through.
+    pale_slope = g.mul(slope, g.node(unreal.MaterialExpressionConstant, r=0.5))
+    pale_base = g.lerp(colour(fine_c, 0.78, 0.76, 0.70), colour(grav_c, 0.6, 0.6, 0.58), pale_slope)
+    base = g.lerp(base, pale_base, pale)
+    normal = g.lerp(normal, g.lerp(fine_n, grav_n, pale_slope), pale)
+    # Rocky: bare dark stone on every slope.
+    rock_tint = colour(rock_c, 0.75, 0.72, 0.68)
+    base = g.lerp(base, g.lerp(base, rock_tint, bare), rocky)
+    normal = g.lerp(normal, g.lerp(normal, rock_n, bare), rocky)
+    rough = g.lerp(rough, g.lerp(rough, g.channel(rock_a, g=True), bare), rocky)
+    # Volcanic: black sand, and near-black basalt on the slopes.
+    black = g.lerp(colour(sand_c, 0.16, 0.15, 0.15), colour(rock_c, 0.32, 0.30, 0.30), bare)
+    base = g.lerp(base, black, volcanic)
+    normal = g.lerp(normal, g.lerp(sand_n, rock_n, bare), volcanic)
+
+    base = g.mul(base, g.macro(0.0004, 0.7, 1.15))
+    mel.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(normal, "", unreal.MaterialProperty.MP_NORMAL)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    add_pulse(g, m)
+    mel.recompile_material(m)
+    eal.save_asset(MAT + "/M_OceanGround")
+    return m
+
+
 import_textures()
 rock = make_rock()
 seabed = make_seabed()
+make_ocean_ground()
 
 unreal.load_asset("/Game/World/Seabed/SM_Seabed").set_material(0, seabed)
 eal.save_asset("/Game/World/Seabed/SM_Seabed")
@@ -265,4 +343,4 @@ for name in ["SM_SlabTower_%02d" % i for i in range(1, 7)] + ["SM_SlabFragment_%
     path = "/Game/World/Formations/" + name
     unreal.load_asset(path).set_material(0, rock)
     eal.save_asset(path)
-unreal.log("THALASSA: built M_Rock and M_SeabedGround, assigned to the seabed and %d formations" % 12)
+unreal.log("THALASSA: built M_Rock, M_SeabedGround and M_OceanGround, assigned to the seabed and %d formations" % 12)

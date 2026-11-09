@@ -72,4 +72,4 @@ namespace ThalassaPerf
 	}
 }
 
-#define THALASSA_PERF_SCOPE(Name) ThalassaPerf::FScope PREPROCESSOR_JOIN(ThalassaPerfScope, __LINE__)(TEXT(Name))
+#define THALASSA_PERF_SCOPE(Name) ThalassaPerf::FScope UE_JOIN(ThalassaPerfScope, __LINE__)(TEXT(Name))
