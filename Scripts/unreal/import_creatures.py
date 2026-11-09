@@ -148,7 +148,10 @@ def make_material(name, jelly=False, eye=False, textured=False):
         return mask
 
     def custom_data(index, y):
-        return node(unreal.MaterialExpressionPerInstanceCustomData, -1000, y, data_index=index)
+        # Outside an instanced component (the mesh editor's preview, a plain mesh in a level) there is no per-instance
+        # data, and each number reads its default: 1 for the rate, the tint and the glow, or the preview is black.
+        default = 1.0 if index in (1, 3, 4, 5, 6) else 0.0
+        return node(unreal.MaterialExpressionPerInstanceCustomData, -1000, y, data_index=index, const_default_value=default)
 
     def custom(code, inputs, description, x, y):
         c = node(unreal.MaterialExpressionCustom, x, y)
