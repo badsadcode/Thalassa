@@ -193,6 +193,8 @@ def fresh_material(name):
     material = tools.create_asset(name, MAT, unreal.Material, unreal.MaterialFactoryNew())
     # The seabed and every rock are Nanite meshes. Without this flag a packaged build draws them in the default material.
     material.set_editor_property("used_with_nanite", True)
+    # The open ocean draws its rocks as instances: without this, a packaged build draws them in the default material.
+    material.set_editor_property("used_with_instanced_static_meshes", True)
     return material
 
 
