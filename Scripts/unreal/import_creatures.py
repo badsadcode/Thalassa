@@ -6,10 +6,13 @@ Reads Saved/Creatures/Creatures.fbx; make it first with:
 M_Creature draws the fish, the gliders and the leviathan; M_Jelly (see-through, unlit, glowing) the jellyfish.
 Both take the skin from the vertex colours, glow where UV channel 4 marks it, and move in the vertex shader (world
 position offset), so moving a thousand animals costs the CPU only their positions. What each mesh carries for this
-is described in make_creatures.py. Per instance, three numbers (PerInstanceCustomData):
-  0  phase: where in its stroke this animal is, so a school doesn't beat in time
-  1  rate: how fast it beats, 1 normally, faster when it flees
-  2  flash: extra glow, when a ping startles it
+is described in make_creatures.py. Per instance, seven numbers (PerInstanceCustomData):
+  0    phase: for fish and gliders, where in its stroke it started, so a school doesn't beat in time; for jellyfish
+       and krakens, where in its stroke it is now (worked out by the game, so the stroke and the swim match)
+  1    rate: how fast it beats, 1 normally, faster when it flees
+  2    flash: extra glow, when a ping startles it
+  3-5  tint: multiplies the skin, and colours a jellyfish's glow
+  6    glow: how much it glows (0: not at all)
 
 No collision and no Nanite (world position offset is cheaper without it for small meshes).
 
@@ -21,7 +24,8 @@ import unreal
 FOLDER = "/Game/Creatures"
 FBX = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()), "Creatures", "Creatures.fbx")
 NAMES = ["SM_Glider", "SM_Fish_Dart", "SM_Fish_Disc", "SM_Fish_Lantern", "SM_Fish_Grouper", "SM_Fish_Eel", "SM_Fish_Cruiser",
-         "SM_Jelly_Giant", "SM_Jelly_Glow", "SM_Jelly_Mote", "SM_Leviathan_Head", "SM_Leviathan_Body", "SM_Leviathan_Tail"]
+         "SM_Jelly_Giant", "SM_Jelly_Glow", "SM_Jelly_Mote", "SM_Leviathan_Head", "SM_Leviathan_Body", "SM_Leviathan_Tail",
+         "SM_Jelly_Helmet", "SM_Jelly_Comb", "SM_Kraken"]
 
 eal = unreal.EditorAssetLibrary
 mel = unreal.MaterialEditingLibrary
@@ -33,15 +37,32 @@ tools = unreal.AssetToolsHelpers.get_asset_tools()
 MOTION_HLSL = """
 float3 o = float3(0, 0, 0);
 float s = Sz * 100;
-if (M > 2.5)
+float pulse = 0.5 + 0.5 * sin(Ph);  // Jellyfish and krakens: the stroke, from the game's clock.
+if (M > 3.5)
+{
+    // A kraken. The mantle draws in with each stroke; the arms close together, then spread, and undulate.
+    if (A < 0.38)
+    {
+        float m = saturate(A / 0.3) * (1 - saturate((A - 0.3) / 0.08));
+        o.yz = -P.yz * 0.12 * pulse * m;
+    }
+    else
+    {
+        float k = saturate((A - 0.4) / 0.6);
+        float2 d = normalize(P.yz + float2(0.001, 0.001));
+        float around = atan2(d.y, d.x);
+        o.yz = -d * pulse * k * s * 0.04;
+        o.yz += float2(-d.y, d.x) * sin(T * 0.6 + k * 5.0 + around * 2.0) * pow(k, 1.3) * s * 0.05;
+        o.x = sin(T * 0.4 + k * 3.0 + around) * k * s * 0.02;
+    }
+}
+else if (M > 2.5)
 {
     // Not at all: the leviathan's pieces move by where they are put.
 }
 else if (M > 1.5)
 {
-    // A jellyfish. The bell: a slow pulse, the rim drawing in most, then relaxing.
-    float w = 6.2832 / (1.3 * sqrt(max(Sz, 0.2))) * Rt;
-    float pulse = 0.5 + 0.5 * sin(T * w + Ph);
+    // A jellyfish. The bell: the rim draws in with each stroke, then relaxes.
     if (A < 0.15)
     {
         float k = A / 0.15;
@@ -50,12 +71,13 @@ else if (M > 1.5)
     }
     else
     {
-        // The tentacles: trailing, swaying slowly, more towards their tips.
+        // The tentacles: trailing, swaying slowly, more towards their tips, each stroke rippling down them.
+        // (For jellyfish, Rt is a steady number of its own between 1 and 2, so no two sway alike.)
         float k = (A - 0.15) / 0.85;
         float reach = pow(k, 1.5) * s * 0.35;
-        o.x = sin(T * 0.45 * Rt + Ph + k * 3.0) * reach;
-        o.y = cos(T * 0.37 * Rt + Ph * 1.3 + k * 2.5) * reach;
-        o.z = s * 0.03 * pulse;
+        o.x = sin(T * 0.45 * Rt + Rt * 20.0 + k * 3.0) * reach;
+        o.y = cos(T * 0.37 * Rt + Rt * 31.0 + k * 2.5) * reach;
+        o.z = s * 0.04 * (0.5 + 0.5 * sin(Ph - k * 2.0));
     }
 }
 else if (M > 0.5)
@@ -75,9 +97,17 @@ return o;
 
 # The glow's colour: a bright skin glows its own colour (the leviathan's amber eyes, the jellyfish); a dark one
 # glows cold blue-green (the lanterns' spots, the gliders' wingtips).
+# The colour is deepened (raised to a power), or bright glows wash out towards white.
 GLOW_HLSL = """
 float l = max(V.r, max(V.g, V.b));
-return l > 0.3 ? V / l : float3(0.15, 0.85, 1.0);
+return l > 0.3 ? pow(V / l, 1.8) : float3(0.15, 0.85, 1.0);
+"""
+
+
+# A jellyfish's glow follows its stroke: brightest as the bell draws in, dimming as it relaxes.
+PULSE_HLSL = """
+float p = 0.5 + 0.5 * sin(Ph);
+return float3(1, 1, 1) * (0.3 + 1.2 * p * p);
 """
 
 
@@ -136,12 +166,22 @@ def make_material(name, jelly=False):
     def const(v, x, y):
         return node(unreal.MaterialExpressionConstant, x, y, r=v)
 
-    vertex = node(unreal.MaterialExpressionVertexColor, -1300, -400)
-    glow_mask = uv(4, -150)
+    tint = node(unreal.MaterialExpressionAppendVector, -1100, -480)
+    tint_rg = node(unreal.MaterialExpressionAppendVector, -1200, -520)
+    mel.connect_material_expressions(custom_data(3, -560), "", tint_rg, "A")
+    mel.connect_material_expressions(custom_data(4, -520), "", tint_rg, "B")
+    mel.connect_material_expressions(tint_rg, "", tint, "A")
+    mel.connect_material_expressions(custom_data(5, -480), "", tint, "B")
+    vertex = mul(node(unreal.MaterialExpressionVertexColor, -1300, -400), tint, -1000, -400)
+    glow_mask = mul(uv(4, -150), custom_data(6, -100), -900, -150)
     glow_colour = custom(GLOW_HLSL, ["V"], "Glow colour", -900, -250)
     mel.connect_material_expressions(vertex, "", glow_colour, "V")
-    # How strongly it glows: a little always, much more in a flash.
+    # How strongly it glows: a little always, much more in a flash; a jellyfish's with its stroke.
     strength = add(const(1.5 if jelly else 0.6, -900, 0), mul(custom_data(2, 60), const(12.0, -1000, 120), -800, 60), -700, 0)
+    if jelly:
+        stroke = custom(PULSE_HLSL, ["Ph"], "Stroke glow", -900, 180)
+        mel.connect_material_expressions(custom_data(0, 180), "", stroke, "Ph")
+        strength = mul(strength, stroke, -600, 60)
     glow = mul(mul(glow_colour, glow_mask, -600, -200), strength, -400, -150)
 
     if jelly:

@@ -541,10 +541,135 @@ def all_fish():
     eel("SM_Fish_Eel", 2.2, 0.13, (0.10, 0.11, 0.07), (0.30, 0.30, 0.20))
 
 
+def comb(name, length, radius, rows=8):
+    """A comb jelly: an egg-shaped body with no tentacles, and rows of glowing combs running from top to bottom.
+    Upright, origin at its middle. All of it counts as 'bell' (UV 1 under 0.15), so it pulses gently."""
+    b = Builder(size_m=length, mode=2)
+    lat, segments = 14, rows * 4
+    rings = []
+    for k in range(1, lat):
+        t = k / lat
+        z = length * (0.5 - t)
+        r = radius * math.sin(math.pi * t) ** 0.8
+        ring = []
+        for s in range(segments):
+            a = 2.0 * math.pi * s / segments
+            on_row = s % 4 == 0
+            ring.append(b.vert((r * math.cos(a), r * math.sin(a), z), (0.85, 0.88, 0.9), 1.0 if on_row and 0.15 < t < 0.85 else 0.0, 0.14 * t))
+        rings.append(ring)
+    top = b.vert((0.0, 0.0, length * 0.5), (0.85, 0.88, 0.9), 0.0, 0.0)
+    bottom = b.vert((0.0, 0.0, -length * 0.5), (0.85, 0.88, 0.9), 0.0, 0.14)
+    for s in range(segments):
+        j = (s + 1) % segments
+        b.face(rings[0][s], rings[0][j], top)
+        b.face(rings[-1][j], rings[-1][s], bottom)
+    for k in range(len(rings) - 1):
+        for s in range(segments):
+            j = (s + 1) % segments
+            b.face(rings[k][s], rings[k + 1][s], rings[k + 1][j], rings[k][j])
+    return b.finish(name)
+
+
 def all_jellies():
-    jelly("SM_Jelly_Giant", 3.0, 2.2, 20, 14.0, (0.70, 0.55, 0.58), (0.80, 0.62, 0.55), glow_rim=0.35, segments=32)
-    jelly("SM_Jelly_Glow", 1.1, 0.9, 12, 6.0, (0.25, 0.45, 0.95), (0.35, 0.95, 0.85), glow_rim=1.0, glow_bands=1.0)
-    jelly("SM_Jelly_Mote", 0.15, 0.13, 6, 0.4, (0.35, 1.0, 0.75), (0.35, 1.0, 0.75), glow_rim=1.0, glow_bands=0.8, arms=0, segments=10)
+    # Jellyfish are pale in their meshes: each school is tinted, and glows or not, by the game (see ThalassaOceanFauna.cpp).
+    pale, rim = (0.85, 0.82, 0.82), (0.95, 0.93, 0.92)
+    jelly("SM_Jelly_Giant", 3.0, 2.2, 20, 14.0, pale, rim, glow_rim=0.5, glow_bands=0.3, segments=32)
+    jelly("SM_Jelly_Glow", 1.1, 0.9, 12, 6.0, pale, rim, glow_rim=1.0, glow_bands=1.0)
+    jelly("SM_Jelly_Mote", 0.15, 0.13, 6, 0.4, pale, rim, glow_rim=1.0, glow_bands=0.8, arms=0, segments=10)
+    # A helmet jelly: a tall bell, short tentacles, a bright ring round the rim.
+    jelly("SM_Jelly_Helmet", 0.75, 1.6, 16, 1.4, pale, rim, glow_rim=1.0, glow_bands=0.0, arms=0, segments=24)
+    comb("SM_Jelly_Comb", 1.2, 0.45)
+
+
+def kraken():
+    """A giant squid-like animal, about 60 m from the tip of its mantle to the end of its two long tentacles. It swims
+    mantle first (+X), arms trailing. UV 1 runs from the mantle's tip (0) through the collar (0.3) and head (0.38) to
+    the tips of the arms (1). Dark red-brown, with pale spots that glow faintly, and big, faintly glowing eyes."""
+    b = Builder(size_m=60.0, mode=4)
+    back, belly, spot = (0.30, 0.06, 0.045), (0.52, 0.22, 0.16), (0.85, 0.72, 0.62)
+
+    def skin(t, a, x):
+        c = mix(belly, back, smooth(-0.6, 0.4, math.sin(a)))
+        n = noise.noise(Vector((x * 0.35, a * 2.0, 5.0)))
+        return spot if n > 0.42 else mix(c, back, 0.3 + 0.3 * n)
+
+    def spots(t, a, x):
+        return 0.7 if noise.noise(Vector((x * 0.35, a * 2.0, 5.0))) > 0.42 else 0.0
+
+    # The mantle: pointed at the tip, widest towards the collar.
+    rings, segments = 18, 20
+    stations = []
+    for k in range(rings):
+        t = k / (rings - 1)
+        r = 4.6 * (0.06 + 0.94 * t ** 0.55) * (1.0 - 0.12 * smooth(0.85, 1.0, t))
+        stations.append((22.0 - 22.0 * t, r, r * 0.92, 0.0))
+    loft(b, stations, segments, skin, spots, lambda t: 0.3 * t, cap_back=False)
+    # Fins: two broad flaps near the tip.
+    for s in (1.0, -1.0):
+        fin(b, [(21.0, s * 0.6, 0.0), (12.5, s * 3.3, 0.0), (15.5, s * 9.0, 0.0)], back, [0.02, 0.1, 0.06])
+    # The head, behind the collar, narrower, with the eyes.
+    head = [(0.4, 4.0, 3.7, 0.0), (-1.5, 3.9, 3.6, 0.0), (-3.5, 3.6, 3.3, 0.0), (-5.5, 2.9, 2.7, 0.0), (-6.5, 2.4, 2.2, 0.0)]
+    loft(b, head, segments, skin, lambda t, a, x: 0.0, lambda t: 0.3 + 0.08 * t, cap_front=False, cap_back=False)
+    for side in (1.0, -1.0):
+        centre = Vector((-2.6, side * 3.55, 0.6))
+        eye_r = 1.7
+        lat, seg = 6, 14
+        prev = None
+        for k in range(lat + 1):
+            phi = math.pi * 0.5 * k / lat
+            ring = []
+            for s in range(seg):
+                a = 2.0 * math.pi * s / seg
+                local = Vector((eye_r * math.sin(phi) * math.cos(a), side * eye_r * math.cos(phi) * 0.6, eye_r * math.sin(phi) * math.sin(a)))
+                pupil = k < 3
+                ring.append(b.vert(centre + local, (0.02, 0.02, 0.02) if pupil else (0.95, 0.85, 0.45), 0.1 if pupil else 0.5, 0.34))
+            if prev:
+                for s in range(seg):
+                    j = (s + 1) % seg
+                    quad = (prev[s], ring[s], ring[j], prev[j])
+                    b.face(*(quad if side > 0 else tuple(reversed(quad))))
+            else:
+                apex = b.vert(centre + Vector((0.0, side * eye_r * 0.62, 0.0)), (0.02, 0.02, 0.02), 0.1, 0.34)
+                for s in range(seg):
+                    tri = (ring[(s + 1) % seg], ring[s], apex)
+                    b.face(*(tri if side > 0 else tuple(reversed(tri))))
+            prev = ring
+
+    def limb(angle, length, base_r, tip_r, club=False):
+        """An arm: a tapering tube from the head trailing back, spreading a little, curling at the tip."""
+        out = Vector((0.0, math.cos(angle), math.sin(angle)))
+        side = Vector((0.0, -math.sin(angle), math.cos(angle)))
+        steps, sides = 20, 6
+        rings_ = []
+        for i in range(steps + 1):
+            s = i / steps
+            centre = Vector((-6.0 - length * s, 0.0, 0.0)) + out * (2.0 + length * 0.12 * math.sin(s * math.pi * 0.8)) \
+                + side * (length * 0.05 * math.sin(s * 4.0 + angle))
+            r = base_r * (1.0 - s) + tip_r * s
+            if club and s > 0.8:
+                r *= 1.0 + 1.2 * math.sin(math.pi * (s - 0.8) / 0.2)
+            ring = []
+            for j in range(sides):
+                a = 2.0 * math.pi * j / sides
+                normal = out * math.cos(a) + side * math.sin(a)
+                c = mix(belly, back, 0.5 + 0.5 * math.cos(a))
+                if math.cos(a) < -0.5:
+                    c = mix(c, spot, 0.5)   # Paler undersides: the suckers' rows.
+                ring.append(b.vert(centre + normal * r, c, 0.0, 0.4 + 0.6 * s))
+            rings_.append(ring)
+        for i in range(steps):
+            for j in range(sides):
+                k = (j + 1) % sides
+                b.face(rings_[i][j], rings_[i + 1][j], rings_[i + 1][k], rings_[i][k])
+        tip = b.vert(rings_[-1][0].co * 0.0 + sum((v.co for v in rings_[-1]), Vector()) / sides + Vector((-0.3, 0.0, 0.0)), back, 0.0, 1.0)
+        for j in range(sides):
+            b.face(rings_[-1][j], rings_[-1][(j + 1) % sides], tip)
+
+    for i in range(8):
+        limb(2.0 * math.pi * (i + 0.5) / 8.0, 30.0 + 3.0 * ((i * 5) % 3), 1.0, 0.08)
+    for angle in (-math.pi * 0.5 + 0.35, -math.pi * 0.5 - 0.35):
+        limb(angle, 52.0, 0.5, 0.12, club=True)
+    return b.finish("SM_Kraken")
 
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -554,6 +679,7 @@ all_jellies()
 lev_head()
 lev_body()
 lev_tail()
+kraken()
 
 for obj in bpy.context.scene.collection.objects:
     xs = [v.co.x for v in obj.data.vertices]

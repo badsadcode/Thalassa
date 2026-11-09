@@ -1,6 +1,6 @@
 # Creatures
 
-Life in the open ocean: ten kinds of animal in schools, from tiny glowing jellyfish to big slow cruisers, and one leviathan, longer than the ship. The ping startles them, and draws the leviathan. The first of the design document's Phase 2 creatures ("one peaceful, one territorial, one ambiguous distant signal"), and the owner's "clutter fish".
+Life in the open ocean: thirteen kinds of animal in schools, from tiny glowing jellyfish to big slow cruisers and krakens, and one leviathan, longer than the ship. The ping startles them, and draws the leviathan. The first of the design document's Phase 2 creatures ("one peaceful, one territorial, one ambiguous distant signal"), and the owner's "clutter fish".
 
 ## What's there
 
@@ -13,14 +13,20 @@ Life in the open ocean: ten kinds of animal in schools, from tiny glowing jellyf
 | Grouper: heavy, mottled | 1.4 m | 2 to 6 | 160 m | 0.8 to 3 m | 150 m | no |
 | Eel: long, ribbon fins | 2.2 m | 1 to 3 | 200 m | 0.4 to 1.5 m | 110 m | no |
 | Cruiser: big, slow, long-finned, a faint glowing line along each flank | 7 m | 1 to 3 | 500 m | 15 to 60 m | 450 m | yes |
-| Giant jellyfish: pale, faintly glowing rim | 6 m bell, tentacles to 14 m | 1 to 3 | 400 m | 25 to 90 m | 400 m | yes |
-| Glow jellyfish: blue, glowing rim and banded tentacles | 2.2 m bell | 3 to 9 | 250 m | 12 to 60 m | 350 m | no |
-| Motes: tiny glowing jellyfish, drifting swarms | 0.3 m | 40 to 110 | 150 m | 5 to 50 m | 160 m | no |
+| Giant jellyfish: pale, clear or deep red, some with a faintly glowing rim | 6 m bell, tentacles to 14 m | 1 to 3 | 400 m | 25 to 90 m | 400 m | yes |
+| Glow jellyfish: glowing rim and banded tentacles, in one of six colours | 2.2 m bell | 3 to 9 | 250 m | 12 to 60 m | 350 m | no |
+| Motes: tiny glowing jellyfish, drifting swarms, in one of six colours | 0.3 m | 40 to 110 | 150 m | 5 to 50 m | 160 m | no |
+| Helmet jellyfish: a tall bell, deep red or dusky purple, or with a glowing amber or violet ring | 1.6 m tall | 4 to 14 | 300 m | 10 to 70 m | 300 m | no |
+| Comb jellyfish: egg-shaped, eight glowing rows, in one of six colours | 1.2 m | 6 to 20 | 200 m | 5 to 40 m | 220 m | no |
+| Kraken: a giant squid-like animal, dark red-brown with pale spots that glow faintly, big glowing eyes | 55 to 90 m | 1 | 2.5 km cells | 50 to 140 m | 2.2 km | yes, one big contact |
 
 Each animal is scaled about 0.8 to 1.3 times. Each kind has its own lattice of cells, and the seed decides whether a cell holds a school of that kind, by province (the table is `ThalassaFauna::Species` in `ThalassaOceanFauna.cpp`). Small fish are everywhere; lanterns and glowing jellyfish like the dark canyons and volcanic fields; groupers and eels the broken ground; the plains are thinner. Every kind has a school near the start, so there's something to meet.
 
 - **Schools** wander two loops added together round their home, a big slow one and a smaller quicker one, so the path never quite repeats, at a height over the ground, following its shape (closely for fish near the ground), banking into turns. Each animal drifts within the school and faces a little its own way. Jellyfish drift slowly, upright, turning and tilting a little.
-- **Motion in the materials:** fish bodies sway with a wave running back to the tail (small fish fast, big ones slowly); gliders' wings beat; jellyfish bells pulse and their tentacles trail.
+- **Motion in the materials:** fish bodies sway with a wave running back to the tail (small fish fast, big ones slowly); gliders' wings beat; jellyfish bells pulse and their tentacles trail; a kraken's mantle draws in, and its arms close together, spread and undulate.
+- **Jellyfish swim in strokes.** Each bell draws in and relaxes (every 1.5 s for a mote, about 3 s for a giant: the period is 1.3 times the square root of its size), and with each stroke the jellyfish bobs up and sinks back, the stroke rippling down its tentacles. Its glow follows the stroke: brightest as the bell draws in, dimming as it relaxes. Each has its own rhythm, so a swarm shimmers rather than blinking together. The stroke is worked out from the server's clock (and handed to the material as the phase), so the bob and the pulse match, and every player sees the same stroke.
+- **Colours.** Jellyfish meshes are pale; each school picks a colour from its kind's list (the palettes in `ThalassaOceanFauna.cpp`), and whether it glows: glowing blue, violet, green, amber, pink or cyan; or not glowing at all, pale, nearly clear, deep red or dusky purple, which is how real deep-sea jellyfish hide (red looks black where no red light reaches). Each animal is a little lighter or darker than its school.
+- **Krakens** swim mantle first, in slow strokes (about 10 s), surging forward with each one. A ping makes one bolt 250 m and its pale spots flare. One lives near the start; elsewhere, mostly in canyons, ridges and volcanic fields.
 - **The ping:** when its wave reaches a school (500 m/s), the school bolts away from where it came from, swims faster, spreads out, and its glow flashes; over 45 s it settles and drifts back. Jellyfish drift only a little, and their glow flares for a few seconds. Pings close together add up. Every school gives the ship room (10 to 80 m, by kind).
 - **Contacts on the chart:** everything big enough (gliders, cruisers, giant jellyfish, the leviathan) shows as an amber diamond with a dark halo, appearing as the wave reaches it and fading over 12 s, where it was when the wave reached it. Small fish are too small for the ping.
 
@@ -46,8 +52,8 @@ Contacts are worked out on each machine from the same inputs (`UThalassaSonarCom
 
 ## How it's drawn
 
-- One instanced mesh component per mesh (13: ten kinds and the leviathan's head, body segment and tail), on the ocean, with no collision and no shadows. The positions are set every frame on the CPU; the motion is in the materials (world position offset).
-- **The meshes** are placeholders made by rules: `Scripts/blender/make_creatures.py` makes them, `Scripts/unreal/import_creatures.py` imports them into `Content/Creatures` and builds the materials. **`M_Creature`** (lit) draws fish, gliders and the leviathan; **`M_Jelly`** (see-through, unlit, brighter and more solid at the edges) the jellyfish. Both read what each mesh carries (see the top of `make_creatures.py`): skin from the vertex colours; UV channel 1 where a vertex is on the moving part; channel 2 its size; channel 3 how it moves (body, wings, jellyfish, or not at all); channel 4 its glow. A bright skin glows its own colour (the leviathan's amber eyes), a dark one cold blue-green. Per instance: phase, stroke rate and flash.
+- One instanced mesh component per mesh (16: thirteen kinds and the leviathan's head, body segment and tail), on the ocean, with no collision and no shadows. The positions are set every frame on the CPU; the motion is in the materials (world position offset).
+- **The meshes** are placeholders made by rules: `Scripts/blender/make_creatures.py` makes them, `Scripts/unreal/import_creatures.py` imports them into `Content/Creatures` and builds the materials. **`M_Creature`** (lit) draws fish, gliders and the leviathan; **`M_Jelly`** (see-through, unlit, brighter and more solid at the edges) the jellyfish. Both read what each mesh carries (see the top of `make_creatures.py`): skin from the vertex colours; UV channel 1 where a vertex is on the moving part; channel 2 its size; channel 3 how it moves (body, wings, jellyfish, not at all, or kraken); channel 4 its glow. A bright skin glows its own colour, deepened (the leviathan's amber eyes, the jellyfish), a dark one cold blue-green. Per instance, seven numbers: phase (for jellyfish and krakens, the stroke itself), rate, flash, tint, and how much it glows.
 - **Two things that went wrong, for the record:** vertex alpha doesn't survive the FBX export (every vertex came through fully glowing, so the glow is in UV channel 4), and FBX colours are read as they are, so they're exported linear, or the dark backs came out pale.
 
 ## Switches
@@ -62,7 +68,8 @@ Contacts are worked out on each machine from the same inputs (`UThalassaSonarCom
 
 - **Two players on the open ocean, gliders only** (the first version; helm tour, sonar on, a ping every 10 s, about 15 ms): 0 corrections, no frames over 50 ms. Host and client found identical contacts for pings 6 to 19; pings 2 to 5 differed, because the client joined after ping 1 and didn't know about it. That's why the recent pings are now replicated.
 - **Two players, all ten kinds and the leviathan** (the same run): 0 corrections, no frames over 50 ms, the ship in step within 2.9 cm, sonar charts 2,370 and 2,371 cells (one in flight). The client joined after pings 1 and 2, and its contacts still matched the host's, by fingerprint, for every ping both saw (3 to 19), including those in the 45 s after the pings it missed. 80 to 110 contacts a ping. The leviathan heard the first pings from 2.2 km and came in: 2,174 m from the ship at 20 s, 1,065 m at 80 s, about 700 m from 120 s while the ship toured away from where it had pinged. This run had the leviathan at its first size (about 155 m); it was scaled to 400 m afterwards, which changes where its pieces are drawn but not how it moves.
-- **Cost:** the fauna's work is at most about 0.85 ms a frame with all the kinds near the start in view, and 0.75 ms with the leviathan in view (`-ThalassaPerf`). The leviathan's path is cached, so it costs one new sample every half second.
+- **Two players, with the pulsing, coloured jellyfish and the krakens** (the same run again): 1 correction of 0.0 cm, no frames over 50 ms, the ship in step within 1.8 cm, identical sonar charts (2,367 cells, same checksum). Contacts identical, by fingerprint, for every ping both saw (3 to 19; the client joined after ping 2).
+- **Cost:** the fauna's work is at most about 0.85 ms a frame with all the kinds near the start in view, and 0.75 ms with the leviathan in view (`-ThalassaPerf`). With thirteen kinds and a kraken gathered round the camera: about 0.9 ms, the worst frame 6.7 ms, about 225 frames a second. The leviathan's path is cached, so it costs one new sample every half second.
 - **Frames:** each kind gathered round one spot (`-ThalassaFaunaAt`); the leviathan at 500 m (a line of lights in the dark) and at 300 m (its head rising, eye, spine ridge, rows of lights); the chart, with the leviathan as a curved chain of contacts.
 
 ## Also fixed: the rocks in a packaged build

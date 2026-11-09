@@ -43,6 +43,7 @@ struct FFaunaSchool
 	double RoamM = 150.0;                      // How far it wanders from home.
 	double SpeedMS = 1.5;                      // How fast it cruises.
 	double Phase[4] = { 0.0, 0.0, 0.0, 0.0 };  // Where in its wandering it was when the clock started.
+	FLinearColor Tint = FLinearColor::White;   // Its colour, and in alpha how much it glows.
 	struct FMember
 	{
 		FVector OffsetM = FVector::ZeroVector; // Its place in the school, in the school's frame.

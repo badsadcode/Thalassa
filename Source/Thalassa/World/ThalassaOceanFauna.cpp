@@ -33,16 +33,46 @@ namespace ThalassaFauna
 		TEXT("/Game/Creatures/SM_Leviathan_Head.SM_Leviathan_Head"),
 		TEXT("/Game/Creatures/SM_Leviathan_Body.SM_Leviathan_Body"),
 		TEXT("/Game/Creatures/SM_Leviathan_Tail.SM_Leviathan_Tail"),
+		TEXT("/Game/Creatures/SM_Jelly_Helmet.SM_Jelly_Helmet"),
+		TEXT("/Game/Creatures/SM_Jelly_Comb.SM_Jelly_Comb"),
+		TEXT("/Game/Creatures/SM_Kraken.SM_Kraken"),
 	};
 	constexpr int32 MeshCount = UE_ARRAY_COUNT(MeshPaths);
 	constexpr int32 LeviathanHead = 10;
+	constexpr int32 CustomFloats = 7;   // Per instance: phase, rate, flash, tint (3), glow. See import_creatures.py.
 
-	enum class EKind : uint8 { Fish, Glider, Jelly };
+	enum class EKind : uint8 { Fish, Glider, Jelly, Kraken };
+
+	// Colours a school can be: the tint, and in alpha how much it glows. Each school picks one from its kind's list.
+	const FLinearColor GlowPalette[] =
+	{
+		{ 0.25f, 0.55f, 1.0f, 1.f },  // Blue.
+		{ 0.62f, 0.30f, 1.0f, 1.f },  // Violet.
+		{ 0.30f, 1.0f, 0.50f, 1.f },  // Green.
+		{ 1.0f, 0.62f, 0.20f, 1.f },  // Amber.
+		{ 1.0f, 0.35f, 0.70f, 1.f },  // Pink.
+		{ 0.20f, 0.95f, 0.90f, 1.f },  // Cyan.
+	};
+	const FLinearColor GiantPalette[] =
+	{
+		{ 0.92f, 0.86f, 0.82f, 0.f },  // Pale, not glowing.
+		{ 0.70f, 0.78f, 0.86f, 0.f },  // Nearly clear.
+		{ 0.55f, 0.06f, 0.05f, 0.f },  // Deep red: in the deep, red light is gone, so red is dark.
+		{ 0.92f, 0.86f, 0.82f, 0.4f }, // Pale, its rim faintly glowing.
+	};
+	const FLinearColor HelmetPalette[] =
+	{
+		{ 0.55f, 0.06f, 0.05f, 0.f },  // Deep red.
+		{ 0.32f, 0.14f, 0.28f, 0.f },  // Dusky purple.
+		{ 1.0f, 0.62f, 0.20f, 1.f },   // A glowing amber ring.
+		{ 0.62f, 0.30f, 1.0f, 1.f },   // A glowing violet ring.
+	};
 
 	/** A kind of animal: where it lives, how many to a school, how it moves, how far away it is drawn. */
 	struct FSpecies
 	{
 		const TCHAR* Name;
+		int32 Mesh;
 		EKind Kind;
 		double CellM;            // One school at most per cell of this size.
 		double Chance[6];        // How likely a cell holds a school, by province: plains, hills, plateaus, ridges, canyons, volcanic.
@@ -57,26 +87,31 @@ namespace ThalassaFauna
 		double KeepClearM;       // Room it gives the ship.
 		double BoltM;            // How far a ping makes it bolt.
 		float SonarRadiusCm;     // How big a contact each animal makes; 0: too small for the ping to show.
+		double SizeM;            // Its mesh's size: big animals stroke slowly.
+		const FLinearColor* Palette = nullptr;   // Colours its schools can be; none: as modelled, glowing as modelled.
+		int32 PaletteCount = 0;
 	};
 
 	// The species, by index; the index is also its mesh's. Small schooling fish in their hundreds near the camera;
 	// bigger fish near the ground; big, slow cruisers and gliders; jellyfish drifting, some glowing.
 	const FSpecies Species[] =
 	{
-		//  Name               Kind           Cell   Plains Hills Plat. Ridge Canyon Volc.    Count     Spacing Spread  Altitude   Roam      Speed        Scale        Draw  Clear Bolt  Sonar
-		{ TEXT("glider"),      EKind::Glider, 600, { 0.30, 0.50, 0.60, 0.40, 0.50, 0.12 },  5,  11,   9.0,  8.0,  25, 55,   120, 220,  1.2, 2.2,    0.8, 1.35,  700,  80,  70, 250.f },
-		{ TEXT("dart"),        EKind::Fish,    90, { 0.45, 0.50, 0.50, 0.55, 0.50, 0.30 }, 30,  80,   0.5,  1.0,   3, 15,    25,  50,  0.8, 1.4,    0.8, 1.2,   110,  20,  25,   0.f },
-		{ TEXT("disc"),        EKind::Fish,   140, { 0.20, 0.40, 0.45, 0.40, 0.35, 0.15 }, 15,  40,   0.7,  1.2,   2,  8,    20,  40,  0.6, 1.0,    0.85, 1.15, 110,  15,  20,   0.f },
-		{ TEXT("lantern"),     EKind::Fish,   110, { 0.30, 0.35, 0.35, 0.45, 0.55, 0.60 }, 20,  60,   0.45, 0.9,   8, 40,    30,  60,  0.5, 0.9,    0.8, 1.2,   160,  15,  20,   0.f },
-		{ TEXT("grouper"),     EKind::Fish,   160, { 0.15, 0.35, 0.35, 0.40, 0.35, 0.20 },  2,   6,   2.5,  3.0, 0.8,  3,    25,  50,  0.35, 0.7,   0.8, 1.3,   150,  25,  15,   0.f },
-		{ TEXT("eel"),         EKind::Fish,   200, { 0.05, 0.20, 0.20, 0.35, 0.45, 0.30 },  1,   3,   3.0,  3.0, 0.4, 1.5,   15,  40,  0.35, 0.6,   0.8, 1.3,   110,  15,  10,   0.f },
-		{ TEXT("cruiser"),     EKind::Fish,   500, { 0.15, 0.25, 0.25, 0.25, 0.30, 0.10 },  1,   3,  14.0, 12.0,  15, 60,   150, 300,  1.0, 1.8,    0.8, 1.3,   450,  60,  60, 350.f },
-		{ TEXT("giant jelly"), EKind::Jelly,  400, { 0.25, 0.20, 0.20, 0.20, 0.30, 0.15 },  1,   3,  25.0, 20.0,  25, 90,    20,  50,  0.12, 0.25,  0.8, 1.3,   400,  40,   8, 300.f },
-		{ TEXT("glow jelly"),  EKind::Jelly,  250, { 0.25, 0.25, 0.25, 0.30, 0.40, 0.45 },  3,   9,   7.0,  7.0,  12, 60,    15,  40,  0.08, 0.2,   0.8, 1.3,   350,  25,   6,   0.f },
-		{ TEXT("mote"),        EKind::Jelly,  150, { 0.20, 0.20, 0.20, 0.25, 0.35, 0.40 }, 40, 110,   1.0,  2.5,   5, 50,    10,  25,  0.05, 0.12,  0.7, 1.4,   160,  10,   4,   0.f },
+		//  Name           Mesh Kind            Cell   Plains Hills Plat. Ridge Canyon Volc.    Count     Spacing Spread  Altitude   Roam      Speed        Scale        Draw  Clear Bolt  Sonar   Size  Palette
+		{ TEXT("glider"),      0, EKind::Glider, 600, { 0.30, 0.50, 0.60, 0.40, 0.50, 0.12 },  5,  11,   9.0,  8.0,  25, 55,   120, 220,  1.2, 2.2,    0.8, 1.35,  700,  80,  70, 250.f,  5.0 },
+		{ TEXT("dart"),        1, EKind::Fish,    90, { 0.45, 0.50, 0.50, 0.55, 0.50, 0.30 }, 30,  80,   0.5,  1.0,   3, 15,    25,  50,  0.8, 1.4,    0.8, 1.2,   110,  20,  25,   0.f,  0.3 },
+		{ TEXT("disc"),        2, EKind::Fish,   140, { 0.20, 0.40, 0.45, 0.40, 0.35, 0.15 }, 15,  40,   0.7,  1.2,   2,  8,    20,  40,  0.6, 1.0,    0.85, 1.15, 110,  15,  20,   0.f,  0.42 },
+		{ TEXT("lantern"),     3, EKind::Fish,   110, { 0.30, 0.35, 0.35, 0.45, 0.55, 0.60 }, 20,  60,   0.45, 0.9,   8, 40,    30,  60,  0.5, 0.9,    0.8, 1.2,   160,  15,  20,   0.f,  0.2 },
+		{ TEXT("grouper"),     4, EKind::Fish,   160, { 0.15, 0.35, 0.35, 0.40, 0.35, 0.20 },  2,   6,   2.5,  3.0, 0.8,  3,    25,  50,  0.35, 0.7,   0.8, 1.3,   150,  25,  15,   0.f,  1.4 },
+		{ TEXT("eel"),         5, EKind::Fish,   200, { 0.05, 0.20, 0.20, 0.35, 0.45, 0.30 },  1,   3,   3.0,  3.0, 0.4, 1.5,   15,  40,  0.35, 0.6,   0.8, 1.3,   110,  15,  10,   0.f,  2.2 },
+		{ TEXT("cruiser"),     6, EKind::Fish,   500, { 0.15, 0.25, 0.25, 0.25, 0.30, 0.10 },  1,   3,  14.0, 12.0,  15, 60,   150, 300,  1.0, 1.8,    0.8, 1.3,   450,  60,  60, 350.f,  7.0 },
+		{ TEXT("giant jelly"), 7, EKind::Jelly,  400, { 0.25, 0.20, 0.20, 0.20, 0.30, 0.15 },  1,   3,  25.0, 20.0,  25, 90,    20,  50,  0.12, 0.25,  0.8, 1.3,   400,  40,   8, 300.f,  6.0, GiantPalette, UE_ARRAY_COUNT(GiantPalette) },
+		{ TEXT("glow jelly"),  8, EKind::Jelly,  250, { 0.25, 0.25, 0.25, 0.30, 0.40, 0.45 },  3,   9,   7.0,  7.0,  12, 60,    15,  40,  0.08, 0.2,   0.8, 1.3,   350,  25,   6,   0.f,  2.2, GlowPalette, UE_ARRAY_COUNT(GlowPalette) },
+		{ TEXT("mote"),        9, EKind::Jelly,  150, { 0.20, 0.20, 0.20, 0.25, 0.35, 0.40 }, 40, 110,   1.0,  2.5,   5, 50,    10,  25,  0.05, 0.12,  0.7, 1.4,   160,  10,   4,   0.f,  0.3, GlowPalette, UE_ARRAY_COUNT(GlowPalette) },
+		{ TEXT("helmet jelly"), 13, EKind::Jelly, 300, { 0.15, 0.20, 0.20, 0.30, 0.40, 0.40 },  4,  14,   3.0,  3.5,  10, 70,    15,  35,  0.08, 0.18,  0.8, 1.3,   300,  20,   5,   0.f,  1.6, HelmetPalette, UE_ARRAY_COUNT(HelmetPalette) },
+		{ TEXT("comb jelly"),  14, EKind::Jelly, 200, { 0.25, 0.25, 0.25, 0.25, 0.35, 0.35 },  6,  20,   2.0,  2.5,   5, 40,    10,  30,  0.06, 0.15,  0.8, 1.4,   220,  15,   4,   0.f,  1.2, GlowPalette, UE_ARRAY_COUNT(GlowPalette) },
+		{ TEXT("kraken"),      15, EKind::Kraken, 2500, { 0.04, 0.12, 0.12, 0.30, 0.45, 0.30 }, 1,  1,  80.0,  0.0,  50, 140,  400, 800,  2.5, 4.5,    0.9, 1.5,  2200, 150, 250, 1500.f, 60.0 },
 	};
 	constexpr int32 SpeciesCount = UE_ARRAY_COUNT(Species);
-	static_assert(SpeciesCount <= LeviathanHead, "Species index their meshes by their own index");
 
 	constexpr double PingSpeedMS = UThalassaSonarComponent::PulseSpeedMS;
 
@@ -206,9 +241,13 @@ void UThalassaOceanFauna::BeginPlay()
 		Component->SetMobility(EComponentMobility::Movable);
 		Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Component->SetCastShadow(false);
-		const double DrawM = Index < SpeciesCount ? Species[Index].DrawM : LeviathanDrawM;
+		double DrawM = LeviathanDrawM;
+		for (const FSpecies& Spec : Species)
+		{
+			DrawM = Spec.Mesh == Index ? Spec.DrawM : DrawM;
+		}
 		Component->SetCullDistances(0, static_cast<int32>(DrawM * 100.0));
-		Component->NumCustomDataFloats = 3;
+		Component->NumCustomDataFloats = CustomFloats;
 		Component->SetupAttachment(GetOwner()->GetRootComponent());
 		Component->SetAbsolute(true, true, true);
 		Component->RegisterComponent();
@@ -274,6 +313,7 @@ bool UThalassaOceanFauna::MakeSchool(const AThalassaOcean& Ocean, uint8 SpeciesI
 		Phase = Draw.Range(0.0, UE_DOUBLE_TWO_PI);
 	}
 	OutSchool.Phase[3] = Draw.Next();
+	OutSchool.Tint = Kind.Palette ? Kind.Palette[FMath::Min(Kind.PaletteCount - 1, static_cast<int32>(Draw.Next() * Kind.PaletteCount))] : FLinearColor::White;
 	FVector2D Placed;
 	if (bStart && SpeciesIndex == 0 && SwitchAt(TEXT("ThalassaGlidersAt="), Placed))
 	{
@@ -288,7 +328,7 @@ bool UThalassaOceanFauna::MakeSchool(const AThalassaOcean& Ocean, uint8 SpeciesI
 		OutSchool.HomeM = Placed + FVector2D(FMath::Cos(Bearing), FMath::Sin(Bearing)) * (6.0 + 3.0 * SpeciesIndex);
 		OutSchool.RoamM = FMath::Min(OutSchool.RoamM, 8.0);
 		OutSchool.SpeedMS *= 0.3;
-		OutSchool.AltitudeM = FMath::Min(OutSchool.AltitudeM, Kind.Kind == EKind::Jelly ? 30.0 : 12.0);
+		OutSchool.AltitudeM = FMath::Min(OutSchool.AltitudeM, Kind.Kind == EKind::Jelly ? 30.0 : (Kind.Kind == EKind::Kraken ? 45.0 : 12.0));
 	}
 
 	// The animals: loosely spread through a flattened oval (jellyfish: a rounder cloud), apart from each other.
@@ -677,9 +717,10 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	for (uint8 Kind = 0; Kind < SpeciesCount; ++Kind)
 	{
 		const FSpecies& Spec = Species[Kind];
-		FDrawn& Out = Drawn[Kind];
+		FDrawn& Out = Drawn[Spec.Mesh];
 		const int64 CX = FaunaCellOf(Eye.X / 100.0, Spec.CellM), CY = FaunaCellOf(Eye.Y / 100.0, Spec.CellM);
 		const int32 Reach = FMath::CeilToInt((Spec.DrawM + Spec.RoamMax * 1.35 + 50.0) / Spec.CellM);
+		const bool bStroked = Spec.Kind == EKind::Jelly || Spec.Kind == EKind::Kraken;
 		const double DriftM = Spec.SpacingM * (Spec.Kind == EKind::Jelly ? 0.5 : 0.33);
 		const double Wobble = Spec.Kind == EKind::Glider ? 6.0 : 10.0;
 		for (int64 Y = CY - Reach; Y <= CY + Reach; ++Y)
@@ -696,7 +737,7 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 				{
 					continue;
 				}
-				Signatures[Kind] = HashCombine(Signatures[Kind], GetTypeHash(School->Key));
+				Signatures[Spec.Mesh] = HashCombine(Signatures[Spec.Mesh], GetTypeHash(School->Key));
 
 				const FRotator Facing(0.0, State.YawDeg, 0.0);
 				const double Bank = Spec.Kind == EKind::Jelly ? 0.0 : FMath::Clamp(-State.TurnDegS * 6.0, -25.0, 25.0);
@@ -705,7 +746,24 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 				{
 					// Its place in the school, opening out when startled, with a slow drift of its own.
 					const FVector Drift(DriftM * FMath::Sin(Time * 0.07 + Member.Drift[0]), DriftM * FMath::Sin(Time * 0.05 + Member.Drift[1]), 0.5 * DriftM * FMath::Sin(Time * 0.09 + Member.Drift[2]));
-					const FVector Offset = Member.OffsetM * (1.0 + 1.4 * State.Spread) + Drift;
+					FVector Offset = Member.OffsetM * (1.0 + 1.4 * State.Spread) + Drift;
+
+					// Jellyfish and krakens swim in strokes, on the game's clock, so every player sees the same stroke.
+					// A jellyfish bobs up as its bell draws in and sinks as it relaxes; a kraken surges forward.
+					double Stroke = 0.0;
+					if (bStroked)
+					{
+						const double Period = 1.3 * FMath::Sqrt(Spec.SizeM * Member.Scale);
+						Stroke = FMath::Fmod(Time * UE_DOUBLE_TWO_PI / Period + Member.Beat, UE_DOUBLE_TWO_PI);
+						if (Spec.Kind == EKind::Jelly)
+						{
+							Offset.Z += 0.15 * Spec.SizeM * Member.Scale * FMath::Sin(Stroke - 0.8);
+						}
+						else
+						{
+							Offset.X += 0.05 * Spec.SizeM * Member.Scale * FMath::Sin(Stroke - 1.0);
+						}
+					}
 					FVector Location = State.CentreCm + Facing.RotateVector(Offset * 100.0);
 					Location.Z = FMath::Max(Location.Z, Floor);
 
@@ -726,9 +784,16 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 						Rotation = FRotator(State.PitchDeg + 3.0 * FMath::Sin(Time * 0.13 + Member.Drift[2]), Yaw, Bank + 4.0 * FMath::Sin(Time * 0.17 + Member.Drift[1]));
 					}
 					Out.Transforms.Add(FTransform(Rotation, Location, FVector(Member.Scale)));
-					Out.CustomData.Add(Member.Beat);
-					Out.CustomData.Add(static_cast<float>(State.Rate));
+					// Each animal a little lighter or darker than its school.
+					const float Shade = 0.92f + 0.16f * static_cast<float>(FMath::Frac(Member.Drift[2] * 7.0));
+					Out.CustomData.Add(bStroked ? static_cast<float>(Stroke) : Member.Beat);
+					// A jellyfish's tentacles sway at a steady rate of their own, between 1 and 2.
+					Out.CustomData.Add(Spec.Kind == EKind::Jelly ? 1.f + static_cast<float>(FMath::Frac(Member.Drift[0])) : static_cast<float>(State.Rate));
 					Out.CustomData.Add(static_cast<float>(State.Flash));
+					Out.CustomData.Add(School->Tint.R * Shade);
+					Out.CustomData.Add(School->Tint.G * Shade);
+					Out.CustomData.Add(School->Tint.B * Shade);
+					Out.CustomData.Add(School->Tint.A);
 				}
 			}
 		}
@@ -757,7 +822,7 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 		{
 			const int32 Mesh = LeviathanHead + Piece.Mesh;
 			Drawn[Mesh].Transforms.Add(Piece.Transform);
-			Drawn[Mesh].CustomData.Append({ 0.f, 1.f, Piece.Flash });
+			Drawn[Mesh].CustomData.Append({ 0.f, 1.f, Piece.Flash, 1.f, 1.f, 1.f, 1.f });
 			Signatures[Mesh] = 1;
 		}
 	}
@@ -773,7 +838,7 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 			continue;
 		}
 		const int32 Count = Out.Transforms.Num();
-		VisibleAnimals += Mesh < SpeciesCount ? Count : 0;
+		VisibleAnimals += (Mesh < LeviathanHead || Mesh > LeviathanHead + 2) ? Count : 0;
 		if (Signatures[Mesh] != Out.Signature || Count != Component->GetInstanceCount())
 		{
 			Component->ClearInstances();
@@ -781,11 +846,10 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 			{
 				Component->AddInstances(Out.Transforms, false, true);
 			}
-			UE_LOG(LogThalassa, Verbose, TEXT("Fauna: %s now %d"), Mesh < SpeciesCount ? Species[Mesh].Name : TEXT("leviathan"), Count);
-			if (Mesh < SpeciesCount && Count > 0 && Out.Signature == 0)
+			if (Count > 0 && Out.Signature == 0)
 			{
 				const FVector Nearest = Out.Transforms[0].GetLocation();
-				UE_LOG(LogThalassa, Display, TEXT("Fauna: %d %s in view, the first at %s m, %.0f m from the camera"), Count, Species[Mesh].Name,
+				UE_LOG(LogThalassa, Display, TEXT("Fauna: %d of %s in view, the first at %s m, %.0f m from the camera"), Count, MeshPaths[Mesh],
 					*(Nearest / 100.0).ToString(), FVector::Dist(Nearest, Eye) / 100.0);
 			}
 			Out.Signature = Signatures[Mesh];
@@ -796,7 +860,7 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 		}
 		for (int32 Index = 0; Index < Count; ++Index)
 		{
-			Component->SetCustomData(Index, TArrayView<const float>(&Out.CustomData[Index * 3], 3), false);
+			Component->SetCustomData(Index, TArrayView<const float>(&Out.CustomData[Index * CustomFloats], CustomFloats), false);
 		}
 		if (Count > 0)
 		{
