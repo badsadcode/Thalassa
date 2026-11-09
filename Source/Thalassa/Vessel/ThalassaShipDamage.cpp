@@ -1,4 +1,5 @@
 #include "Vessel/ThalassaShipDamage.h"
+#include "Vessel/ThalassaWaterSurface.h"
 
 #include "Components/PointLightComponent.h"
 #include "Components/SpotLightComponent.h"
@@ -427,6 +428,16 @@ void UThalassaShipDamageComponent::TickServer(float DeltaTime)
 		}
 		// The exact level stays here; what replicates moves in steps of a tenth of a percent, not every frame's sliver.
 		FloodExact[Index] = FMath::Clamp(FloodExact[Index] + Inflow - Pumping, 0.f, 1.f);
+		// For looking at the water: -ThalassaFlood=<compartment>,<level> holds one compartment at a level (0 to 1).
+		FString Hold;
+		if (FParse::Value(FCommandLine::Get(), TEXT("ThalassaFlood="), Hold, false))
+		{
+			FString Which, Level;
+			if (Hold.Split(TEXT(","), &Which, &Level) && FCString::Atoi(*Which) == Index)
+			{
+				FloodExact[Index] = FMath::Clamp(FCString::Atof(*Level), 0.f, 1.f);
+			}
+		}
 		if (FMath::Abs(FloodExact[Index] - FloodLevel[Index]) >= 0.001f || (FloodExact[Index] == 0.f && FloodLevel[Index] != 0.f))
 		{
 			FloodLevel[Index] = FloodExact[Index];
@@ -462,18 +473,11 @@ void UThalassaShipDamageComponent::TickVisuals(float DeltaTime)
 	}
 	USceneComponent* Root = Vessel->GetRootComponent();
 
-	// Water in the compartments: a surface at each one's level, the airlock's water's look.
-	const UStaticMeshComponent* AirlockWater = Vessel->GetAirlockWaterComponent();
+	// Water in the compartments: a surface at each one's level that moves and shades like water. Rough while
+	// breaches pour into it, and sloshing as the ship moves.
 	while (WaterPlanes.Num() < Vessel->GetCompartmentCount())
 	{
-		UStaticMeshComponent* Plane = NewObject<UStaticMeshComponent>(Vessel);
-		Plane->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane.Plane")));
-		if (AirlockWater)
-		{
-			Plane->SetMaterial(0, AirlockWater->GetMaterial(0));
-		}
-		Plane->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Plane->SetCastShadow(false);
+		UThalassaWaterSurfaceComponent* Plane = NewObject<UThalassaWaterSurfaceComponent>(Vessel);
 		Plane->SetupAttachment(Root);
 		Plane->RegisterComponent();
 		Plane->SetVisibility(false);
@@ -482,14 +486,22 @@ void UThalassaShipDamageComponent::TickVisuals(float DeltaTime)
 	for (int32 Index = 0; Index < WaterPlanes.Num(); ++Index)
 	{
 		const float Level = GetFloodLevel(Index);
-		UStaticMeshComponent* Plane = WaterPlanes[Index];
-		Plane->SetVisibility(Level > 0.003f);
-		if (Level > 0.003f)
+		UThalassaWaterSurfaceComponent* Plane = WaterPlanes[Index];
+		// Not drawn full to the ceiling either: there's no top to see.
+		const bool bShown = Level > 0.003f && Level < 0.995f;
+		Plane->SetVisibility(bShown);
+		if (bShown)
 		{
 			const FShipZone& Zone = Vessel->GetCompartment(Index);
+			Plane->Build(FVector2D(Zone.Extent.X * 2.f, Zone.Extent.Y * 2.f));
 			const FVector Centre = Zone.Transform.TransformPositionNoScale(FVector(0.f, 0.f, -Zone.Extent.Z + Level * 2.f * Zone.Extent.Z));
 			Plane->SetRelativeLocationAndRotation(Centre, Zone.Transform.GetRotation());
-			Plane->SetRelativeScale3D(FVector(Zone.Extent.X / 50.f, Zone.Extent.Y / 50.f, 1.f));
+			float Pouring = 0.f;
+			for (const FShipBreach& Breach : Breaches)
+			{
+				Pouring += Breach.Compartment == Index ? Breach.Severity : 0.f;
+			}
+			Plane->UpdateWater(DeltaTime, 0.08f + FMath::Clamp(Pouring, 0.f, 1.f) * 0.92f, Level * 2.f * Zone.Extent.Z);
 		}
 	}
 
@@ -575,7 +587,7 @@ void UThalassaShipDamageComponent::TickVisuals(float DeltaTime)
 		{
 			Fullest = GetFloodLevel(Index) > GetFloodLevel(Fullest) ? Index : Fullest;
 		}
-		const UStaticMeshComponent* Water = WaterPlanes.IsValidIndex(Fullest) ? WaterPlanes[Fullest].Get() : nullptr;
+		const UThalassaWaterSurfaceComponent* Water = WaterPlanes.IsValidIndex(Fullest) ? WaterPlanes[Fullest].Get() : nullptr;
 		UE_LOG(LogThalassa, Display, TEXT("DAMAGEDRAW: root %s; jet %s visible %d at %s scale %s mesh %s; water %d visible %d at %s scale %s"),
 			*GetNameSafe(Root), *GetNameSafe(Jet), Jet ? Jet->IsVisible() : -1, Jet ? *Jet->GetComponentLocation().ToString() : TEXT("-"),
 			Jet ? *Jet->GetComponentScale().ToString() : TEXT("-"), Jet ? *GetNameSafe(Jet->GetStaticMesh()) : TEXT("-"),

@@ -1,6 +1,7 @@
 #include "Vessel/ThalassaVessel.h"
 
 #include "Vessel/ThalassaShipDamage.h"
+#include "Vessel/ThalassaWaterSurface.h"
 #include "Vessel/ThalassaSonarComponent.h"
 #include "Engine/StaticMeshActor.h"
 #include "Vessel/ThalassaSonarDisplay.h"
@@ -1453,6 +1454,49 @@ bool AThalassaVessel::IsWaterAt(const FVector& WorldLocation) const
 	return false;
 }
 
+bool AThalassaVessel::GetInteriorWaterSurface(const FVector& WorldLocation, float& OutSurfaceZ) const
+{
+	if (!IsInCompartment(WorldLocation))
+	{
+		return false;
+	}
+	const FTransform& Ship = GetActorTransform();
+	const FVector Local = Ship.InverseTransformPosition(WorldLocation);
+	if (AirlockChamberBox().IsInsideOrOn(Local))
+	{
+		const float Top = AirlockWaterLevel * ThalassaVesselLayout::AirlockCeilingCm;
+		if (AirlockWaterLevel <= 0.f || Local.Z >= Top)
+		{
+			return false;
+		}
+		// Full to the ceiling: the top is above the chamber, so the view is all water.
+		const float TopCm = AirlockWaterLevel >= 0.995f ? Top + 500.f : Top;
+		OutSurfaceZ = static_cast<float>(Ship.TransformPosition(FVector(Local.X, Local.Y, TopCm)).Z);
+		return true;
+	}
+	if (Damage)
+	{
+		for (int32 Index = 0; Index < DryZones.Num(); ++Index)
+		{
+			const FShipZone& Zone = DryZones[Index];
+			if (Zone.Contains(Local))
+			{
+				const float Level = Damage->GetFloodLevel(Index);
+				FVector InZone = Zone.Transform.InverseTransformPositionNoScale(Local);
+				const float Top = -Zone.Extent.Z + Level * 2.f * Zone.Extent.Z;
+				if (Level <= 0.f || InZone.Z >= Top)
+				{
+					return false;
+				}
+				InZone.Z = Level >= 0.995f ? Top + 500.f : Top;
+				OutSurfaceZ = static_cast<float>(Ship.TransformPosition(Zone.Transform.TransformPositionNoScale(InZone)).Z);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 bool AThalassaVessel::IsLadderAt(const FVector& WorldLocation, float MarginCm) const
 {
 	const FVector Local = GetActorTransform().InverseTransformPosition(WorldLocation);
@@ -1532,6 +1576,14 @@ void AThalassaVessel::TickAirlockServer(float DeltaSeconds)
 		bAirlockDoorwayBlocked = IsDoorwayOccupied(DoorY);
 	}
 
+	// For looking at the water: -ThalassaAirlockWater=<level> holds the chamber's water at a level (0 to 1).
+	float HeldLevel = 0.f;
+	if (FParse::Value(FCommandLine::Get(), TEXT("ThalassaAirlockWater="), HeldLevel))
+	{
+		AirlockWaterLevel = FMath::Clamp(HeldLevel, 0.f, 1.f);
+		return;
+	}
+
 	// The water only moves once the door that was open has fully closed.
 	const float WaterStep = DeltaSeconds / AirlockFloodSeconds;
 	if (AirlockState == EAirlockState::Flooding && AirlockInnerDoorOpen <= 0.f)
@@ -1575,8 +1627,37 @@ void AThalassaVessel::TickAirlockVisuals(float DeltaSeconds)
 	MoveDoor(AirlockInnerDoor, AirlockInnerDoorOpen, AirlockState == EAirlockState::InnerOpen, DoorInnerY);
 	MoveDoor(AirlockOuterDoor, AirlockOuterDoorOpen, AirlockState == EAirlockState::OuterOpen, DoorOuterY);
 
-	AirlockWater->SetVisibility(AirlockWaterLevel > 0.f);
+	// The old flat plane only marks where the water is; the surface draws it.
+	AirlockWater->SetVisibility(false);
 	AirlockWater->SetRelativeLocation(FVector(0.f, 337.f, AirlockWaterLevel * AirlockCeilingCm));
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	if (!AirlockSurface && AirlockWaterLevel > 0.f)
+	{
+		AirlockSurface = NewObject<UThalassaWaterSurfaceComponent>(this, TEXT("AirlockSurface"));
+		AirlockSurface->SetupAttachment(AirlockWater->GetAttachParent());
+		AirlockSurface->RegisterComponent();
+		// The chamber's floor plan, as the plane covered it (100 cm, scaled).
+		AirlockSurface->Build(FVector2D(400.f, 175.f));
+	}
+	if (AirlockSurface)
+	{
+		// Hidden right at the ceiling too: there is no top to see when it's full.
+		const bool bShown = AirlockWaterLevel > 0.f && AirlockWaterLevel < 0.995f;
+		AirlockSurface->SetVisibility(bShown);
+		AirlockSurface->SetRelativeLocation(FVector(0.f, 337.f, AirlockWaterLevel * AirlockCeilingCm));
+		if (bShown)
+		{
+			// Rough while the sea pours in or drains out, settling over a second or two when it stops. (On clients
+			// the level arrives in steps, hence the easing.)
+			const float Pouring = AirlockWaterLevel != AirlockLevelSeen ? 1.f : 0.f;
+			AirlockChurn = FMath::Lerp(AirlockChurn, Pouring, 1.f - FMath::Exp(-DeltaSeconds / (Pouring > AirlockChurn ? 0.2f : 1.2f)));
+			AirlockSurface->UpdateWater(DeltaSeconds, 0.05f + AirlockChurn * 0.8f, AirlockWaterLevel * AirlockCeilingCm);
+		}
+	}
+	AirlockLevelSeen = AirlockWaterLevel;
 }
 
 void AThalassaVessel::UpdateConsoleText(float DeltaSeconds)

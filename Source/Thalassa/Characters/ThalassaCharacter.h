@@ -8,6 +8,7 @@ class UCameraComponent;
 class UStaticMeshComponent;
 class UThalassaMovementComponent;
 class AThalassaVessel;
+class UMaterialInstanceDynamic;
 
 /** First-person crew member. In a test run, a scripted walker that tours the ship. */
 UCLASS()
@@ -83,6 +84,11 @@ private:
 	float BotHelmSeconds = -1.f;
 	int32 BotHelmCue = 0;
 	float BotHelmLogTimer = 0.f;
+	/** The view from under the water inside the ship: murk and colour by distance (M_PP_InsideWater). */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> InWaterView;
+	void UpdateInWaterView();
+
 	/** How far the view still has to travel after a crouch or stand moved the capsule. Eased to zero. */
 	float CameraCrouchOffset = 0.f;
 

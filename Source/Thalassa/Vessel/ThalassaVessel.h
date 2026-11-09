@@ -29,6 +29,7 @@ class UThalassaHullAmbienceComponent;
 class UThalassaBleepComponent;
 class UThalassaImpactComponent;
 class UThalassaShipDamageComponent;
+class UThalassaWaterSurfaceComponent;
 class UInstancedStaticMeshComponent;
 
 /** A box on the ship, in ship coordinates, read from a marker component. It may be turned. */
@@ -174,6 +175,12 @@ public:
 
 	/** True if this world location is under water: the open sea, or a flooded compartment. */
 	bool IsWaterAt(const FVector& WorldLocation) const;
+
+	/**
+	 * True if this world location is in water inside the ship (the airlock, or a flooded compartment), and then
+	 * where that water's top is, as a world height. For the view from under it.
+	 */
+	bool GetInteriorWaterSurface(const FVector& WorldLocation, float& OutSurfaceZ) const;
 
 	/** True if this world location is in a ship compartment, so anyone there moves with the ship. */
 	bool IsInCompartment(const FVector& WorldLocation) const;
@@ -408,6 +415,12 @@ private:
 	/** The visible surface of the water in the chamber. */
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UStaticMeshComponent> AirlockWater;
+
+	/** What draws that water now: a surface that moves and shades like water. Made when first needed, not on servers. */
+	UPROPERTY(Transient)
+	TObjectPtr<UThalassaWaterSurfaceComponent> AirlockSurface;
+	float AirlockLevelSeen = 0.f;
+	float AirlockChurn = 0.f;
 
 	UPROPERTY(Replicated)
 	EAirlockState AirlockState = EAirlockState::InnerOpen;

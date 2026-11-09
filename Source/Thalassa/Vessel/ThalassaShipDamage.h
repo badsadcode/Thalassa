@@ -5,6 +5,7 @@
 #include "ThalassaShipDamage.generated.h"
 
 class AThalassaVessel;
+class UThalassaWaterSurfaceComponent;
 class UStaticMeshComponent;
 class UPointLightComponent;
 
@@ -152,7 +153,7 @@ private:
 
 	// Drawing, on every machine.
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<UStaticMeshComponent>> WaterPlanes;
+	TArray<TObjectPtr<UThalassaWaterSurfaceComponent>> WaterPlanes;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> BreachMarks;

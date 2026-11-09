@@ -7,6 +7,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "Tools/ThalassaTestConfig.h"
@@ -80,6 +82,11 @@ void AThalassaCharacter::Tick(float DeltaSeconds)
 			// The deck must move before the people standing on it do, or they lag it by a frame.
 			GetCharacterMovement()->AddTickPrerequisiteActor(BoundVessel);
 		}
+	}
+
+	if (IsLocallyControlled())
+	{
+		UpdateInWaterView();
 	}
 
 	if (IsLocallyControlled() && ThalassaTestConfig::IsWalkStraight() && BoundVessel && GetController()
@@ -173,6 +180,39 @@ void AThalassaCharacter::HoldStationPosition()
 	if (Distance > 8.f)
 	{
 		AddMovementInput(Flat / Distance, FMath::Clamp(Distance / 60.f, 0.2f, 1.f));
+	}
+}
+
+void AThalassaCharacter::UpdateInWaterView()
+{
+	// Out in the sea the world's own fog is the water. Inside, water in the airlock or a flooded compartment
+	// gets its own look once the eyes go under: colours fading with distance, red first, and a slight waver.
+	float SurfaceZ = 0.f;
+	const bool bUnder = BoundVessel && BoundVessel->GetInteriorWaterSurface(Camera->GetComponentLocation(), SurfaceZ);
+	if (!InWaterView)
+	{
+		if (!bUnder)
+		{
+			return;
+		}
+		UMaterialInterface* Look = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Ship/Water/M_PP_InsideWater.M_PP_InsideWater"));
+		if (!Look)
+		{
+			return;
+		}
+		InWaterView = UMaterialInstanceDynamic::Create(Look, this);
+		Camera->PostProcessSettings.WeightedBlendables.Array.Add(FWeightedBlendable(0.f, InWaterView));
+	}
+	for (FWeightedBlendable& Blendable : Camera->PostProcessSettings.WeightedBlendables.Array)
+	{
+		if (Blendable.Object == InWaterView)
+		{
+			Blendable.Weight = bUnder ? 1.f : 0.f;
+		}
+	}
+	if (bUnder)
+	{
+		InWaterView->SetScalarParameterValue(TEXT("SurfaceZ"), SurfaceZ);
 	}
 }
 
