@@ -39,3 +39,9 @@ site/.astro/
 # Blender backups and Python caches
 *.blend1
 __pycache__/
+
+# Game assets stay on the owner's machine, not on GitHub (owner's decision, 2026-11-09: no storage costs).
+# Content/ also holds Fab Marketplace assets, whose licence forbids sharing their source files publicly.
+# Back these folders up yourself. Their history up to then is still in the repo (Git LFS).
+/Content/
+/Art/
