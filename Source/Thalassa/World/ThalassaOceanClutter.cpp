@@ -41,14 +41,19 @@ namespace ThalassaClutter
 		// 20-24: broken slab fragments.
 		TEXT("/Game/World/Formations/SM_SlabFragment_01"), TEXT("/Game/World/Formations/SM_SlabFragment_02"), TEXT("/Game/World/Formations/SM_SlabFragment_03"),
 		TEXT("/Game/World/Formations/SM_SlabFragment_04"), TEXT("/Game/World/Formations/SM_SlabFragment_05"),
+		// 25-28: Meshy AI landmarks, made by the owner (import_meshy.py): a layered ledge, a weathered arch, a cluster
+		// of rounded stones, a tall monolith. Optional: any that are missing are simply left out.
+		TEXT("/Game/World/Meshy/RockyCliffLedge/SM_Meshy_RockyCliffLedge"), TEXT("/Game/World/Meshy/WeatheredStoneArch/SM_Meshy_WeatheredStoneArch"),
+		TEXT("/Game/World/Meshy/WeatheredStoneCluster/SM_Meshy_WeatheredStoneCluster"), TEXT("/Game/World/Meshy/WeatheredStoneMonolith/SM_Meshy_WeatheredStoneMonolith"),
 	};
 	constexpr int32 MeshCount = UE_ARRAY_COUNT(MeshPaths);
-	constexpr uint8 SmallScans = 0, BigBoulders = 5, RockMass = 7, DarkBoulders = 8, SlabTowers = 14, SlabFragments = 20;
+	constexpr uint8 SmallScans = 0, BigBoulders = 5, RockMass = 7, DarkBoulders = 8, SlabTowers = 14, SlabFragments = 20, Ledge = 25, Arch = 26, Cluster = 27, Monolith = 28;
+	constexpr uint8 FirstOptionalMesh = Ledge;
 
 	// Layers: each has its own lattice, how far away it is drawn, and its own salt.
-	enum ELayer : uint8 { Stones, Boulders, Masses, Towers, LayerCount };
-	constexpr double LayerCellM[LayerCount] = { 8.0, 32.0, 128.0, 256.0 };
-	constexpr float CullCm[LayerCount] = { 25000.f, 80000.f, 200000.f, 250000.f };
+	enum ELayer : uint8 { Stones, Boulders, Masses, Towers, Landmarks, LayerCount };
+	constexpr double LayerCellM[LayerCount] = { 8.0, 32.0, 128.0, 256.0, 256.0 };
+	constexpr float CullCm[LayerCount] = { 25000.f, 80000.f, 200000.f, 250000.f, 300000.f };
 
 	// How likely a cell is to hold something, by province: plains, hills, plateaus, ridges, canyons, volcanic.
 	// The plains stay mostly empty on purpose; ridges and volcanic fields are strewn with rock.
@@ -58,6 +63,7 @@ namespace ThalassaClutter
 		{ 0.03, 0.14, 0.10, 0.30, 0.22, 0.30 },     // Boulders, per 32 m cell.
 		{ 0.02, 0.08, 0.10, 0.22, 0.15, 0.12 },     // Rock masses, per 128 m cell.
 		{ 0.004, 0.03, 0.08, 0.06, 0.04, 0.0 },     // Slab tower clusters, per 256 m cell.
+		{ 0.01, 0.03, 0.04, 0.05, 0.06, 0.02 },     // Landmarks (a ledge, an arch, a stone cluster or a monolith), per 256 m cell.
 	};
 
 	constexpr double SolidFromCm = 300.0;   // Boulders this big and up are solid.
@@ -177,11 +183,32 @@ UThalassaOceanClutter::UThalassaOceanClutter()
 	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 }
 
-void UThalassaOceanClutter::Place(const FThalassaSeabedGenerator& Generator, uint64 Seed, const TArray<double>& Sizes, FClutterPatch& Patch)
+void UThalassaOceanClutter::Place(const FThalassaSeabedGenerator& Generator, uint64 Seed, const TArray<double>& Sizes, const TArray<double>& Bases, FClutterPatch& Patch)
 {
 	using namespace ThalassaClutter;
 	const FGround Ground{ Generator };
 	const double OriginX = Patch.Key.X * PatchM, OriginY = Patch.Key.Y * PatchM;
+
+	// A ledge and an arch near the start, clear of the ship, so the landmarks can be seen straight away.
+	if (!Patch.Key.bNear && Patch.Key.X == 0 && Patch.Key.Y == 0 && Sizes[Ledge] > 0.0 && Sizes[Arch] > 0.0)
+	{
+		FDraws Draw(CellHash(0, 0, Seed ^ 0x1A4D3A4Bu));
+		const double ArchScale = 5500.0 / Sizes[Arch], LedgeScale = 8000.0 / Sizes[Ledge];
+		const FTransform ArchAt = Settle(Ground, Draw, 200.0, 150.0, 55.0, 0.08, FVector(ArchScale), 1.0);
+		Add(Patch, Arch, Landmarks, true, FTransform(FRotator(0.0, 90.0, 0.0), ArchAt.GetLocation() + FVector(0.0, 0.0, Bases[Arch] * ArchScale), ArchAt.GetScale3D()));
+		const FTransform LedgeAt = Settle(Ground, Draw, 70.0, 220.0, 80.0, 0.1, FVector(LedgeScale), 1.0);
+		Add(Patch, Ledge, Landmarks, true, FTransform(FRotator(0.0, -20.0, 0.0), LedgeAt.GetLocation() + FVector(0.0, 0.0, Bases[Ledge] * LedgeScale), LedgeAt.GetScale3D()));
+	}
+	// A monolith and a stone cluster on the other side of the start.
+	if (!Patch.Key.bNear && Patch.Key.X == 0 && Patch.Key.Y == -1 && Sizes[Monolith] > 0.0 && Sizes[Cluster] > 0.0)
+	{
+		FDraws Draw(CellHash(0, -1, Seed ^ 0x1A4D3A4Bu));
+		const double MonolithScale = 5500.0 / Sizes[Monolith], ClusterScale = 3500.0 / Sizes[Cluster];
+		const FTransform MonolithAt = Settle(Ground, Draw, 120.0, -140.0, 30.0, 0.05, FVector(MonolithScale), 1.0);
+		Add(Patch, Monolith, Landmarks, true, FTransform(FRotator(0.0, 10.0, 0.0), MonolithAt.GetLocation() + FVector(0.0, 0.0, Bases[Monolith] * MonolithScale), MonolithAt.GetScale3D()));
+		const FTransform ClusterAt = Settle(Ground, Draw, 200.0, -90.0, 35.0, 0.1, FVector(ClusterScale), 1.0);
+		Add(Patch, Cluster, Landmarks, true, FTransform(FRotator(0.0, 60.0, 0.0), ClusterAt.GetLocation() + FVector(0.0, 0.0, Bases[Cluster] * ClusterScale), ClusterAt.GetScale3D()));
+	}
 
 	for (int32 L = Patch.Key.bNear ? Stones : Boulders; L < (Patch.Key.bNear ? Boulders : LayerCount); ++L)
 	{
@@ -216,6 +243,9 @@ void UThalassaOceanClutter::Place(const FThalassaSeabedGenerator& Generator, uin
 					break;
 				case Towers:
 					Chance *= Slope < 0.35 ? 1.0 : 0.0; // They stand on level ground.
+					break;
+				case Landmarks:
+					Chance *= Slope < 0.6 ? 1.0 : 0.0;
 					break;
 				default:
 					break;
@@ -255,6 +285,25 @@ void UThalassaOceanClutter::Place(const FThalassaSeabedGenerator& Generator, uin
 					const uint8 Mesh = Province == EProvince::Volcanic ? static_cast<uint8>(Draw.Pick(DarkBoulders, 6))
 						: Draw.Next() < 0.6 ? RockMass : BigBoulders;
 					Rock(Patch, Ground, Draw, Sizes, Mesh, Layer, XM, YM, Draw.Range(10.0, 28.0), 0.2);
+					break;
+				}
+				case Landmarks:
+				{
+					// A big formation on its own: a layered ledge, 50 to 90 m long; an arch, 35 to 60 m across; a cluster
+					// of rounded stones, 20 to 40 m; or a monolith, 30 to 70 m tall. Only those whose meshes exist.
+					struct FKind { uint8 Mesh; double Low, High; };
+					static const FKind Kinds[] = { { Ledge, 50.0, 90.0 }, { Arch, 35.0, 60.0 }, { Cluster, 20.0, 40.0 }, { Monolith, 30.0, 70.0 } };
+					const FKind& Kind = Kinds[Draw.Pick(0, UE_ARRAY_COUNT(Kinds))];
+					if (Sizes[Kind.Mesh] <= 0.0)
+					{
+						break;
+					}
+					const double Size = Draw.Range(Kind.Low, Kind.High);
+					const double Scale = Size * 100.0 / Sizes[Kind.Mesh];
+					// Big formations sink a little deeper, so on a slope their low edge doesn't float.
+					FTransform Placed = Settle(Ground, Draw, XM, YM, Size, 0.1, FVector(Scale), 2.0);
+					Placed.AddToTranslation(Placed.GetRotation().RotateVector(FVector(0.0, 0.0, Bases[Kind.Mesh] * Scale)));
+					Add(Patch, Kind.Mesh, Layer, true, Placed);
 					break;
 				}
 				case Towers:
@@ -299,21 +348,23 @@ void UThalassaOceanClutter::BeginPlay()
 	Super::BeginPlay();
 	bDisabled = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoClutter"));
 
-	TArray<double> Sizes;
+	TArray<double> Sizes, Bases;
 	for (int32 Index = 0; Index < MeshCount; ++Index)
 	{
 		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, MeshPaths[Index]);
 		if (!Mesh)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("THALASSA: ocean clutter has no mesh at %s"), MeshPaths[Index]);
-			bDisabled = true;
+			UE_LOG(LogTemp, Warning, TEXT("THALASSA: ocean clutter has no mesh at %s%s"), MeshPaths[Index], Index >= FirstOptionalMesh ? TEXT(" (optional: left out)") : TEXT(""));
+			bDisabled |= Index < FirstOptionalMesh;
 		}
 		Meshes.Add(Mesh);
-		Sizes.Add(Mesh ? Mesh->GetBounds().BoxExtent.GetMax() * 2.0 : 100.0);
+		// A missing optional mesh has size 0, which its placement rules check.
+		Sizes.Add(Mesh ? Mesh->GetBounds().BoxExtent.GetMax() * 2.0 : (Index >= FirstOptionalMesh ? 0.0 : 100.0));
+		Bases.Add(Mesh ? -(Mesh->GetBounds().Origin.Z - Mesh->GetBounds().BoxExtent.Z) : 0.0);
 	}
 
 	const AThalassaOcean* Ocean = Cast<AThalassaOcean>(GetOwner());
-	Shared = MakeShared<FShared, ESPMode::ThreadSafe>(static_cast<uint64>(Ocean ? Ocean->Seed : 0), Sizes);
+	Shared = MakeShared<FShared, ESPMode::ThreadSafe>(static_cast<uint64>(Ocean ? Ocean->Seed : 0), Sizes, Bases);
 	UE_LOG(LogTemp, Display, TEXT("THALASSA: ocean clutter %s, %d meshes"), bDisabled ? TEXT("off") : TEXT("on"), MeshCount);
 }
 
@@ -388,7 +439,7 @@ void UThalassaOceanClutter::Launch(const FClutterPatchKey& Key)
 		}
 		FClutterPatch Patch;
 		Patch.Key = Key;
-		Place(State->Generator, State->Seed, State->MeshSizesCm, Patch);
+		Place(State->Generator, State->Seed, State->MeshSizesCm, State->MeshBaseCm, Patch);
 		if (State->bAlive.load())
 		{
 			State->Finished.Enqueue(MoveTemp(Patch));
@@ -437,6 +488,14 @@ void UThalassaOceanClutter::Commit(FClutterPatch&& Patch)
 		Component->RegisterComponent();
 		Component->AddInstances(Group.Value, false, true);
 		Components.Add(Component);
+		if (Layer == Landmarks)
+		{
+			for (const FTransform& Placed : Group.Value)
+			{
+				UE_LOG(LogTemp, Display, TEXT("THALASSA: landmark %s at %s m, %.0f m across"), *GetNameSafe(Meshes[Mesh]),
+					*(Placed.GetLocation() / 100.0).ToString(), Meshes[Mesh] ? Meshes[Mesh]->GetBounds().BoxExtent.GetMax() * 2.0 * Placed.GetScale3D().X / 100.0 : 0.0);
+			}
+		}
 		TotalInstances += Group.Value.Num();
 	}
 }
@@ -474,7 +533,7 @@ void UThalassaOceanClutter::TickComponent(float DeltaTime, ELevelTick TickType, 
 			{
 				FClutterPatch Patch;
 				Patch.Key = Key;
-				Place(Shared->Generator, Shared->Seed, Shared->MeshSizesCm, Patch);
+				Place(Shared->Generator, Shared->Seed, Shared->MeshSizesCm, Shared->MeshBaseCm, Patch);
 				InFlight.Add(Key);
 				Commit(MoveTemp(Patch));
 			}

@@ -29,7 +29,7 @@ namespace ThalassaSonar
 
 	// Bump this whenever the test map's seabed, rocks or anything else solid out there changes shape, so old
 	// charts are not drawn over the new world. 2: the generated seabed, formations and dark biome (2026-11-08).
-	constexpr int32 SeabedGeneration = 3; // 3: the open ocean's generator revision 2.
+	constexpr int32 SeabedGeneration = 4; // 3: the open ocean's generator revision 2. 4: Meshy landmarks, solid, near the start and scattered.
 
 	constexpr float RangeCm = 300000.f;         // 3 km, like a real survey sonar: the open ocean is often well over 1 km deep.
 

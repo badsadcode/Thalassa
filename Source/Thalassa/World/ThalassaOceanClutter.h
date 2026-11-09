@@ -59,7 +59,7 @@ public:
 	static constexpr double PatchM = 256.0;
 
 	/** The rocks in one patch. Pure: the same seed and patch always give the same rocks. Safe on any thread. */
-	static void Place(const FThalassaSeabedGenerator& Generator, uint64 Seed, const TArray<double>& MeshSizesCm, FClutterPatch& Patch);
+	static void Place(const FThalassaSeabedGenerator& Generator, uint64 Seed, const TArray<double>& MeshSizesCm, const TArray<double>& MeshBaseCm, FClutterPatch& Patch);
 
 private:
 	void UpdateWanted();
@@ -70,10 +70,11 @@ private:
 	/** Shared with the worker threads, which keep it alive until they finish. */
 	struct FShared
 	{
-		FShared(uint64 InSeed, const TArray<double>& InSizes) : Generator(InSeed), Seed(InSeed), MeshSizesCm(InSizes) {}
+		FShared(uint64 InSeed, const TArray<double>& InSizes, const TArray<double>& InBases) : Generator(InSeed), Seed(InSeed), MeshSizesCm(InSizes), MeshBaseCm(InBases) {}
 		const FThalassaSeabedGenerator Generator;
 		const uint64 Seed;
 		const TArray<double> MeshSizesCm;
+		const TArray<double> MeshBaseCm;   // How far each mesh reaches below its origin, at scale 1.
 		std::atomic<bool> bAlive{ true };
 		TQueue<FClutterPatch, EQueueMode::Mpsc> Finished;
 	};

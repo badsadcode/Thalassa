@@ -18,6 +18,8 @@ Everything that ships with the game or the site and was not written for this pro
 | `Content/World/Rocks/namaqualand_boulder_03/*` | [Poly Haven](https://polyhaven.com/a/namaqualand_boulder_03) | CC0 1.0 | Scanned boulder, 2K textures. |
 | `Content/World/Rocks/namaqualand_boulder_05/*` | [Poly Haven](https://polyhaven.com/a/namaqualand_boulder_05) | CC0 1.0 | Scanned boulder, 2K textures. |
 | `Content/World/Rocks/coast_rocks_05/*` | [Poly Haven](https://polyhaven.com/a/coast_rocks_05) | CC0 1.0 | Scanned coastal rock mass, 2K textures. Used at 16 to 32 m as medium landmarks. |
+| `Content/World/Meshy/*` (rocky cliff ledge, weathered stone arch, stone cluster, stone monolith) | Made by the owner with [Meshy AI](https://www.meshy.ai) | Owner's paid Meshy subscription, which allows commercial use | Slimmed to 30,000 triangles and 2K textures (`slim_meshy.py`), imported by `import_meshy.py`. Coloured by our Dark Rock 02 scan by default. |
+| `Content/Creatures/Eyes/*` (iris textures) | Made by the owner | Owner's own | Green slit (leviathan), orange horizontal slit (kraken); an amber round one is kept for later. |
 | `Content/World/Textures/Ground093C/*` (Ground 093 C) | [ambientCG](https://ambientcg.com/view?id=Ground093C) | CC0 1.0 | 2K colour, DirectX normal, roughness. Used by `M_SeabedGround` on the flats. |
 
 The CC0 sources are fetched into `Saved/Textures/` and `Saved/Models/` (not in git) by `Scripts/build/fetch_textures.py`. They're imported by `Scripts/unreal/create_ocean_materials.py` and `Scripts/unreal/import_rock_models.py`. The rock models' colours are cooled on import (BaseColorFactor). CC0 needs no attribution. The sites are credited here as a courtesy.

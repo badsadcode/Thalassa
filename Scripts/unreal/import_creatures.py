@@ -14,6 +14,11 @@ is described in make_creatures.py. Per instance, seven numbers (PerInstanceCusto
   3-5  tint: multiplies the skin, and colours a jellyfish's glow
   6    glow: how much it glows (0: not at all)
 
+The leviathan's head and the kraken have a second material slot for their eyes: M_CreatureEye, the same motion,
+with an iris texture across each eye (the owner's eye images, put in Saved/Eyes as T_Eye_<Colour>.png; imported
+into /Game/Creatures/Eyes). The leviathan has the green slit, the kraken the orange horizontal one, as cephalopods
+do. The eyes glow faintly from within, and flare with the rest of the animal when a ping reaches it.
+
 No collision and no Nanite (world position offset is cheaper without it for small meshes).
 
 Run with: UnrealEditor-Cmd.exe Thalassa.uproject -ExecutePythonScript=<this file> -unattended -nullrhi
@@ -23,6 +28,8 @@ import unreal
 
 FOLDER = "/Game/Creatures"
 FBX = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()), "Creatures", "Creatures.fbx")
+EYES = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()), "Eyes")
+EYE_OF = {"SM_Leviathan_Head": "T_Eye_Green", "SM_Kraken": "T_Eye_Orange"}
 NAMES = ["SM_Glider", "SM_Fish_Dart", "SM_Fish_Disc", "SM_Fish_Lantern", "SM_Fish_Grouper", "SM_Fish_Eel", "SM_Fish_Cruiser",
          "SM_Jelly_Giant", "SM_Jelly_Glow", "SM_Jelly_Mote", "SM_Leviathan_Head", "SM_Leviathan_Body", "SM_Leviathan_Tail",
          "SM_Jelly_Helmet", "SM_Jelly_Comb", "SM_Kraken"]
@@ -111,7 +118,7 @@ return float3(1, 1, 1) * (0.3 + 1.2 * p * p);
 """
 
 
-def make_material(name, jelly=False):
+def make_material(name, jelly=False, eye=False):
     """M_Creature (opaque, lit) for fish, gliders and the leviathan; M_Jelly (see-through, glowing) for jellyfish."""
     path = FOLDER + "/" + name
     if eal.does_asset_exist(path):
@@ -184,7 +191,15 @@ def make_material(name, jelly=False):
         strength = mul(strength, stroke, -600, 60)
     glow = mul(mul(glow_colour, glow_mask, -600, -200), strength, -400, -150)
 
-    if jelly:
+    if eye:
+        # An iris texture across the eye, glowing faintly from within, flaring with a ping.
+        iris = node(unreal.MaterialExpressionTextureSampleParameter2D, -1000, -700, parameter_name="Iris")
+        mel.connect_material_property(iris, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+        mel.connect_material_property(const(0.15, -400, -300), "", unreal.MaterialProperty.MP_ROUGHNESS)
+        mel.connect_material_property(const(0.9, -400, -250), "", unreal.MaterialProperty.MP_SPECULAR)
+        bright = add(const(0.35, -900, -820), mul(custom_data(2, -760), const(4.0, -1000, -740), -800, -760), -650, -780)
+        mel.connect_material_property(mul(iris, bright, -500, -700), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    elif jelly:
         # See-through, brighter and more solid at the edges, as a jellyfish is, glowing where it glows.
         fresnel = node(unreal.MaterialExpressionFresnel, -900, -500, exponent=2.5)
         skin = mul(vertex, add(const(0.2, -900, -580), fresnel, -700, -500), -500, -450)
@@ -255,6 +270,35 @@ if len(NAMES) == 1 and imported:
 
 creature = make_material("M_Creature")
 jelly = make_material("M_Jelly", jelly=True)
+eye_material = make_material("M_CreatureEye", eye=True)
+
+
+def eye_instance(texture_name):
+    """MI_<texture>: M_CreatureEye with one of the owner's iris images, imported if it isn't yet."""
+    folder = FOLDER + "/Eyes"
+    path = folder + "/" + texture_name
+    source = os.path.join(EYES, texture_name + ".png")
+    if os.path.exists(source):
+        task = unreal.AssetImportTask()
+        task.filename = source
+        task.destination_path = folder
+        task.destination_name = texture_name
+        task.replace_existing = True
+        task.automated = True
+        task.save = True
+        tools.import_asset_tasks([task])
+    texture = unreal.load_asset(path)
+    if not texture:
+        unreal.log_warning("THALASSA: no eye texture %s (put it in Saved/Eyes)" % texture_name)
+        return None
+    mi_path = folder + "/MI_" + texture_name[2:]
+    if eal.does_asset_exist(mi_path):
+        eal.delete_asset(mi_path)
+    mi = tools.create_asset("MI_" + texture_name[2:], folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    mel.set_material_instance_parent(mi, eye_material)
+    mel.set_material_instance_texture_parameter_value(mi, "Iris", texture)
+    eal.save_asset(mi_path)
+    return mi
 found = 0
 for name in NAMES:
     mesh = unreal.load_asset(FOLDER + "/" + name)
@@ -263,6 +307,10 @@ for name in NAMES:
         continue
     found += 1
     mesh.set_material(0, jelly if name.startswith("SM_Jelly") else creature)
+    if name in EYE_OF and len(mesh.get_editor_property("static_materials")) > 1:
+        eye = eye_instance(EYE_OF[name])
+        if eye:
+            mesh.set_material(1, eye)
     body = mesh.get_editor_property("body_setup")
     if body:
         body.set_editor_property("collision_trace_flag", unreal.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX)

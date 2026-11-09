@@ -52,21 +52,29 @@ def smooth(a, b, x):
 
 
 class Builder:
-    """A bmesh plus what each vertex carries: colour with glow, where it is on the moving part."""
+    """A bmesh plus what each vertex carries: colour with glow, where it is on the moving part. Faces can use the
+    second material slot (material=1: the eyes, drawn with an eye texture through UV channel 0)."""
 
     def __init__(self, size_m, mode):
         self.bm = bmesh.new()
         self.data = {}
+        self.uv = {}
         self.size_m = size_m
         self.mode = mode
+        self.has_eyes = False
 
-    def vert(self, co, colour, glow, along):
+    def vert(self, co, colour, glow, along, uv=None):
         v = self.bm.verts.new(co)
         self.data[v] = ((*colour, glow), along)
+        if uv is not None:
+            self.uv[v] = uv
         return v
 
-    def face(self, *verts):
-        return self.bm.faces.new(verts)
+    def face(self, *verts, material=0):
+        f = self.bm.faces.new(verts)
+        f.material_index = material
+        self.has_eyes |= material == 1
+        return f
 
     def finish(self, name):
         bm = self.bm
@@ -79,7 +87,7 @@ class Builder:
         for f in bm.faces:
             for loop in f.loops:
                 colour, along = self.data[loop.vert]
-                loop[uv0].uv = (loop.vert.co.x / self.size_m, loop.vert.co.y / self.size_m)
+                loop[uv0].uv = self.uv.get(loop.vert, (loop.vert.co.x / self.size_m, loop.vert.co.y / self.size_m))
                 loop[uv1].uv = (along, 0.0)
                 loop[uv2].uv = (self.size_m, 0.0)
                 loop[uv3].uv = (float(self.mode), 0.0)
@@ -89,6 +97,9 @@ class Builder:
         mesh = bpy.data.meshes.new(name)
         bm.to_mesh(mesh)
         bm.free()
+        mesh.materials.append(bpy.data.materials.get("Body") or bpy.data.materials.new("Body"))
+        if self.has_eyes:
+            mesh.materials.append(bpy.data.materials.get("Eye") or bpy.data.materials.new("Eye"))
         mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
         attribute = mesh.color_attributes.new("Col", "BYTE_COLOR", "POINT")
         for index, colour in enumerate(colours):
@@ -464,7 +475,7 @@ def lev_head():
     for side in (1.0, -1.0):
         centre = Vector((3.2, side * r(0.36) * 0.93, 0.9))
         eye_r = 0.9
-        lat, seg = 6, 12
+        lat, seg = 10, 24
         prev = None
         for k in range(lat + 1):
             phi = math.pi * 0.5 * k / lat
@@ -472,18 +483,19 @@ def lev_head():
             for s in range(seg):
                 a = 2.0 * math.pi * s / seg
                 local = Vector((eye_r * math.sin(phi) * math.cos(a), side * eye_r * math.cos(phi), eye_r * math.sin(phi) * math.sin(a)))
-                pupil = k < 2
-                ring.append(b.vert(centre + local, (0.02, 0.02, 0.0) if pupil else (0.9, 0.75, 0.35), 0.15 if pupil else 1.0, 0.0))
+                # The iris texture spread across the eye: its middle at the front of the bulge.
+                uv = (0.5 + 0.48 * math.sin(phi) * math.cos(a), 0.5 + 0.48 * math.sin(phi) * math.sin(a))
+                ring.append(b.vert(centre + local, (0.9, 0.75, 0.35), 1.0, 0.0, uv))
             if prev:
                 for s in range(seg):
                     j = (s + 1) % seg
                     quad = (prev[s], ring[s], ring[j], prev[j])
-                    b.face(*(quad if side > 0 else tuple(reversed(quad))))
+                    b.face(*(quad if side > 0 else tuple(reversed(quad))), material=1)
             else:
-                apex = b.vert(centre + Vector((0.0, side * eye_r * 1.02, 0.0)), (0.02, 0.02, 0.0), 0.1, 0.0)
+                apex = b.vert(centre + Vector((0.0, side * eye_r * 1.02, 0.0)), (0.9, 0.75, 0.35), 1.0, 0.0, (0.5, 0.5))
                 for s in range(seg):
                     tri = (ring[(s + 1) % seg], ring[s], apex)
-                    b.face(*(tri if side > 0 else tuple(reversed(tri))))
+                    b.face(*(tri if side > 0 else tuple(reversed(tri))), material=1)
             prev = ring
     return b.finish("SM_Leviathan_Head")
 
@@ -613,7 +625,7 @@ def kraken():
     for side in (1.0, -1.0):
         centre = Vector((-2.6, side * 3.55, 0.6))
         eye_r = 1.7
-        lat, seg = 6, 14
+        lat, seg = 10, 24
         prev = None
         for k in range(lat + 1):
             phi = math.pi * 0.5 * k / lat
@@ -621,18 +633,18 @@ def kraken():
             for s in range(seg):
                 a = 2.0 * math.pi * s / seg
                 local = Vector((eye_r * math.sin(phi) * math.cos(a), side * eye_r * math.cos(phi) * 0.6, eye_r * math.sin(phi) * math.sin(a)))
-                pupil = k < 3
-                ring.append(b.vert(centre + local, (0.02, 0.02, 0.02) if pupil else (0.95, 0.85, 0.45), 0.1 if pupil else 0.5, 0.34))
+                uv = (0.5 + 0.48 * math.sin(phi) * math.cos(a), 0.5 + 0.48 * math.sin(phi) * math.sin(a))
+                ring.append(b.vert(centre + local, (0.95, 0.85, 0.45), 0.5, 0.34, uv))
             if prev:
                 for s in range(seg):
                     j = (s + 1) % seg
                     quad = (prev[s], ring[s], ring[j], prev[j])
-                    b.face(*(quad if side > 0 else tuple(reversed(quad))))
+                    b.face(*(quad if side > 0 else tuple(reversed(quad))), material=1)
             else:
-                apex = b.vert(centre + Vector((0.0, side * eye_r * 0.62, 0.0)), (0.02, 0.02, 0.02), 0.1, 0.34)
+                apex = b.vert(centre + Vector((0.0, side * eye_r * 0.62, 0.0)), (0.95, 0.85, 0.45), 0.5, 0.34, (0.5, 0.5))
                 for s in range(seg):
                     tri = (ring[(s + 1) % seg], ring[s], apex)
-                    b.face(*(tri if side > 0 else tuple(reversed(tri))))
+                    b.face(*(tri if side > 0 else tuple(reversed(tri))), material=1)
             prev = ring
 
     def limb(angle, length, base_r, tip_r, club=False):
