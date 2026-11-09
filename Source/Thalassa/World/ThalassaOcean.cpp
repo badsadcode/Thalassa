@@ -9,6 +9,11 @@
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Components/SkyLightComponent.h"
+#include "Engine/SkyLight.h"
+#include "Engine/TextureCube.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Vessel/ThalassaVessel.h"
 #include "World/ThalassaOceanClutter.h"
@@ -100,6 +105,27 @@ void AThalassaOcean::BeginPlay()
 {
 	Super::BeginPlay();
 	GetGenerator();
+
+	// Test switch, for tuning the light: -ThalassaAmbient=<intensity> gives the ambient (sky) light an even source, the
+	// water's colour from every direction, as light scattered in water is, instead of a capture of the dark water
+	// (which stays dark however far it is turned up), and sets how strong it is.
+	float Ambient = 0.f;
+	if (FParse::Value(FCommandLine::Get(), TEXT("ThalassaAmbient="), Ambient))
+	{
+		for (TActorIterator<ASkyLight> It(GetWorld()); It; ++It)
+		{
+			if (USkyLightComponent* Sky = It->GetLightComponent())
+			{
+				Sky->SourceType = SLS_SpecifiedCubemap;
+				Sky->SetCubemap(LoadObject<UTextureCube>(nullptr, TEXT("/Engine/EngineResources/DefaultTextureCube.DefaultTextureCube")));
+				Sky->bLowerHemisphereIsBlack = false;
+				Sky->SetLightColor(FLinearColor(0.32f, 0.72f, 0.78f));
+				Sky->SetIntensity(Ambient);
+				Sky->RecaptureSky();
+				UE_LOG(LogTemp, Display, TEXT("THALASSA: test ambient light %.2f, even, the water's colour"), Ambient);
+			}
+		}
+	}
 	UE_LOG(LogTemp, Display, TEXT("THALASSA: ocean seed %lld, generator revision %d, fingerprint %llu"),
 		Seed, FThalassaSeabedGenerator::Revision, GetGenerator().Fingerprint());
 

@@ -36,6 +36,7 @@ namespace ThalassaFauna
 		TEXT("/Game/Creatures/SM_Jelly_Helmet.SM_Jelly_Helmet"),
 		TEXT("/Game/Creatures/SM_Jelly_Comb.SM_Jelly_Comb"),
 		TEXT("/Game/Creatures/SM_Kraken.SM_Kraken"),
+		TEXT("/Game/Creatures/KrakenElder/SM_KrakenElder.SM_KrakenElder"),
 	};
 	constexpr int32 MeshCount = UE_ARRAY_COUNT(MeshPaths);
 	constexpr int32 LeviathanHead = 10;
@@ -85,7 +86,7 @@ namespace ThalassaFauna
 		double ScaleMin, ScaleMax;
 		double DrawM;            // Drawn when nearer the camera than this.
 		double KeepClearM;       // Room it gives the ship.
-		double BoltM;            // How far a ping makes it bolt.
+		double BoltM;            // How far a ping makes it bolt. Negative: it comes towards the ping instead.
 		float SonarRadiusCm;     // How big a contact each animal makes; 0: too small for the ping to show.
 		double SizeM;            // Its mesh's size: big animals stroke slowly.
 		const FLinearColor* Palette = nullptr;   // Colours its schools can be; none: as modelled, glowing as modelled.
@@ -110,6 +111,8 @@ namespace ThalassaFauna
 		{ TEXT("helmet jelly"), 13, EKind::Jelly, 300, { 0.15, 0.20, 0.20, 0.30, 0.40, 0.40 },  4,  14,   3.0,  3.5,  10, 70,    15,  35,  0.08, 0.18,  0.8, 1.3,   300,  20,   5,   0.f,  1.6, HelmetPalette, UE_ARRAY_COUNT(HelmetPalette) },
 		{ TEXT("comb jelly"),  14, EKind::Jelly, 200, { 0.25, 0.25, 0.25, 0.25, 0.35, 0.35 },  6,  20,   2.0,  2.5,   5, 40,    10,  30,  0.06, 0.15,  0.8, 1.4,   220,  15,   4,   0.f,  1.2, GlowPalette, UE_ARRAY_COUNT(GlowPalette) },
 		{ TEXT("kraken"),      15, EKind::Kraken, 2500, { 0.04, 0.12, 0.12, 0.30, 0.45, 0.30 }, 1,  1,  80.0,  0.0,  50, 140,  400, 800,  2.5, 4.5,    0.9, 1.5,  2200, 150, 250, 1500.f, 60.0 },
+		// The elder kraken: the owner's model, 140 to 220 m long, rarer, deeper, and it doesn't flee a ping: it comes closer.
+		{ TEXT("elder kraken"), 16, EKind::Kraken, 6000, { 0.02, 0.05, 0.05, 0.12, 0.20, 0.15 }, 1, 1, 200.0,  0.0,  80, 200,  600, 1200, 3.0, 5.0,    1.4, 2.2,  3000, 250, -150, 3000.f, 100.0 },
 	};
 	constexpr int32 SpeciesCount = UE_ARRAY_COUNT(Species);
 
@@ -328,7 +331,7 @@ bool UThalassaOceanFauna::MakeSchool(const AThalassaOcean& Ocean, uint8 SpeciesI
 		OutSchool.HomeM = Placed + FVector2D(FMath::Cos(Bearing), FMath::Sin(Bearing)) * (6.0 + 3.0 * SpeciesIndex);
 		OutSchool.RoamM = FMath::Min(OutSchool.RoamM, 8.0);
 		OutSchool.SpeedMS *= 0.3;
-		OutSchool.AltitudeM = FMath::Min(OutSchool.AltitudeM, Kind.Kind == EKind::Jelly ? 30.0 : (Kind.Kind == EKind::Kraken ? 45.0 : 12.0));
+		OutSchool.AltitudeM = FMath::Min(OutSchool.AltitudeM, Kind.Kind == EKind::Jelly ? 30.0 : (Kind.Kind == EKind::Kraken ? Kind.AltMin : 12.0));
 	}
 
 	// The animals: loosely spread through a flattened oval (jellyfish: a rounder cloud), apart from each other.
@@ -419,7 +422,9 @@ FFaunaSchoolState UThalassaOceanFauna::SchoolAt(const AThalassaOcean& Ocean, con
 		if (Ping.Time > Latest && Kind.Kind != EKind::Jelly)
 		{
 			Latest = Ping.Time;
-			State.FleeYawDeg = FMath::RadiansToDegrees(FMath::Atan2(Away.Y, Away.X));
+			// Fleeing, it faces away from the ping; coming closer, towards it.
+			const FVector2D Facing = Kind.BoltM < 0.0 ? -Away : Away;
+			State.FleeYawDeg = FMath::RadiansToDegrees(FMath::Atan2(Facing.Y, Facing.X));
 			State.Fleeing = (1.0 - FMath::Exp(-Age)) * (1.0 - FaunaSmooth(10.0, 25.0, Age));
 		}
 	}

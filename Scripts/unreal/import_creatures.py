@@ -19,6 +19,10 @@ with an iris texture across each eye (the owner's eye images, put in Saved/Eyes 
 into /Game/Creatures/Eyes). The leviathan has the green slit, the kraken the orange horizontal one, as cephalopods
 do. The eyes glow faintly from within, and flare with the rest of the animal when a ping reaches it.
 
+SM_KrakenElder, the owner's own kraken (made from Art/Creatures/Kraken_Test.blend by make_kraken2.py into
+Saved/Kraken2), is drawn with M_CreatureTextured: the same motion, its colour and normal from textures. It has three
+slots: Body, Limb and Eye.
+
 No collision and no Nanite (world position offset is cheaper without it for small meshes).
 
 Run with: UnrealEditor-Cmd.exe Thalassa.uproject -ExecutePythonScript=<this file> -unattended -nullrhi
@@ -30,6 +34,7 @@ FOLDER = "/Game/Creatures"
 FBX = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()), "Creatures", "Creatures.fbx")
 EYES = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()), "Eyes")
 EYE_OF = {"SM_Leviathan_Head": "T_Eye_Green", "SM_Kraken": "T_Eye_Orange"}
+KRAKEN2 = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()), "Kraken2")
 NAMES = ["SM_Glider", "SM_Fish_Dart", "SM_Fish_Disc", "SM_Fish_Lantern", "SM_Fish_Grouper", "SM_Fish_Eel", "SM_Fish_Cruiser",
          "SM_Jelly_Giant", "SM_Jelly_Glow", "SM_Jelly_Mote", "SM_Leviathan_Head", "SM_Leviathan_Body", "SM_Leviathan_Tail",
          "SM_Jelly_Helmet", "SM_Jelly_Comb", "SM_Kraken"]
@@ -118,7 +123,7 @@ return float3(1, 1, 1) * (0.3 + 1.2 * p * p);
 """
 
 
-def make_material(name, jelly=False, eye=False):
+def make_material(name, jelly=False, eye=False, textured=False):
     """M_Creature (opaque, lit) for fish, gliders and the leviathan; M_Jelly (see-through, glowing) for jellyfish."""
     path = FOLDER + "/" + name
     if eal.does_asset_exist(path):
@@ -208,6 +213,17 @@ def make_material(name, jelly=False, eye=False):
         clamp = node(unreal.MaterialExpressionSaturate, -300, -650)
         mel.connect_material_expressions(solid, "", clamp, "")
         mel.connect_material_property(clamp, "", unreal.MaterialProperty.MP_OPACITY)
+    elif textured:
+        # The model's own textures, tinted per instance like the rest.
+        colour = node(unreal.MaterialExpressionTextureSampleParameter2D, -1000, -800, parameter_name="Colour")
+        normal = node(unreal.MaterialExpressionTextureSampleParameter2D, -1000, -650, parameter_name="Normal",
+                      sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL,
+                      texture=unreal.load_asset("/Engine/EngineMaterials/DefaultNormal"))
+        mel.connect_material_property(mul(colour, tint, -700, -800), "", unreal.MaterialProperty.MP_BASE_COLOR)
+        mel.connect_material_property(normal, "RGB", unreal.MaterialProperty.MP_NORMAL)
+        mel.connect_material_property(const(0.4, -400, -300), "", unreal.MaterialProperty.MP_ROUGHNESS)
+        mel.connect_material_property(const(0.5, -400, -250), "", unreal.MaterialProperty.MP_SPECULAR)
+        mel.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     else:
         mel.connect_material_property(vertex, "", unreal.MaterialProperty.MP_BASE_COLOR)
         mel.connect_material_property(const(0.38, -400, -300), "", unreal.MaterialProperty.MP_ROUGHNESS)
@@ -319,3 +335,84 @@ for name in NAMES:
     unreal.log("THALASSA: %s, %d UV channels, %.0f by %.0f by %.0f cm" % (name, channels, box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z))
     eal.save_asset(FOLDER + "/" + name)
 unreal.log("THALASSA: imported %d of %d creatures into %s" % (found, len(NAMES), FOLDER))
+
+
+def import_kraken2():
+    """The owner's kraken: its mesh, its textures, and material instances for its three slots."""
+    fbx = os.path.join(KRAKEN2, "SM_KrakenElder.fbx")
+    if not os.path.exists(fbx):
+        unreal.log_warning("THALASSA: no elder kraken at %s; run make_kraken2.py first" % fbx)
+        return
+    folder = FOLDER + "/KrakenElder"
+    options = unreal.FbxImportUI()
+    options.import_mesh = True
+    options.import_materials = False
+    options.import_textures = False
+    options.import_animations = False
+    options.mesh_type_to_import = unreal.FBXImportType.FBXIT_STATIC_MESH
+    options.static_mesh_import_data.combine_meshes = True
+    options.static_mesh_import_data.auto_generate_collision = False
+    options.static_mesh_import_data.generate_lightmap_u_vs = False
+    options.static_mesh_import_data.vertex_color_import_option = unreal.VertexColorImportOption.REPLACE
+    task = unreal.AssetImportTask()
+    task.filename = fbx
+    task.destination_path = folder
+    task.destination_name = "SM_KrakenElder"
+    task.replace_existing = True
+    task.automated = True
+    task.save = False
+    task.options = options
+    tools.import_asset_tasks([task])
+    mesh_path = folder + "/SM_KrakenElder"
+    imported = [p.split(".")[0] for p in task.get_editor_property("imported_object_paths")]
+    meshes = [p for p in imported if isinstance(unreal.load_asset(p), unreal.StaticMesh)]
+    if meshes and meshes[0] != mesh_path:
+        if eal.does_asset_exist(mesh_path):
+            eal.delete_asset(mesh_path)
+        eal.rename_asset(meshes[0], mesh_path)
+    mesh = unreal.load_asset(mesh_path)
+    if not mesh:
+        unreal.log_error("THALASSA: the elder kraken did not import")
+        return
+
+    def texture(name, normal=False):
+        task = unreal.AssetImportTask()
+        task.filename = os.path.join(KRAKEN2, name + ".png")
+        task.destination_path = folder
+        task.destination_name = name
+        task.replace_existing = True
+        task.automated = True
+        task.save = False
+        tools.import_asset_tasks([task])
+        t = unreal.load_asset(folder + "/" + name)
+        if t and normal:
+            t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
+            t.set_editor_property("srgb", False)
+        eal.save_asset(folder + "/" + name)
+        return t
+
+    def instance(name, colour, normal=None):
+        path = folder + "/" + name
+        if eal.does_asset_exist(path):
+            eal.delete_asset(path)
+        mi = tools.create_asset(name, folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        mel.set_material_instance_parent(mi, textured)
+        mel.set_material_instance_texture_parameter_value(mi, "Colour", colour)
+        if normal:
+            mel.set_material_instance_texture_parameter_value(mi, "Normal", normal)
+        eal.save_asset(path)
+        return mi
+
+    body = instance("MI_KrakenElder_Body", texture("T_KrakenElder_BodyColour"), texture("T_KrakenElder_BodyNormal", normal=True))
+    limb = instance("MI_KrakenElder_Limb", texture("T_KrakenElder_LimbColour"))
+    eye = eye_instance("T_Eye_Orange")
+    slots = [str(m.get_editor_property("material_slot_name")) for m in mesh.get_editor_property("static_materials")]
+    for index, slot in enumerate(slots):
+        mesh.set_material(index, eye if slot.startswith("Eye") else (limb if slot.startswith("Limb") else body))
+    eal.save_asset(mesh_path)
+    box = mesh.get_bounding_box()
+    unreal.log("THALASSA: elder kraken, slots %s, %.0f x %.0f x %.0f cm" % (slots, box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z))
+
+
+textured = make_material("M_CreatureTextured", textured=True)
+import_kraken2()
