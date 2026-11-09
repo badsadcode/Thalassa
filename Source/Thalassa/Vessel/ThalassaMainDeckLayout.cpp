@@ -14,6 +14,8 @@ namespace
 	const FLinearColor ConsoleColor(0.03f, 0.04f, 0.05f);
 
 	constexpr float CeilingZ = 350.f;
+	constexpr float BridgeSill = 30.f;   // The bridge windows: from just off the floor...
+	constexpr float BridgeHead = 330.f;  // ...to just under the ceiling.
 	constexpr float DoorHeight = 250.f;
 	constexpr float WallThickness = 30.f;
 	constexpr float PlateTop = -100.f; // Under the floor tiles, so that sunken areas have somewhere to sink to.
@@ -166,8 +168,14 @@ FVesselLayout BuildMainDeckLayout()
 	B.WallX(2500.f, -6000.f, 6000.f, HullColor);
 	B.WallX(-1800.f, 6000.f, 9500.f, HullColor);
 	B.WallX(2000.f, 6000.f, 9500.f, HullColor);
-	B.WallX(-1200.f, 9500.f, 14000.f, BridgeColor);
-	B.WallX(1200.f, 9500.f, 14000.f, BridgeColor);
+	// The bridge's sides: solid aft, glass for the forward 25 m, wrapping round from the bow window.
+	for (const float Y : { -1200.f, 1200.f })
+	{
+		B.WallX(Y, 9500.f, 11500.f, BridgeColor);
+		B.Box(FVector(11500.f, Y - WallThickness * 0.5f, 0.f), FVector(14000.f, Y + WallThickness * 0.5f, BridgeSill), BridgeColor);
+		B.Box(FVector(11500.f, Y - WallThickness * 0.5f, BridgeHead), FVector(14000.f, Y + WallThickness * 0.5f, CeilingZ), BridgeColor);
+		B.Box(FVector(11500.f, Y - WallThickness * 0.5f, BridgeSill), FVector(14000.f, Y + WallThickness * 0.5f, BridgeHead), HullColor, false);
+	}
 	B.Box(FVector(-14015.f, -1500.f, -400.f), FVector(-13985.f, 1500.f, CeilingZ), EngineColor);
 	B.WallY(-6000.f, -2500.f, -2200.f, HullColor);
 	B.WallY(-6000.f, 2200.f, 2500.f, HullColor);
@@ -183,10 +191,10 @@ FVesselLayout BuildMainDeckLayout()
 	B.Box(FVector(500.f, -3115.f, 290.f), FVector(3500.f, -3085.f, CeilingZ), GatherColor);
 	B.Box(FVector(500.f, -3115.f, 60.f), FVector(3500.f, -3085.f, 290.f), HullColor, false);
 
-	// The bridge's forward window, the same way.
-	B.Box(FVector(13985.f, -1200.f, 0.f), FVector(14015.f, 1200.f, 90.f), BridgeColor);
-	B.Box(FVector(13985.f, -1200.f, 300.f), FVector(14015.f, 1200.f, CeilingZ), BridgeColor);
-	B.Box(FVector(13985.f, -1200.f, 90.f), FVector(14015.f, 1200.f, 300.f), HullColor, false);
+	// The bridge's forward window, the same way: nearly floor to ceiling, and on round the sides (above).
+	B.Box(FVector(13985.f, -1200.f, 0.f), FVector(14015.f, 1200.f, BridgeSill), BridgeColor);
+	B.Box(FVector(13985.f, -1200.f, BridgeHead), FVector(14015.f, 1200.f, CeilingZ), BridgeColor);
+	B.Box(FVector(13985.f, -1200.f, BridgeSill), FVector(14015.f, 1200.f, BridgeHead), HullColor, false);
 
 	// ---------------------------------------------- The ring corridor, off-centre on purpose.
 	// Outer edge X -5000..3000, Y -1700..1300. Corridor 400 wide. Inner block X -4600..2600, Y -1300..900.

@@ -777,7 +777,8 @@ void AThalassaVessel::BeginPlay()
 		int32 Index = 0;
 		for (const FHullBox& Box : GetLayout().Boxes)
 		{
-			if (UMaterialInstanceDynamic* Material = HullPieces[Index]->CreateAndSetMaterialInstanceDynamic(0))
+			UMaterialInstanceDynamic* Material = HullPieces.IsValidIndex(Index) ? HullPieces[Index]->CreateAndSetMaterialInstanceDynamic(0) : nullptr;
+			if (Material)
 			{
 				Material->SetVectorParameterValue(TEXT("Color"), Box.Color);
 			}

@@ -270,8 +270,11 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<USceneComponent> ShipRoot;
 
-	/** Graybox visuals only. */
-	UPROPERTY(VisibleAnywhere)
+	/**
+	 * Graybox visuals only. Transient: BP_Thalassa would otherwise save the list as it was, and a layout with
+	 * more or fewer boxes would no longer match it. The constructor makes it fresh from the layout every time.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> HullPieces;
 
 	/** All hull collision, and the one movement base. Never rendered. */
