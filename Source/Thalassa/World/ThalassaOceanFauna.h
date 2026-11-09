@@ -44,6 +44,7 @@ struct FFaunaSchool
 	double SpeedMS = 1.5;                      // How fast it cruises.
 	double Phase[4] = { 0.0, 0.0, 0.0, 0.0 };  // Where in its wandering it was when the clock started.
 	FLinearColor Tint = FLinearColor::White;   // Its colour, and in alpha how much it glows.
+	double SizeMul = 1.0;                      // Animated kinds: 1, or more for a school of giants.
 	struct FMember
 	{
 		FVector OffsetM = FVector::ZeroVector; // Its place in the school, in the school's frame.
@@ -117,7 +118,7 @@ public:
 	FVector LeviathanHeadAt(double Time);
 
 	/** Animals being drawn now. */
-	int32 GetVisibleAnimals() const { return VisibleAnimals; }
+	int32 GetVisibleAnimals() const { return VisibleAnimals + AnimatedShown; }
 
 private:
 	const FFaunaSchool* FindSchool(uint8 Species, int64 CellX, int64 CellY);
@@ -140,9 +141,22 @@ private:
 	{
 		TArray<FTransform> Transforms;
 		TArray<float> CustomData;
+		TArray<uint32> Ids;    // Animated kinds: which animal each is, so it keeps its component.
 		uint32 Signature = 0;
 	};
 	TArray<FDrawn> Drawn;
+
+	/** The animated kinds (Fab creatures): the nearest of each, each in its own skeletal mesh component, reused. */
+	void DrawAnimated(const FVector& Eye);
+	TArray<FDrawn> AnimatedDrawn;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class USkeletalMeshComponent>> AnimatedPool;
+	TArray<int32> AnimatedPoolKind;
+	TArray<bool> AnimatedPoolBusy;
+	TMap<uint32, int32> AnimatedSlots;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UObject>> AnimatedAssets;   // Held, so they load once, at start.
+	int32 AnimatedShown = 0;
 	int32 VisibleAnimals = 0;
 
 	TArray<FFaunaPing> Pings;

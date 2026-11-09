@@ -1,7 +1,11 @@
 #include "World/ThalassaOceanFauna.h"
 
 #include "Camera/PlayerCameraManager.h"
+#include "Animation/AnimSequence.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -91,6 +95,14 @@ namespace ThalassaFauna
 		double SizeM;            // Its mesh's size: big animals stroke slowly.
 		const FLinearColor* Palette = nullptr;   // Colours its schools can be; none: as modelled, glowing as modelled.
 		int32 PaletteCount = 0;
+		// Animated kinds (Fab Marketplace creatures, skinned and rigged): their mesh and swim loop, and how far their
+		// mesh is turned from facing +X. Mesh is then -1: they are drawn as animated components, not instances.
+		const TCHAR* Skeletal = nullptr;
+		const TCHAR* SwimAnim = nullptr;
+		double YawOffsetDeg = 0.0;
+		// A companion keeps another kind's school exactly (the whale calf, its mother), this far off each member.
+		int32 CompanionOf = -1;
+		FVector CompanionOffsetM = FVector::ZeroVector;
 	};
 
 	// The species, by index; the index is also its mesh's. Small schooling fish in their hundreds near the camera;
@@ -113,8 +125,80 @@ namespace ThalassaFauna
 		{ TEXT("kraken"),      15, EKind::Kraken, 2500, { 0.04, 0.12, 0.12, 0.30, 0.45, 0.30 }, 1,  1,  80.0,  0.0,  50, 140,  400, 800,  2.5, 4.5,    0.9, 1.5,  2200, 150, 250, 1500.f, 60.0 },
 		// The elder kraken: the owner's model, 140 to 220 m long, rarer, deeper, and it doesn't flee a ping: it comes closer.
 		{ TEXT("elder kraken"), 16, EKind::Kraken, 6000, { 0.02, 0.05, 0.05, 0.12, 0.20, 0.15 }, 1, 1, 200.0,  0.0,  80, 200,  600, 1200, 3.0, 5.0,    1.4, 2.2,  3000, 250, -150, 3000.f, 100.0 },
+
+		// Animated Fab Marketplace creatures (publisher Existence), in their own Content folders. Their meshes are made
+		// small; Scale is what makes them their size here. A negative Bolt means a ping draws them closer.
+		//  Name             Mesh Kind          Cell   Plains Hills Plat. Ridge Canyon Volc.    Count   Spacing Spread  Altitude    Roam       Speed       Scale       Draw  Clear Bolt  Sonar  Size
+		{ TEXT("megalodon"),   -1, EKind::Fish, 3000, { 0.05, 0.08, 0.08, 0.10, 0.15, 0.10 },  1, 2,  40.0, 25.0,  30, 120,  400, 900,  3.0, 5.0,    9.0, 12.0,  600,  60, -100, 600.f, 16.0, nullptr, 0,
+			TEXT("/Game/Shark_Megalodon/Base_mesh/SK_Shark_Megalodon.SK_Shark_Megalodon"), TEXT("/Game/Shark_Megalodon/Animations/Anim_Shark_Megalodon_Swim_03_WithoutMoving.Anim_Shark_Megalodon_Swim_03_WithoutMoving"), -90.0 },
+		{ TEXT("shark goblin"), -1, EKind::Fish, 1200, { 0.10, 0.20, 0.20, 0.25, 0.30, 0.20 },  2, 5,  10.0,  8.0,  10,  60,  150, 300,  2.5, 4.0,    4.0, 6.0,   350,  30,  -60, 200.f,  4.0, nullptr, 0,
+			TEXT("/Game/SharkGoblin/Base_mesh/SK_SharkGoblin.SK_SharkGoblin"), TEXT("/Game/SharkGoblin/Animations/Anim_Swimming_02_WithoutMoving.Anim_Swimming_02_WithoutMoving"), -90.0 },
+		{ TEXT("hammerhead"),  -1, EKind::Fish, 1000, { 0.15, 0.20, 0.20, 0.20, 0.20, 0.10 },  3, 8,   8.0,  7.0,  15,  60,  200, 350,  2.0, 3.0,    3.0, 4.5,   350,  40,   40, 200.f,  4.5, nullptr, 0,
+			TEXT("/Game/HammerheadShark/BaseMesh/SK_HammerheadShark.SK_HammerheadShark"), TEXT("/Game/HammerheadShark/Animations/AS_Swim_03_InPlace.AS_Swim_03_InPlace"), -90.0 },
+		// The whale is far bigger than any real one, on purpose: 60 to 90 m. Its calf is 20 m.
+		{ TEXT("blue whale"),  -1, EKind::Fish, 4000, { 0.20, 0.15, 0.15, 0.10, 0.10, 0.05 },  1, 1,  60.0,  0.0,  70, 160, 1000, 1800, 3.0, 4.0,    4.0, 6.0,  1500, 200,   50, 2500.f, 75.0, nullptr, 0,
+			TEXT("/Game/BlueWhaleAndWhaleCalf/BaseMesh/BlueWhale/SK_blue_whale.SK_blue_whale"), TEXT("/Game/BlueWhaleAndWhaleCalf/Animations/Whale/AS_While_swimming_03.AS_While_swimming_03"), -90.0 },
+		{ TEXT("whale calf"),  -1, EKind::Fish, 4000, { 0.20, 0.15, 0.15, 0.10, 0.10, 0.05 },  1, 1,  60.0,  0.0,  70, 160, 1000, 1800, 3.0, 4.0,    4.0, 4.4,  1500, 200,   50, 800.f, 20.0, nullptr, 0,
+			TEXT("/Game/BlueWhaleAndWhaleCalf/BaseMesh/BlueWhaleCalf/SK_blue_whale_calf.SK_blue_whale_calf"), TEXT("/Game/BlueWhaleAndWhaleCalf/Animations/WhaleCalf/AS_WhileCalf_swimming_03.AS_WhileCalf_swimming_03"), -90.0,
+			/* CompanionOf the blue whale (species 17), beside and a little below it: */ 17, FVector(-15.0, 45.0, -15.0) },
+		{ TEXT("dolphin"),     -1, EKind::Fish,  800, { 0.25, 0.30, 0.30, 0.25, 0.20, 0.10 },  3, 8,   6.0,  5.0,  10,  50,  200, 400,  3.0, 5.0,    0.4, 0.5,   300,  25,   60, 150.f,  3.0, nullptr, 0,
+			TEXT("/Game/DolphinAndRemora/BaseMesh/Dolphin/SK_Dolphin.SK_Dolphin"), TEXT("/Game/DolphinAndRemora/Animations/Dolphin/AS_swimming_02_inplace.AS_swimming_02_inplace"), -90.0 },
+		{ TEXT("sea turtle"),  -1, EKind::Fish,  600, { 0.15, 0.20, 0.20, 0.15, 0.15, 0.05 },  1, 2,   5.0,  4.0,   3,  25,  100, 250,  0.6, 1.0,    1.4, 2.0,   200,  15,   20,   0.f,  1.5, nullptr, 0,
+			TEXT("/Game/SeaTurtle/BaseMesh/SK_SeaTurtle.SK_SeaTurtle"), TEXT("/Game/SeaTurtle/Animations/AS_swimming.AS_swimming"), -90.0 },
+		{ TEXT("stingray"),    -1, EKind::Fish,  500, { 0.30, 0.20, 0.15, 0.10, 0.15, 0.05 },  1, 4,   4.0,  3.0, 0.5,   2,   50, 120,  0.6, 1.2,    3.0, 4.0,   180,  15,   25,   0.f,  2.5, nullptr, 0,
+			TEXT("/Game/Stingray/Base_mesh/SK_Stingray.SK_Stingray"), TEXT("/Game/Stingray/Animations/Anim_Swim_01_WithoutMoving.Anim_Swim_01_WithoutMoving"), -90.0 },
+		{ TEXT("moray eel"),   -1, EKind::Fish,  300, { 0.02, 0.15, 0.15, 0.30, 0.35, 0.20 },  1, 1,   3.0,  0.0, 0.3,   1,    5,  15,  0.2, 0.4,    2.0, 3.0,   120,   0,  -10,   0.f,  3.0, nullptr, 0,
+			TEXT("/Game/MorayEel/Base_mesh/SK_MorayEel.SK_MorayEel"), TEXT("/Game/MorayEel/Animations/anim_swim_01.anim_swim_01"), -90.0 },
+		{ TEXT("anglerfish"),  -1, EKind::Fish,  700, { 0.05, 0.10, 0.10, 0.20, 0.35, 0.40 },  1, 1,   3.0,  0.0,   5,  40,   30,  80,  0.3, 0.6,    4.0, 6.0,   150,   0,  -30,   0.f,  3.0, nullptr, 0,
+			TEXT("/Game/AnglerFish/BaseMesh/SK_AnglerFish.SK_AnglerFish"), TEXT("/Game/AnglerFish/Animations/Anim_AnglerFish_Swimming_1.Anim_AnglerFish_Swimming_1"), -90.0 },
+		{ TEXT("marlin"),      -1, EKind::Fish,  900, { 0.20, 0.20, 0.20, 0.15, 0.10, 0.05 },  1, 3,  10.0,  8.0,  20,  80,  300, 500,  4.0, 6.0,    3.0, 4.0,   300,  30,   80, 150.f,  3.5, nullptr, 0,
+			TEXT("/Game/MarlinSailfish/Base_mesh/SK_MarlinSailfish.SK_MarlinSailfish"), TEXT("/Game/MarlinSailfish/Animations/Anim_MarlinSailfish_Swim_01_WithoutMoving.Anim_MarlinSailfish_Swim_01_WithoutMoving"), -90.0 },
 	};
 	constexpr int32 SpeciesCount = UE_ARRAY_COUNT(Species);
+
+	/** Animated kinds: how often a school is gigantic, and how many times bigger. */
+	struct FGiantRule { const TCHAR* Name; double Chance; double Times; };
+	const FGiantRule GiantRules[] =
+	{
+		{ TEXT("megalodon"), 0.15, 3.5 },     // 50 m and more.
+		{ TEXT("shark goblin"), 0.10, 3.0 },
+		{ TEXT("hammerhead"), 0.10, 3.0 },
+		{ TEXT("blue whale"), 0.20, 2.0 },    // Up to about 180 m.
+		{ TEXT("whale calf"), 0.0, 1.0 },     // Its mother decides.
+		{ TEXT("dolphin"), 0.05, 4.0 },
+		{ TEXT("sea turtle"), 0.10, 5.0 },    // An 8 m turtle.
+		{ TEXT("stingray"), 0.15, 5.0 },      // A 15 m ray.
+		{ TEXT("moray eel"), 0.10, 5.0 },     // A 15 m eel in the rocks.
+		{ TEXT("anglerfish"), 0.20, 5.0 },    // A monster in the canyons.
+		{ TEXT("marlin"), 0.10, 3.0 },
+	};
+
+	/** The looks a school of an animated kind can have: a tint on its own colours. Mostly as made. */
+	const FLinearColor FabTints[] =
+	{
+		{ 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f },
+		{ 1.25f, 1.22f, 1.18f },  // Pale.
+		{ 0.55f, 0.58f, 0.62f },  // Dark.
+		{ 0.75f, 0.90f, 1.20f },  // Bluish.
+		{ 0.80f, 1.05f, 0.80f },  // Greenish.
+		{ 1.15f, 0.80f, 0.65f },  // Rusty.
+		{ 1.60f, 1.55f, 1.50f },  // Nearly white, rare.
+	};
+
+	/** Checks the table at start: a companion must point at the kind it follows. */
+	bool SpeciesTableIsSound()
+	{
+		for (int32 Index = 0; Index < SpeciesCount; ++Index)
+		{
+			const int32 Of = Species[Index].CompanionOf;
+			if (Of >= SpeciesCount || (Of >= 0 && (Of == Index || Species[Of].CellM != Species[Index].CellM)))
+			{
+				UE_LOG(LogThalassa, Error, TEXT("THALASSA: fauna kind %s follows kind %d, which isn't a kind it can follow"), Species[Index].Name, Of);
+				return false;
+			}
+		}
+		return true;
+	}
 
 	constexpr double PingSpeedMS = UThalassaSonarComponent::PulseSpeedMS;
 
@@ -205,7 +289,7 @@ void UThalassaOceanFauna::BeginPlay()
 	Super::BeginPlay();
 
 	const AThalassaOcean* Ocean = Cast<AThalassaOcean>(GetOwner());
-	bDisabled = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoFauna")) || !Ocean;
+	bDisabled = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoFauna")) || !Ocean || !SpeciesTableIsSound();
 
 	// The leviathan's home: a big loop about 1.6 km from the start, from the seed.
 	if (Ocean)
@@ -222,6 +306,23 @@ void UThalassaOceanFauna::BeginPlay()
 			LeviathanHomeM = Placed;
 			LeviathanLoopM = 250.0;
 			LeviathanSpeedMS = 4.0;
+		}
+	}
+
+	// The animated kinds' meshes and swim loops, loaded now, not the first time one swims into view: that load
+	// stalled a frame for about 100 ms.
+	if (!bDisabled && GetNetMode() != NM_DedicatedServer)
+	{
+		for (const FSpecies& Spec : Species)
+		{
+			if (Spec.Skeletal)
+			{
+				AnimatedAssets.Add(LoadObject<UObject>(nullptr, Spec.Skeletal));
+			}
+			if (Spec.SwimAnim)
+			{
+				AnimatedAssets.Add(LoadObject<UObject>(nullptr, Spec.SwimAnim));
+			}
 		}
 	}
 
@@ -289,6 +390,20 @@ bool UThalassaOceanFauna::MakeSchool(const AThalassaOcean& Ocean, uint8 SpeciesI
 {
 	using namespace ThalassaFauna;
 	const FSpecies& Kind = Species[SpeciesIndex];
+	if (Kind.CompanionOf >= 0 && Kind.CompanionOf != SpeciesIndex)
+	{
+		if (!MakeSchool(Ocean, static_cast<uint8>(Kind.CompanionOf), CellX, CellY, OutSchool))
+		{
+			return false;
+		}
+		OutSchool.Key.Species = SpeciesIndex;
+		for (FFaunaSchool::FMember& Member : OutSchool.Members)
+		{
+			Member.OffsetM += Kind.CompanionOffsetM * OutSchool.SizeMul;
+			Member.Scale = (Kind.ScaleMin + Kind.ScaleMax) * 0.5 * OutSchool.SizeMul;
+		}
+		return true;
+	}
 	const uint64 Seed = static_cast<uint64>(Ocean.Seed);
 	// The glider keeps its first salt, so the schools already met stay where they were.
 	const uint64 Salt = 0xF15Bull + 0x1000ull * SpeciesIndex;
@@ -362,6 +477,30 @@ bool UThalassaOceanFauna::MakeSchool(const AThalassaOcean& Ocean, uint8 SpeciesI
 		}
 		Member.Beat = static_cast<float>(Draw.Range(0.0, UE_DOUBLE_TWO_PI));
 		OutSchool.Members.Add(Member);
+	}
+
+	// Animated kinds come in looks and sizes: each school a tint, and now and then a giant.
+	if (Kind.Mesh < 0)
+	{
+		OutSchool.Tint = FabTints[FMath::Min(static_cast<int32>(UE_ARRAY_COUNT(FabTints)) - 1, static_cast<int32>(Draw.Next() * UE_ARRAY_COUNT(FabTints)))];
+		const double Roll = Draw.Next();
+		const double Spread = Draw.Range(0.8, 1.2);
+		for (const FGiantRule& Rule : GiantRules)
+		{
+			if (FCString::Strcmp(Rule.Name, Kind.Name) == 0 && Roll < Rule.Chance)
+			{
+				OutSchool.SizeMul = Rule.Times * Spread;
+			}
+		}
+		if (OutSchool.SizeMul != 1.0)
+		{
+			for (FFaunaSchool::FMember& Member : OutSchool.Members)
+			{
+				Member.Scale *= OutSchool.SizeMul;
+				Member.OffsetM *= OutSchool.SizeMul;
+			}
+			OutSchool.AltitudeM *= FMath::Pow(OutSchool.SizeMul, 0.7);
+		}
 	}
 	return true;
 }
@@ -670,7 +809,8 @@ void UThalassaOceanFauna::GatherSonarTargets(const FVector& Origin, float RangeC
 					const FVector Location = State.CentreCm + Facing.RotateVector(Member.OffsetM * 100.0);
 					if (FVector::Dist(Location, Origin) <= RangeCm)
 					{
-						OutTargets.Add({ Location, static_cast<float>(Spec.SonarRadiusCm * Member.Scale) });
+						// Animated kinds' scale is their mesh's, not their size: their contact grows only if they are giants.
+						OutTargets.Add({ Location, static_cast<float>(Spec.SonarRadiusCm * (Spec.Mesh < 0 ? School->SizeMul : Member.Scale)) });
 					}
 				}
 			}
@@ -722,9 +862,21 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	for (uint8 Kind = 0; Kind < SpeciesCount; ++Kind)
 	{
 		const FSpecies& Spec = Species[Kind];
-		FDrawn& Out = Drawn[Spec.Mesh];
+		const bool bAnimated = Spec.Mesh < 0;
+		if (bAnimated && AnimatedDrawn.Num() < SpeciesCount)
+		{
+			AnimatedDrawn.SetNum(SpeciesCount);
+		}
+		FDrawn& Out = bAnimated ? AnimatedDrawn[Kind] : Drawn[Spec.Mesh];
+		if (bAnimated)
+		{
+			Out.Transforms.Reset();
+			Out.CustomData.Reset();
+			Out.Ids.Reset();
+		}
 		const int64 CX = FaunaCellOf(Eye.X / 100.0, Spec.CellM), CY = FaunaCellOf(Eye.Y / 100.0, Spec.CellM);
-		const int32 Reach = FMath::CeilToInt((Spec.DrawM + Spec.RoamMax * 1.35 + 50.0) / Spec.CellM);
+		const double ReachDrawM = Spec.DrawM * (bAnimated ? 5.0 : 1.0);   // Animated kinds may be giants, seen from further.
+		const int32 Reach = FMath::CeilToInt((ReachDrawM + Spec.RoamMax * 1.35 + 50.0) / Spec.CellM);
 		const bool bStroked = Spec.Kind == EKind::Jelly || Spec.Kind == EKind::Kraken;
 		const double DriftM = Spec.SpacingM * (Spec.Kind == EKind::Jelly ? 0.5 : 0.33);
 		const double Wobble = Spec.Kind == EKind::Glider ? 6.0 : 10.0;
@@ -738,17 +890,21 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 					continue;
 				}
 				const FFaunaSchoolState State = SchoolAt(*Ocean, *School, Time, Pings, Ship);
-				if (FVector::Dist(State.CentreCm, Eye) > (Spec.DrawM + 30.0) * 100.0)
+				if (FVector::Dist(State.CentreCm, Eye) > (Spec.DrawM * School->SizeMul + 30.0) * 100.0)
 				{
 					continue;
 				}
-				Signatures[Spec.Mesh] = HashCombine(Signatures[Spec.Mesh], GetTypeHash(School->Key));
+				if (!bAnimated)
+				{
+					Signatures[Spec.Mesh] = HashCombine(Signatures[Spec.Mesh], GetTypeHash(School->Key));
+				}
 
 				const FRotator Facing(0.0, State.YawDeg, 0.0);
 				const double Bank = Spec.Kind == EKind::Jelly ? 0.0 : FMath::Clamp(-State.TurnDegS * 6.0, -25.0, 25.0);
 				const double Floor = State.GroundCm + 100.0 * (Spec.Kind == EKind::Jelly ? Spec.AltMin * 0.8 : FMath::Max(0.25, Spec.AltMin * 0.3));
-				for (const FFaunaSchool::FMember& Member : School->Members)
+				for (int32 MemberIndex = 0; MemberIndex < School->Members.Num(); ++MemberIndex)
 				{
+					const FFaunaSchool::FMember& Member = School->Members[MemberIndex];
 					// Its place in the school, opening out when startled, with a slow drift of its own.
 					const FVector Drift(DriftM * FMath::Sin(Time * 0.07 + Member.Drift[0]), DriftM * FMath::Sin(Time * 0.05 + Member.Drift[1]), 0.5 * DriftM * FMath::Sin(Time * 0.09 + Member.Drift[2]));
 					FVector Offset = Member.OffsetM * (1.0 + 1.4 * State.Spread) + Drift;
@@ -788,6 +944,18 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 						}
 						Rotation = FRotator(State.PitchDeg + 3.0 * FMath::Sin(Time * 0.13 + Member.Drift[2]), Yaw, Bank + 4.0 * FMath::Sin(Time * 0.17 + Member.Drift[1]));
 					}
+					if (bAnimated)
+					{
+						// The mesh faces along its own axis; turned to face forward. Its swim loop runs faster when fleeing.
+						Out.Transforms.Add(FTransform(Rotation.Quaternion() * FRotator(0.0, Spec.YawOffsetDeg, 0.0).Quaternion(), Location, FVector(Member.Scale)));
+						// Play rate, then the school's tint. Giants swim slower strokes.
+						Out.CustomData.Add(static_cast<float>(State.Rate / FMath::Sqrt(School->SizeMul)));
+						Out.CustomData.Add(School->Tint.R);
+						Out.CustomData.Add(School->Tint.G);
+						Out.CustomData.Add(School->Tint.B);
+						Out.Ids.Add(HashCombine(GetTypeHash(School->Key), static_cast<uint32>(MemberIndex)));
+						continue;
+					}
 					Out.Transforms.Add(FTransform(Rotation, Location, FVector(Member.Scale)));
 					// Each animal a little lighter or darker than its school.
 					const float Shade = 0.92f + 0.16f * static_cast<float>(FMath::Frac(Member.Drift[2] * 7.0));
@@ -803,6 +971,8 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 			}
 		}
 	}
+
+	DrawAnimated(Eye);
 
 	// Where the leviathan is, now and then, for tests: does a ping bring it?
 	const FVector LeviathanHead3 = LeviathanHeadAt(Time);
@@ -872,4 +1042,108 @@ void UThalassaOceanFauna::TickComponent(float DeltaTime, ELevelTick TickType, FA
 			Component->MarkRenderStateDirty();
 		}
 	}
+}
+
+void UThalassaOceanFauna::DrawAnimated(const FVector& Eye)
+{
+	using namespace ThalassaFauna;
+	constexpr int32 MaxPerKind = 20;   // The nearest of each kind are animated; farther ones aren't drawn.
+
+	TSet<uint32> Shown;
+	for (int32 Kind = 0; Kind < AnimatedDrawn.Num(); ++Kind)
+	{
+		const FSpecies& Spec = Species[Kind];
+		FDrawn& Out = AnimatedDrawn[Kind];
+		if (Spec.Mesh >= 0 || !Spec.Skeletal || Out.Transforms.Num() == 0)
+		{
+			continue;
+		}
+		// Nearest first.
+		TArray<int32> Order;
+		for (int32 Index = 0; Index < Out.Transforms.Num(); ++Index)
+		{
+			Order.Add(Index);
+		}
+		Order.Sort([&Out, &Eye](int32 A, int32 B) { return FVector::DistSquared(Out.Transforms[A].GetLocation(), Eye) < FVector::DistSquared(Out.Transforms[B].GetLocation(), Eye); });
+		Order.SetNum(FMath::Min(Order.Num(), MaxPerKind));
+
+		for (int32 Index : Order)
+		{
+			const uint32 Id = HashCombine(Out.Ids[Index], static_cast<uint32>(Kind));
+			Shown.Add(Id);
+			// Each animal keeps its own component while it is shown, so its swimming carries on smoothly.
+			int32* Slot = AnimatedSlots.Find(Id);
+			if (!Slot)
+			{
+				int32 Free = INDEX_NONE;
+				for (int32 Pool = 0; Pool < AnimatedPool.Num(); ++Pool)
+				{
+					if (AnimatedPoolKind[Pool] == Kind && !AnimatedPoolBusy[Pool])
+					{
+						Free = Pool;
+						break;
+					}
+				}
+				if (Free == INDEX_NONE)
+				{
+					USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, Spec.Skeletal);
+					UAnimSequence* Swim = Spec.SwimAnim ? LoadObject<UAnimSequence>(nullptr, Spec.SwimAnim) : nullptr;
+					if (!Mesh)
+					{
+						continue;
+					}
+					USkeletalMeshComponent* Component = NewObject<USkeletalMeshComponent>(GetOwner());
+					Component->SetSkeletalMeshAsset(Mesh);
+					Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					Component->SetCastShadow(false);
+					Component->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+					Component->SetupAttachment(GetOwner()->GetRootComponent());
+					Component->SetAbsolute(true, true, true);
+					Component->RegisterComponent();
+					if (Swim)
+					{
+						Component->PlayAnimation(Swim, true);
+						Component->SetPosition(FMath::FRand() * Swim->GetPlayLength(), false);
+					}
+					for (int32 Material = 0; Material < Component->GetNumMaterials(); ++Material)
+					{
+						Component->CreateDynamicMaterialInstance(Material);
+					}
+					Free = AnimatedPool.Add(Component);
+					AnimatedPoolKind.Add(Kind);
+					AnimatedPoolBusy.Add(false);
+				}
+				AnimatedPoolBusy[Free] = true;
+				Slot = &AnimatedSlots.Add(Id, Free);
+				// Its school's look (tint_fab_materials.py added the parameter to the creature's materials).
+				const FLinearColor Tint(Out.CustomData[Index * 4 + 1], Out.CustomData[Index * 4 + 2], Out.CustomData[Index * 4 + 3]);
+				for (int32 Material = 0; Material < AnimatedPool[Free]->GetNumMaterials(); ++Material)
+				{
+					if (UMaterialInstanceDynamic* Look = Cast<UMaterialInstanceDynamic>(AnimatedPool[Free]->GetMaterial(Material)))
+					{
+						Look->SetVectorParameterValue(TEXT("ThalassaTint"), Tint);
+					}
+				}
+			}
+			USkeletalMeshComponent* Component = AnimatedPool[*Slot];
+			Component->SetWorldTransform(Out.Transforms[Index]);
+			Component->SetPlayRate(Out.CustomData[Index * 4]);
+			Component->SetVisibility(true);
+		}
+	}
+
+	// Animals no longer shown give their components back.
+	for (auto It = AnimatedSlots.CreateIterator(); It; ++It)
+	{
+		if (!Shown.Contains(It.Key()))
+		{
+			AnimatedPoolBusy[It.Value()] = false;
+			if (USkeletalMeshComponent* Component = AnimatedPool[It.Value()])
+			{
+				Component->SetVisibility(false);
+			}
+			It.RemoveCurrent();
+		}
+	}
+	AnimatedShown = Shown.Num();
 }

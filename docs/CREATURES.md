@@ -2,6 +2,8 @@
 
 Life in the open ocean: thirteen kinds of animal in schools, from tiny glowing jellyfish to big slow cruisers and krakens, and one leviathan, longer than the ship. The ping startles them, and draws the leviathan. The first of the design document's Phase 2 creatures ("one peaceful, one territorial, one ambiguous distant signal"), and the owner's "clutter fish".
 
+**Owner's decision (2026-11-09):** the home-made creatures stay. The Fab Marketplace creatures (sharks, whales, turtles and the rest, in their own `Content` folders) are added alongside them, never in place of them.
+
 ## What's there
 
 | Kind | Size | School | Where | Height above ground | Drawn to | On the ping's chart |
@@ -31,6 +33,32 @@ Each animal is scaled about 0.8 to 1.3 times. Each kind has its own lattice of c
 - **Krakens** have the owner's orange iris with a horizontal slit, as real squid do. They swim mantle first, in slow strokes (about 10 s), surging forward with each one. A ping makes one bolt 250 m and its pale spots flare. One lives near the start; elsewhere, mostly in canyons, ridges and volcanic fields.
 - **The ping:** when its wave reaches a school (500 m/s), the school bolts away from where it came from, swims faster, spreads out, and its glow flashes; over 45 s it settles and drifts back. Jellyfish drift only a little, and their glow flares for a few seconds. Pings close together add up. Every school gives the ship room (10 to 80 m, by kind).
 - **Contacts on the chart:** everything big enough (gliders, cruisers, giant jellyfish, the leviathan) shows as an amber diamond with a dark halo, appearing as the wave reaches it and fading over 12 s, where it was when the wave reached it. Small fish are too small for the ping.
+
+## Fab creatures (2026-11-09)
+
+The owner bought a set of animated sea creatures on Fab (publisher Existence) and added about 30 to the project, each in its own `Content` folder (`Shark_Megalodon`, `SharkGoblin`, `HammerheadShark`, `BlueWhaleAndWhaleCalf`, `DolphinAndRemora`, `SeaTurtle`, `Stingray`, `MorayEel`, `AnglerFish`, `MarlinSailfish`, nine reef fish `Fish_01` to `Fish_09`, crabs, the mantis shrimp, the nautilus, turtles, the acid worm and more, about 8 GB). **They are never committed:** `Content/` is gitignored, and Fab's licence forbids sharing them publicly. Each is a skinned, rigged mesh with swim, idle, attack, hit and death animations, often in versions that swim in place.
+
+The first eleven are in the game as **animated kinds**, in the same species table as ours, moved by the same clock-driven schools (so every player sees the same animals), each with its swim loop playing:
+
+| Kind | Size here | School | Notes |
+|---|---|---|---|
+| Megalodon | 14 to 18 m | 1 to 2, 3 km cells | a ping draws it closer |
+| Shark goblin | 3 to 4.6 m | 2 to 5 | a ping draws them closer |
+| Hammerhead | 3.7 to 5.6 m | schools of 3 to 8 | |
+| Blue whale | 60 to 90 m, far bigger than any real one | 1, 4 km cells | |
+| Whale calf | about 20 m | with its mother | keeps its mother's school, beside and below her |
+| Dolphin | 2.7 to 3.3 m | 3 to 8 | |
+| Sea turtle | 1.3 to 1.8 m | 1 to 2 | |
+| Stingray | 2.2 to 3 m across | 1 to 4, on the ground | |
+| Moray eel | 2.4 to 3.6 m | 1, barely leaves its rocks | lunges towards a ping |
+| Anglerfish | 2.5 to 3.7 m | 1, likes canyons and volcanic ground | drawn to a ping |
+| Marlin | 3 to 4 m | 1 to 3 | |
+
+- **How they're drawn:** the nearest 20 of each kind each get a skeletal mesh component from a pool, kept by that animal while it is shown so its swimming carries on smoothly, turned a quarter (their meshes face +Y), its swim loop's rate following how fast it's going, no collision, no shadows, animating only while seen. Farther ones aren't drawn. `UThalassaOceanFauna::DrawAnimated`.
+- **Looks and sizes:** each school of an animated kind gets a tint from its seed (mostly as made; sometimes pale, dark, bluish, greenish, rusty, or nearly white), and some schools are giants, from 2 to 5 times bigger by kind (`GiantRules`): a whale up to about 180 m, a 50 m megalodon, 15 m stingrays and eels, a monstrous anglerfish. Giants are seen from further, swim slower strokes, keep higher off the ground, and make bigger sonar contacts. The calf takes its mother's size and look.
+- **The tint** needs a parameter the Fab materials don't have: `Scripts/unreal/tint_fab_materials.py` adds `ThalassaTint` (white by default) to each creature's base material, multiplying its base colour. Run it again after re-adding a creature from Fab. It is run against the main checkout's `Content` directly.
+- **Measured:** with every kind gathered round the camera, about 210 frames a second, the worst frame under 9 ms, the fauna's work 1.2 to 1.5 ms. Two players on the ocean (helm tour, a ping every 10 s): 0 corrections, identical charts and identical contacts. A first run had one frame of 53 to 106 ms when the first animated creature came into view, loading its mesh and swim loop from disk; they're loaded at start now, and the rerun had no frame over 50 ms.
+- **Not yet:** the nine reef fish and the piranha, as schools (hundreds of animated meshes would be too heavy: their swim loops need baking into textures first); the crabs, mantis shrimp and acid worm walking the seabed; attacks, using their attack animations, for the hunt; the remaining packs.
 
 ## The leviathan
 
