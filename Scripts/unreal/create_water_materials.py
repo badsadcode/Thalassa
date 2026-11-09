@@ -98,7 +98,7 @@ TO_VIEW = unreal.MaterialVectorCoordTransform.TRANSFORM_VIEW
 # The waves, shared by the vertex shader (height) and the pixel shader (slope). P is in the surface's own
 # centimetres, T seconds. Deep-water waves: w = sqrt(g k).
 WAVES = """
-float amp = (0.35 + 3.4 * C * C) * S;
+float amp = (0.3 + 1.6 * C * C) * S;
 const float Lengths[6] = { 173.0, 97.0, 61.0, 41.0, 29.0, 19.0 };
 const float Weights[6] = { 1.0, 0.75, 0.55, 0.4, 0.28, 0.18 };
 const float Angles[6] = { 0.2, 1.87, 3.75, 5.1, 2.6, 0.95 };
@@ -139,13 +139,21 @@ return normalize(float3(-g.x, -g.y, 1.0));
 FOAM_HLSL = """
 // Water between the surface and whatever is behind it, along the view: little of it means a wall right there.
 float gap = max(DO - PD, 0.0) * Dist / max(PD, 1.0);
-float edge = saturate(1.0 - gap / (4.0 + 14.0 * C));
-float2 q = P.xy * 0.09;
-float n = sin(q.x * 1.7 + T * 0.9 + sin(q.y * 2.3 - T * 0.7) * 1.5) * sin(q.y * 1.9 - T * 0.6 + sin(q.x * 1.3 + T) * 1.5);
-n = n * 0.5 + 0.5;
-// Churned water whitens in patches.
-float caps = saturate((n - (1.05 - 0.55 * C)) * 4.0);
-return saturate(edge * (0.3 + 0.7 * n) + caps);
+float edge = saturate(1.0 - gap / (3.0 + 6.0 * C));
+// Fine bubbles, drifting: value noise at two small scales, so no shape repeats. Fades with distance before
+// it could shimmer.
+float2 q = P.xy * 0.35 + float2(T * 1.3, T * -0.9);
+float2 c = floor(q); float2 f = frac(q); f = f * f * (3.0 - 2.0 * f);
+#define H(v) frac(sin(dot(v, float2(127.1, 311.7))) * 43758.5453)
+float n1 = lerp(lerp(H(c), H(c + float2(1, 0)), f.x), lerp(H(c + float2(0, 1)), H(c + float2(1, 1)), f.x), f.y);
+q = P.xy * 0.9 + float2(T * -1.7, T * 1.1);
+c = floor(q); f = frac(q); f = f * f * (3.0 - 2.0 * f);
+float n2 = lerp(lerp(H(c), H(c + float2(1, 0)), f.x), lerp(H(c + float2(0, 1)), H(c + float2(1, 1)), f.x), f.y);
+#undef H
+float n = n1 * 0.6 + n2 * 0.4;
+float near = saturate(1.0 - Dist / 1500.0);
+float bubbles = saturate((n - (0.92 - 0.25 * C)) * 5.0) * C * 0.45 * near;
+return saturate(edge * (0.25 + 0.5 * n) * 0.8 + bubbles);
 """
 
 REFRACT_HLSL = """

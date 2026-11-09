@@ -1640,7 +1640,7 @@ void AThalassaVessel::TickAirlockVisuals(float DeltaSeconds)
 		AirlockSurface->SetupAttachment(AirlockWater->GetAttachParent());
 		AirlockSurface->RegisterComponent();
 		// The chamber's floor plan, as the plane covered it (100 cm, scaled).
-		AirlockSurface->Build(FVector2D(400.f, 175.f));
+		AirlockSurface->Build(FVector2D(460.f, 175.f));   // Reaching into the side walls, so its edge never shows (not past the doors).
 	}
 	if (AirlockSurface)
 	{
