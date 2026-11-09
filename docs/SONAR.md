@@ -103,9 +103,10 @@ Measured on the bridge with the chart and holotable in view, pinging every 8 s: 
 
 ## Not done yet
 
-- **More of the look:** a real 3D hologram of the chart on the bridge (the holotable is a first step), and contacts.
+- **More of the look:** a real 3D hologram of the chart on the bridge (the holotable is a first step). Contacts are on the chart since 2026-11-09, but not on the holotable.
 - **Scale.** Changes replicate cheaply now, but a player joining late still receives the whole chart at once, and the save holds every cell. After hours of charting, both will need pages sent on request, and the chart's ±819 km limit may need lifting.
-- **The ping's look, further:** a visible wave in the water itself, not only on the ground; echoes heard back from big features at the right delay; and creatures that hear it.
+- **The ping's look, further:** a visible wave in the water itself, not only on the ground; and echoes heard back from big features at the right delay.
+- ~~Creatures that hear it.~~ Done 2026-11-09: gliders scatter when the wave reaches them, and show on the chart as contacts. See `CREATURES.md`.
 - **Imperfection.** Returns are exact. Real sonar has noise, shadows behind obstacles, and resolution that falls with range.
 - **Hydrophones.** Only the ping exists. There is no listening yet.
 - **Substrate.** Rock and sediment could return different strengths, so the chart shows what the seabed is made of. See `SEABED.md`.

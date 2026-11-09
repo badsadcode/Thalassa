@@ -42,6 +42,7 @@ The owner's direction (2026-11-08): the world must be far bigger than the 6 km t
 - **Solid or not.** Boulders of 3 m and more, masses and towers block (BlockAll), so the ship, divers and the sonar meet them. Smaller stones are scenery. No shadows (the floodlights cast none).
 - **Streaming.** 256 m patches: stones within one patch of the camera, everything bigger within three. The host also keeps the solid layers around every pawn and the ship. Patches are placed on worker threads (at most 8 at once) and added within 3 ms per frame as instanced meshes, one component per mesh per patch. A patch goes only when it is more than one patch beyond where it is wanted. On the first frame, the solid patches are placed at once.
 - **Switch:** `-ThalassaNoClutter` turns it off, for comparisons.
+- **Materials:** everything the clutter draws needs the usage flags for instanced meshes and Nanite, or a packaged build draws it in the default material. `Scripts/unreal/set_clutter_material_usage.py` sets them (and gives the scanned rocks project copies of the glTF importer's engine material). Run it after reimporting rocks. Fixed 2026-11-09; see `CREATURES.md`.
 - **Measured:** adding a patch costs at most about 1 ms. Helm tests with two players at the start and 12 m over the ridges: no frames over 50 ms, no corrections, the ship in step within 3 cm at the start (34 cm at worst over the ridges).
 
 ## Province looks (2026-11-09)
@@ -58,7 +59,7 @@ The test map keeps `M_SeabedGround`. Collision tiles carry no colours.
 ## Not done yet
 
 - ~~The sonar chart is one 6.4 km grid.~~ Fixed 2026-11-08: the chart covers the whole ocean, in pages, and the active ping charts the area around the ship. See `SONAR.md`.
-- ~~No formations, rocks or life in the open ocean.~~ Rocks done 2026-11-09 (see Clutter above). Still no life, no big landmark formations, and no other formation families.
+- ~~No formations, rocks or life in the open ocean.~~ Rocks done 2026-11-09 (see Clutter above), and the first life the same day (`CREATURES.md`). Still no big landmark formations, and no other formation families.
 - **A coarse whole-ocean plan.** Today's large shapes are noise. The Thornwake way is a plan raster with vector features (trenches, ridge lines, regions and biomes), built once from the seed.
 - **The terrain's character, further.** ~~Every province wears the same seabed material.~~ Since 2026-11-09 each province has its own ground (see Province looks above), but only from four texture sets, blended by slope. The province shapes also come from noise, not from a whole-ocean plan.
 - **A thin straight line** showed in one frame along X = 0, a tile boundary. It may be a lighting seam between tiles. Not investigated yet.

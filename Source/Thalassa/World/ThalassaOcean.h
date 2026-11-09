@@ -8,6 +8,7 @@
 class UProceduralMeshComponent;
 class UMaterialInterface;
 class UThalassaOceanClutter;
+class UThalassaOceanFauna;
 
 /** A seabed tile's address: its detail level and its column and row on that level's grid. */
 struct FOceanTileKey
@@ -77,6 +78,10 @@ public:
 	/** Rocks on the seabed, placed by rules from the seed. */
 	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Ocean")
 	TObjectPtr<UThalassaOceanClutter> Clutter;
+
+	/** Life in the water: schools placed by the seed and moved by the server's clock. */
+	UPROPERTY(VisibleAnywhere, Category = "Thalassa|Ocean")
+	TObjectPtr<UThalassaOceanFauna> Fauna;
 
 	static constexpr double TileM = 256.0;       // Level 0.
 	static constexpr int32 Quads = 64;            // Per tile side: 4 m apart at level 0.

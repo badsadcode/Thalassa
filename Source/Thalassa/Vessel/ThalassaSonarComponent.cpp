@@ -1,5 +1,6 @@
 #include "Vessel/ThalassaSonarComponent.h"
 #include "World/ThalassaOcean.h"
+#include "World/ThalassaOceanFauna.h"
 
 #include "Engine/Texture2D.h"
 #include "Kismet/GameplayStatics.h"
@@ -364,11 +365,43 @@ void UThalassaSonarComponent::UpdatePulseVisuals()
 	UKismetMaterialLibrary::SetScalarParameterValue(this, PulseParameters, TEXT("PulseStrength"), Strength);
 }
 
+void UThalassaSonarComponent::UpdateContacts()
+{
+	if (Pulse.Serial == 0 || Pulse.Serial == ContactPulse)
+	{
+		return;
+	}
+	ContactPulse = Pulse.Serial;
+	Contacts.Reset();
+	// A ping from long ago (one that was already out when this machine joined) shows nothing.
+	if (GetServerTime() - Pulse.StartTime > Pulse.RangeM / PulseSpeedMS + ContactFadeSeconds)
+	{
+		return;
+	}
+	AThalassaOcean* Ocean = AThalassaOcean::Find(GetWorld());
+	if (!Ocean || !Ocean->Fauna)
+	{
+		return;
+	}
+	TArray<FThalassaSonarTarget> Targets;
+	Ocean->Fauna->GatherSonarTargets(Pulse.Origin, Pulse.RangeM * 100.f, Pulse.StartTime, Targets);
+	uint32 Fingerprint = 0;
+	for (const FThalassaSonarTarget& Target : Targets)
+	{
+		const double Distance = FVector::Dist(Target.Location, Pulse.Origin) / 100.0;
+		Contacts.Add({ Target.Location, Pulse.StartTime + Distance / PulseSpeedMS, Target.RadiusCm });
+		// To the metre, for comparing machines in tests.
+		Fingerprint = HashCombine(Fingerprint, GetTypeHash(FIntVector(FMath::RoundToInt(Target.Location.X / 100.0), FMath::RoundToInt(Target.Location.Y / 100.0), FMath::RoundToInt(Target.Location.Z / 100.0))));
+	}
+	UE_LOG(LogThalassa, Display, TEXT("Sonar: ping %d returned from %d animals, fingerprint %08x"), Pulse.Serial, Contacts.Num(), Fingerprint);
+}
+
 void UThalassaSonarComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	UpdatePulseVisuals();
+	UpdateContacts();
 
 	if (!GetOwner() || !GetOwner()->HasAuthority())
 	{

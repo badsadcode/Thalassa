@@ -12,6 +12,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Vessel/ThalassaVessel.h"
 #include "World/ThalassaOceanClutter.h"
+#include "World/ThalassaOceanFauna.h"
 
 namespace ThalassaOceanStream
 {
@@ -31,6 +32,7 @@ AThalassaOcean::AThalassaOcean()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	RootComponent->SetMobility(EComponentMobility::Static);
 	Clutter = CreateDefaultSubobject<UThalassaOceanClutter>(TEXT("Clutter"));
+	Fauna = CreateDefaultSubobject<UThalassaOceanFauna>(TEXT("Fauna"));
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Ground(TEXT("/Game/World/Materials/M_OceanGround.M_OceanGround"));
 	SeabedMaterial = Ground.Object;

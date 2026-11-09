@@ -81,6 +81,14 @@ struct FSonarPulse
 	int32 Serial = 0;
 };
 
+/** Something alive the ping returned from: where it was, and when the wave reached it (server clock). */
+struct FSonarContact
+{
+	FVector Location = FVector::ZeroVector;
+	double HitTime = 0.0;
+	float RadiusCm = 0.f;
+};
+
 /** What a sonar of a given grade can do. Grades come with upgrades; test builds can switch between them. */
 struct FSonarGrade
 {
@@ -133,6 +141,17 @@ public:
 
 	int32 GetSurveyedCellCount() const { return Chart.Items.Num(); }
 
+	/** The last ping sent, for anything that reacts to it. Serial 0: none yet. */
+	const FSonarPulse& GetLastPulse() const { return Pulse; }
+
+	/**
+	 * Contacts from the last ping: everything alive its wave reached. Worked out on each machine from the
+	 * replicated ping and the creatures, which every machine places the same way, so nothing more is sent.
+	 * A contact shows from when the wave reaches it; the chart fades it out over ContactFadeSeconds.
+	 */
+	const TArray<FSonarContact>& GetContacts() const { return Contacts; }
+	static constexpr float ContactFadeSeconds = 12.f;
+
 	/**
 	 * The chart around a point, as a texture, north up: ViewCells across plus a margin, smoothed between
 	 * cells, hill-shaded, with depth contours and a glow on freshly measured ground. Built locally from the
@@ -171,6 +190,7 @@ private:
 	void TickPulseServer();
 	void RecordCell(int32 Layer, const FIntPoint& Cell, int16 HeightM, bool bHighest);
 	void UpdatePulseVisuals();
+	void UpdateContacts();
 
 	/** Brings the local copy of the chart up to date, noting when each cell last changed here. */
 	void SyncDense();
@@ -237,6 +257,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialParameterCollection> PulseParameters;
 	int32 HeardPulse = 0;
+
+	TArray<FSonarContact> Contacts;
+	int32 ContactPulse = 0;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTexture2D> LocalChart;

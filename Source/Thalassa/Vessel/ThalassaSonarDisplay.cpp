@@ -46,6 +46,15 @@ namespace ThalassaSonarDisplay
 		Canvas->DrawItem(Item);
 	}
 
+	/** A filled triangle, painted over what is there, see-through by the colour's alpha. */
+	void Paint(UCanvas* Canvas, const FVector2D& A, const FVector2D& B, const FVector2D& C, const FLinearColor& Colour)
+	{
+		FCanvasTriangleItem Item(A, B, C, GWhiteTexture);
+		Item.SetColor(Colour);
+		Item.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(Item);
+	}
+
 	/** A see-through rectangle. */
 	void Shade(UCanvas* Canvas, const FVector2D& TopLeft, const FVector2D& Size, const FLinearColor& Colour)
 	{
@@ -132,6 +141,35 @@ namespace ThalassaSonarDisplay
 			const float Fade = 1.f - PulseRadiusM / PulseRangeM;
 			Ring(Canvas, Centre, PulseRadiusM * PixelsPerMeter, Clip, Dim(FLinearColor(0.7f, 1.f, 1.f), Fade), Thin * 3.f);
 			Ring(Canvas, Centre, FMath::Max(0.f, PulseRadiusM - 25.f) * PixelsPerMeter, Clip, Dim(FLinearColor(0.2f, 0.8f, 0.8f), Fade * 0.5f), Thin * 2.f);
+		}
+
+		// Contacts: everything alive the ping's wave reached, in warm light so they stand out from the ground.
+		// Each appears as the wave reaches it, bright at first, and fades: it is where the animal was, not where it is.
+		const double Now = Vessel.GetSyncedTime();
+		for (const FSonarContact& Contact : Sonar->GetContacts())
+		{
+			const float Age = static_cast<float>(Now - Contact.HitTime);
+			if (Age < 0.f || Age > UThalassaSonarComponent::ContactFadeSeconds)
+			{
+				continue;
+			}
+			const FVector Offset = (Contact.Location - Vessel.GetActorLocation()) / 100.f;
+			const FVector2D At = Middle + FVector2D(Offset.Y, -Offset.X) * PixelsPerMeter;
+			if (!Clip.IsInside(At))
+			{
+				continue;
+			}
+			const float Fade = FMath::Square(1.f - Age / UThalassaSonarComponent::ContactFadeSeconds);
+			const float Fresh = 1.f + 2.f * FMath::Max(0.f, 1.f - Age / 0.4f);
+			const float Half = FMath::Max(Thin * 2.f, Contact.RadiusCm / 100.f * PixelsPerMeter * 1.5f) * (1.f + 0.5f * (Fresh - 1.f));
+			// A dark halo first, so a contact reads over pale shallow ground as well as dark deep water.
+			const float Halo = Half + Thin * 1.5f;
+			const FLinearColor Dark(0.f, 0.f, 0.f, 0.7f * Fade);
+			Paint(Canvas, At + FVector2D(0.f, -Halo), At + FVector2D(Halo, 0.f), At + FVector2D(0.f, Halo), Dark);
+			Paint(Canvas, At + FVector2D(0.f, -Halo), At + FVector2D(0.f, Halo), At + FVector2D(-Halo, 0.f), Dark);
+			const FLinearColor Warm = FLinearColor(1.f, 0.62f, 0.22f) * Fade * Fresh;
+			Glow(Canvas, At + FVector2D(0.f, -Half), At + FVector2D(Half, 0.f), At + FVector2D(0.f, Half), Warm);
+			Glow(Canvas, At + FVector2D(0.f, -Half), At + FVector2D(0.f, Half), At + FVector2D(-Half, 0.f), Warm);
 		}
 
 		// The compass: a tick every 10 degrees around the edge, longer every 30, and the four points.
