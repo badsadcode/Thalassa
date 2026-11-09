@@ -47,7 +47,7 @@ namespace ThalassaClutter
 
 	// Layers: each has its own lattice, how far away it is drawn, and its own salt.
 	enum ELayer : uint8 { Stones, Boulders, Masses, Towers, LayerCount };
-	constexpr double CellM[LayerCount] = { 8.0, 32.0, 128.0, 256.0 };
+	constexpr double LayerCellM[LayerCount] = { 8.0, 32.0, 128.0, 256.0 };
 	constexpr float CullCm[LayerCount] = { 25000.f, 80000.f, 200000.f, 250000.f };
 
 	// How likely a cell is to hold something, by province: plains, hills, plateaus, ridges, canyons, volcanic.
@@ -67,7 +67,7 @@ namespace ThalassaClutter
 	constexpr double CommitBudgetSeconds = 0.003;
 	constexpr int32 MaxInFlight = 8;
 
-	FORCEINLINE uint64 Mix(uint64 X)
+	FORCEINLINE uint64 Hash64(uint64 X)
 	{
 		X += 0x9E3779B97F4A7C15ull;
 		X = (X ^ (X >> 30)) * 0xBF58476D1CE4E5B9ull;
@@ -75,9 +75,9 @@ namespace ThalassaClutter
 		return X ^ (X >> 31);
 	}
 
-	FORCEINLINE uint64 HashCell(int64 X, int64 Y, uint64 Salt)
+	FORCEINLINE uint64 CellHash(int64 X, int64 Y, uint64 Salt)
 	{
-		return Mix(Mix(static_cast<uint64>(X) ^ (Salt * 0xD6E8FEB86659FD93ull)) ^ (static_cast<uint64>(Y) * 0xA0761D6478BD642Full));
+		return Hash64(Hash64(static_cast<uint64>(X) ^ (Salt * 0xD6E8FEB86659FD93ull)) ^ (static_cast<uint64>(Y) * 0xA0761D6478BD642Full));
 	}
 
 	/** A stream of uniform numbers from one cell's hash. */
@@ -85,12 +85,12 @@ namespace ThalassaClutter
 	{
 		uint64 State;
 		explicit FDraws(uint64 H) : State(H) {}
-		double Next() { State = Mix(State); return static_cast<double>(State >> 11) * (1.0 / 9007199254740992.0); }
+		double Next() { State = Hash64(State); return static_cast<double>(State >> 11) * (1.0 / 9007199254740992.0); }
 		double Range(double Low, double High) { return Low + (High - Low) * Next(); }
 		int32 Pick(int32 First, int32 Count) { return First + FMath::Min(Count - 1, static_cast<int32>(Next() * Count)); }
 	};
 
-	FORCEINLINE double SmoothStep(double Edge0, double Edge1, double X)
+	FORCEINLINE double Smooth(double Edge0, double Edge1, double X)
 	{
 		const double T = FMath::Clamp((X - Edge0) / (Edge1 - Edge0), 0.0, 1.0);
 		return T * T * (3.0 - 2.0 * T);
@@ -122,8 +122,8 @@ namespace ThalassaClutter
 		/** Clumping: some stretches of ground are strewn with rock and others nearly bare. About 0.9 on average. */
 		double Clumping(double XM, double YM, uint64 Seed) const
 		{
-			const uint64 H = HashCell(static_cast<int64>(FMath::FloorToDouble(XM / 128.0)), static_cast<int64>(FMath::FloorToDouble(YM / 128.0)), Seed ^ 0xC1A0u);
-			const double C = static_cast<double>(Mix(H) >> 11) * (1.0 / 9007199254740992.0);
+			const uint64 H = CellHash(static_cast<int64>(FMath::FloorToDouble(XM / 128.0)), static_cast<int64>(FMath::FloorToDouble(YM / 128.0)), Seed ^ 0xC1A0u);
+			const double C = static_cast<double>(Hash64(H) >> 11) * (1.0 / 9007199254740992.0);
 			return 0.15 + 2.2 * C * C;
 		}
 	};
@@ -171,8 +171,6 @@ namespace ThalassaClutter
 	}
 }
 
-using namespace ThalassaClutter;
-
 UThalassaOceanClutter::UThalassaOceanClutter()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -181,21 +179,22 @@ UThalassaOceanClutter::UThalassaOceanClutter()
 
 void UThalassaOceanClutter::Place(const FThalassaSeabedGenerator& Generator, uint64 Seed, const TArray<double>& Sizes, FClutterPatch& Patch)
 {
+	using namespace ThalassaClutter;
 	const FGround Ground{ Generator };
 	const double OriginX = Patch.Key.X * PatchM, OriginY = Patch.Key.Y * PatchM;
 
 	for (int32 L = Patch.Key.bNear ? Stones : Boulders; L < (Patch.Key.bNear ? Boulders : LayerCount); ++L)
 	{
 		const ELayer Layer = static_cast<ELayer>(L);
-		const int32 Cells = FMath::RoundToInt(PatchM / CellM[L]);
+		const int32 Cells = FMath::RoundToInt(PatchM / LayerCellM[L]);
 		for (int32 J = 0; J < Cells; ++J)
 		{
 			for (int32 I = 0; I < Cells; ++I)
 			{
 				const int64 CX = Patch.Key.X * Cells + I, CY = Patch.Key.Y * Cells + J;
-				FDraws Draw(HashCell(CX, CY, Seed ^ (0x5CA7u + L * 0x1000193u)));
-				const double XM = OriginX + (I + Draw.Range(0.1, 0.9)) * CellM[L];
-				const double YM = OriginY + (J + Draw.Range(0.1, 0.9)) * CellM[L];
+				FDraws Draw(CellHash(CX, CY, Seed ^ (0x5CA7u + L * 0x1000193u)));
+				const double XM = OriginX + (I + Draw.Range(0.1, 0.9)) * LayerCellM[L];
+				const double YM = OriginY + (J + Draw.Range(0.1, 0.9)) * LayerCellM[L];
 				const EProvince Province = Ground.Province(XM, YM, Draw.Next());
 				const double Roll = Draw.Next();
 				const double Base = Density[L][static_cast<int32>(Province)];
@@ -210,10 +209,10 @@ void UThalassaOceanClutter::Place(const FThalassaSeabedGenerator& Generator, uin
 				case Stones:
 				case Boulders:
 					// Scree: loose rock gathers on slopes, but cliffs are too steep to hold it.
-					Chance *= (1.0 + 2.5 * SmoothStep(0.25, 0.7, Slope)) * (Slope > 1.4 ? 0.0 : 1.0) * Ground.Clumping(XM, YM, Seed);
+					Chance *= (1.0 + 2.5 * Smooth(0.25, 0.7, Slope)) * (Slope > 1.4 ? 0.0 : 1.0) * Ground.Clumping(XM, YM, Seed);
 					break;
 				case Masses:
-					Chance *= 1.0 + SmoothStep(0.15, 0.5, Slope);
+					Chance *= 1.0 + Smooth(0.15, 0.5, Slope);
 					break;
 				case Towers:
 					Chance *= Slope < 0.35 ? 1.0 : 0.0; // They stand on level ground.
@@ -296,6 +295,7 @@ void UThalassaOceanClutter::Place(const FThalassaSeabedGenerator& Generator, uin
 
 void UThalassaOceanClutter::BeginPlay()
 {
+	using namespace ThalassaClutter;
 	Super::BeginPlay();
 	bDisabled = FParse::Param(FCommandLine::Get(), TEXT("ThalassaNoClutter"));
 
@@ -328,6 +328,7 @@ void UThalassaOceanClutter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void UThalassaOceanClutter::UpdateWanted()
 {
+	using namespace ThalassaClutter;
 	Wanted.Reset();
 	const auto PatchOf = [](const FVector& Location)
 	{
@@ -397,6 +398,7 @@ void UThalassaOceanClutter::Launch(const FClutterPatchKey& Key)
 
 void UThalassaOceanClutter::Commit(FClutterPatch&& Patch)
 {
+	using namespace ThalassaClutter;
 	THALASSA_PERF_SCOPE("clutter commit");
 	InFlight.Remove(Patch.Key);
 	if (!Wanted.Contains(Patch.Key) || Built.Contains(Patch.Key))
@@ -454,6 +456,7 @@ void UThalassaOceanClutter::Remove(const FClutterPatchKey& Key)
 
 void UThalassaOceanClutter::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
+	using namespace ThalassaClutter;
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	if (bDisabled || !Shared.IsValid())
 	{
