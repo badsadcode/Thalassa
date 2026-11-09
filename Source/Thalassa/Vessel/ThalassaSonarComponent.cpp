@@ -130,6 +130,7 @@ void UThalassaSonarComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 	DOREPLIFETIME(UThalassaSonarComponent, Grade);
 	DOREPLIFETIME(UThalassaSonarComponent, Chart);
 	DOREPLIFETIME(UThalassaSonarComponent, Pulse);
+	DOREPLIFETIME(UThalassaSonarComponent, RecentPulses);
 }
 
 void UThalassaSonarComponent::BeginPlay()
@@ -286,6 +287,12 @@ bool UThalassaSonarComponent::TryPing()
 	Pulse.StartTime = GetServerTime();
 	Pulse.RangeM = Info.PingRangeM;
 	++Pulse.Serial;
+	RecentPulses.Add(Pulse);
+	RecentPulses.RemoveAll([this](const FSonarPulse& Old) { return Old.StartTime < Pulse.StartTime - RecentPulseSeconds; });
+	if (RecentPulses.Num() > 80)
+	{
+		RecentPulses.RemoveAt(0, RecentPulses.Num() - 80);
+	}
 
 	// Every ping cell within range, nearest first: charted as the wave reaches it.
 	PendingPing.Reset();

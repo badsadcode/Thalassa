@@ -5,6 +5,7 @@
 #include "ThalassaOceanFauna.generated.h"
 
 class UInstancedStaticMeshComponent;
+class UStaticMesh;
 class AThalassaOcean;
 class AThalassaVessel;
 
@@ -21,16 +22,16 @@ struct FFaunaPing
 	FVector Origin = FVector::ZeroVector;
 	double Time = 0.0;
 	float RangeM = 0.f;
-	int32 Serial = 0;
 };
 
-/** A school's address on the fauna lattice: its cell. */
+/** A school's address: its kind of animal and its cell on that kind's lattice. */
 struct FFaunaSchoolKey
 {
+	uint8 Species = 0;
 	int64 X = 0;
 	int64 Y = 0;
-	bool operator==(const FFaunaSchoolKey& Other) const { return X == Other.X && Y == Other.Y; }
-	friend uint32 GetTypeHash(const FFaunaSchoolKey& Key) { return HashCombine(::GetTypeHash(Key.X), ::GetTypeHash(Key.Y)); }
+	bool operator==(const FFaunaSchoolKey& Other) const { return Species == Other.Species && X == Other.X && Y == Other.Y; }
+	friend uint32 GetTypeHash(const FFaunaSchoolKey& Key) { return HashCombine(HashCombine(::GetTypeHash(Key.Species), ::GetTypeHash(Key.X)), ::GetTypeHash(Key.Y)); }
 };
 
 /** A school, as the seed lays it out: where it lives and who is in it. Nothing in it changes with time. */
@@ -38,7 +39,7 @@ struct FFaunaSchool
 {
 	FFaunaSchoolKey Key;
 	FVector2D HomeM = FVector2D::ZeroVector;   // The middle of the area it roams.
-	double AltitudeM = 40.0;                   // How high above the ground it glides.
+	double AltitudeM = 40.0;                   // How high above the ground it swims.
 	double RoamM = 150.0;                      // How far it wanders from home.
 	double SpeedMS = 1.5;                      // How fast it cruises.
 	double Phase[4] = { 0.0, 0.0, 0.0, 0.0 };  // Where in its wandering it was when the clock started.
@@ -47,7 +48,7 @@ struct FFaunaSchool
 		FVector OffsetM = FVector::ZeroVector; // Its place in the school, in the school's frame.
 		double Scale = 1.0;
 		double Drift[3] = { 0.0, 0.0, 0.0 };   // Phases of its slow drift within the school.
-		float Beat = 0.f;                      // Where in its wingbeat it is.
+		float Beat = 0.f;                      // Where in its stroke it is.
 	};
 	TArray<FMember> Members;
 };
@@ -56,26 +57,39 @@ struct FFaunaSchool
 struct FFaunaSchoolState
 {
 	FVector CentreCm = FVector::ZeroVector;
+	double GroundCm = 0.0;
 	double YawDeg = 0.0;
 	double PitchDeg = 0.0;
 	double TurnDegS = 0.0;       // How fast it is turning: the animals bank into it.
 	double Spread = 0.0;         // 0 calm; up to 1 scattered by a ping.
-	double Rate = 1.0;           // Wingbeat rate.
+	double Rate = 1.0;           // Stroke rate.
 	double Flash = 0.0;          // The glow's flash when a ping reaches it.
 	double FleeYawDeg = 0.0;     // Which way it fled.
 	double Fleeing = 0.0;        // How much it is still turned away.
 };
 
+/** One piece of the leviathan, placed along its body. */
+struct FLeviathanPiece
+{
+	uint8 Mesh = 0;              // 0 head, 1 body segment, 2 tail.
+	FTransform Transform;
+	float RadiusCm = 0.f;
+	float Flash = 0.f;           // Its lights flaring as a ping's wave passes over.
+};
+
 /**
- * Life in the open ocean. The first creature: schools of big, peaceful gliders. See docs/CREATURES.md.
+ * Life in the open ocean. See docs/CREATURES.md.
  *
- * Like the seabed and the rocks, nothing is sent over the network. Where each school lives follows from the seed;
- * where it is at any moment follows from the server's clock, which every machine shares; and how it reacts to a
- * ping follows from the replicated ping. So every player sees the same animals in the same places doing the same
- * thing, and none of it costs bandwidth. Each school wanders a loop round its home, gliding at a height above the
- * ground. When a ping's wave reaches it, it scatters away from the ship, its glow flashes, and it gathers again.
+ * Schools of many kinds: small schooling fish, bigger fish near the ground, big slow cruisers, gliders, giant and
+ * glowing jellyfish, swarms of tiny glowing ones. And one leviathan, near the start, far bigger than the ship.
  *
- * The animals are drawn as instances, one component per kind; their wingbeats are in the material.
+ * Like the seabed and the rocks, nothing is sent over the network but the pings. Where each school lives follows
+ * from the seed; where it is at any moment follows from the server's clock, which every machine shares; and how
+ * it reacts to pings follows from the sonar's replicated list of recent pings. So every player sees the same
+ * animals in the same places doing the same thing. A ping startles schools when its wave reaches them; it draws
+ * the leviathan, which comes to circle where the ping came from, then leaves.
+ *
+ * Drawn as instances, one component per mesh; strokes, wingbeats and jellyfish pulses are in the materials.
  */
 UCLASS()
 class THALASSA_API UThalassaOceanFauna : public UActorComponent
@@ -88,11 +102,8 @@ public:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	/** Fauna lattice cells are this big: at most one school in each. */
-	static constexpr double CellM = 600.0;
-
-	/** The school in a cell, if the seed puts one there. Pure: the same seed and cell always give the same school. */
-	static bool MakeSchool(const AThalassaOcean& Ocean, int64 CellX, int64 CellY, FFaunaSchool& OutSchool);
+	/** The school of a kind in a cell, if the seed puts one there. Pure: the same seed and cell always give the same school. */
+	static bool MakeSchool(const AThalassaOcean& Ocean, uint8 Species, int64 CellX, int64 CellY, FFaunaSchool& OutSchool);
 
 	/** Where a school is at a time on the server's clock, given the recent pings. Pure. */
 	static FFaunaSchoolState SchoolAt(const AThalassaOcean& Ocean, const FFaunaSchool& School, double Time,
@@ -101,29 +112,45 @@ public:
 	/** Everything alive the ping could return from within a range of a point, at a time on the server's clock. */
 	void GatherSonarTargets(const FVector& Origin, float RangeCm, double Time, TArray<FThalassaSonarTarget>& OutTargets);
 
-	/** Schools being drawn now, and animals in them. */
-	int32 GetVisibleSchools() const { return Visible.Num(); }
+	/** Where the leviathan's head is, in world centimetres, at a time on the server's clock. */
+	FVector LeviathanHeadAt(double Time);
+
+	/** Animals being drawn now. */
 	int32 GetVisibleAnimals() const { return VisibleAnimals; }
 
 private:
-	const FFaunaSchool* FindSchool(int64 CellX, int64 CellY);
-	/** Notes a new ping, if one has gone out, keeping the last few: a startled school takes most of a minute to settle. */
-	void NotePings();
+	const FFaunaSchool* FindSchool(uint8 Species, int64 CellX, int64 CellY);
+	void ReadPings();
 	double Now() const;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UInstancedStaticMeshComponent> Gliders;
+	/** The leviathan's pieces at a time, along the path its head has taken. */
+	void LeviathanPieces(double Time, TArray<FLeviathanPiece>& OutPieces);
+	/** Where the head was at a past sample time, cached: the path behind it doesn't change. */
+	FVector LeviathanSample(int64 Index);
 
-	/** Schools laid out so far, by cell, including empty cells (an empty school). Cheap; kept. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> Instances;
+
+	/** Schools laid out so far, including empty cells (no members). Cheap; kept. */
 	TMap<FFaunaSchoolKey, FFaunaSchool> Schools;
 
-	/** The schools drawn last frame, in the order their animals are in the instances. */
-	TArray<FFaunaSchoolKey> Visible;
+	// What each instance component drew last frame, so an unchanged set only moves its instances.
+	struct FDrawn
+	{
+		TArray<FTransform> Transforms;
+		TArray<float> CustomData;
+		uint32 Signature = 0;
+	};
+	TArray<FDrawn> Drawn;
 	int32 VisibleAnimals = 0;
-	TArray<FTransform> Transforms;
-	TArray<float> CustomData;
 
 	TArray<FFaunaPing> Pings;
+	TMap<int64, FVector> LeviathanTrail;
+	FVector2D LeviathanHomeM = FVector2D::ZeroVector;
+	double LeviathanLoopM = 1000.0;
+	double LeviathanSpeedMS = 5.0;
+	double LeviathanPhase = 0.0;
+
 	TWeakObjectPtr<AThalassaVessel> Vessel;
 	bool bDisabled = false;
 };

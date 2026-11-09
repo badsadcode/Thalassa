@@ -1,42 +1,69 @@
-# Creatures: first version
+# Creatures
 
-The first life in the open ocean: schools of big, peaceful gliders, which the ping startles. It is the first of the design document's Phase 2 creatures ("one peaceful, one territorial, one ambiguous distant signal").
+Life in the open ocean: ten kinds of animal in schools, from tiny glowing jellyfish to big slow cruisers, and one leviathan, longer than the ship. The ping startles them, and draws the leviathan. The first of the design document's Phase 2 creatures ("one peaceful, one territorial, one ambiguous distant signal"), and the owner's "clutter fish".
 
 ## What's there
 
-- **The glider.** A broad-winged animal about 5 m across (4 to 7 m: each animal is scaled 0.8 to 1.35), with a domed dark back, pale lines curving out along the wings, a pale belly, a long whip of a tail, and a faint glowing spot near each wingtip. Placeholder art: `Scripts/blender/make_creatures.py` makes it by rules, `Scripts/unreal/import_creatures.py` imports it as `Content/Creatures/SM_Glider` and builds `M_Creature`.
-- **Schools.** 5 to 11 animals, loosely spread through a flattened oval and never nearer each other than 9 m. A school glides 25 to 55 m above the ground, following its shape but not its smallest bumps, rising and falling a little, banking into turns. Each animal drifts slowly within the school and faces a little its own way.
-- **Where they live.** The ocean is divided into 600 m fauna cells. The seed decides whether a cell has a school, by province: plains 30%, hills 50%, plateaus 60%, ridges 40%, canyons 50%, volcanic fields 12%. A school always lives near the start, so there's something to meet. Each school wanders two loops added together round its home: a big slow one, 120 to 220 m across, at 1.2 to 2.2 m/s, and a smaller, quicker one, so the path never quite repeats.
-- **The ping.** When a ping's wave reaches a school (it spreads at 500 m/s, so a school 1 km away hears it 2 s after it goes out), the school bolts up to 70 m away from where it came from, beating its wings three times as fast, spreading out to over twice as wide, and the wingtip spots flash. Over the next 45 s it settles, gathers and drifts back to its path. Pings close together add up: a school pinged again while still fleeing bolts further. A school gives the ship 80 m of room.
-- **Contacts on the chart.** Every animal the ping's wave reaches shows on the sonar chart as an amber diamond with a dark halo, appearing as the wave reaches it, bright at first, fading over 12 s. It marks where the animal was when the wave reached it, not where it is now. A school shows as a cluster.
+| Kind | Size | School | Where | Height above ground | Drawn to | On the ping's chart |
+|---|---|---|---|---|---|---|
+| Glider: broad wings, glowing wingtip spots | 4 to 7 m across | 5 to 11 | 600 m cells | 25 to 55 m | 700 m | yes |
+| Dart: small, slender, silver | 0.3 m | 30 to 80 | 90 m cells | 3 to 15 m | 110 m | no |
+| Disc: deep-bodied, gold with dark bands | 0.4 m | 15 to 40 | 140 m | 2 to 8 m | 110 m | no |
+| Lantern: small, dark, glowing spots along the belly | 0.2 m | 20 to 60 | 110 m | 8 to 40 m | 160 m | no |
+| Grouper: heavy, mottled | 1.4 m | 2 to 6 | 160 m | 0.8 to 3 m | 150 m | no |
+| Eel: long, ribbon fins | 2.2 m | 1 to 3 | 200 m | 0.4 to 1.5 m | 110 m | no |
+| Cruiser: big, slow, long-finned, a faint glowing line along each flank | 7 m | 1 to 3 | 500 m | 15 to 60 m | 450 m | yes |
+| Giant jellyfish: pale, faintly glowing rim | 6 m bell, tentacles to 14 m | 1 to 3 | 400 m | 25 to 90 m | 400 m | yes |
+| Glow jellyfish: blue, glowing rim and banded tentacles | 2.2 m bell | 3 to 9 | 250 m | 12 to 60 m | 350 m | no |
+| Motes: tiny glowing jellyfish, drifting swarms | 0.3 m | 40 to 110 | 150 m | 5 to 50 m | 160 m | no |
+
+Each animal is scaled about 0.8 to 1.3 times. Each kind has its own lattice of cells, and the seed decides whether a cell holds a school of that kind, by province (the table is `ThalassaFauna::Species` in `ThalassaOceanFauna.cpp`). Small fish are everywhere; lanterns and glowing jellyfish like the dark canyons and volcanic fields; groupers and eels the broken ground; the plains are thinner. Every kind has a school near the start, so there's something to meet.
+
+- **Schools** wander two loops added together round their home, a big slow one and a smaller quicker one, so the path never quite repeats, at a height over the ground, following its shape (closely for fish near the ground), banking into turns. Each animal drifts within the school and faces a little its own way. Jellyfish drift slowly, upright, turning and tilting a little.
+- **Motion in the materials:** fish bodies sway with a wave running back to the tail (small fish fast, big ones slowly); gliders' wings beat; jellyfish bells pulse and their tentacles trail.
+- **The ping:** when its wave reaches a school (500 m/s), the school bolts away from where it came from, swims faster, spreads out, and its glow flashes; over 45 s it settles and drifts back. Jellyfish drift only a little, and their glow flares for a few seconds. Pings close together add up. Every school gives the ship room (10 to 80 m, by kind).
+- **Contacts on the chart:** everything big enough (gliders, cruisers, giant jellyfish, the leviathan) shows as an amber diamond with a dark halo, appearing as the wave reaches it and fading over 12 s, where it was when the wave reached it. Small fish are too small for the ping.
+
+## The leviathan
+
+One, about 400 m long (the ship is 280 m), a body of 16 segments tapering to a tail with an upright fluke, a ridge of spines, trailing fins, rows of glowing spots along its flanks, and two big glowing amber eyes over 4 m across: what you'd see through a window, with the rest of it lost in the dark.
+
+- **Its round:** a big slow loop, 0.9 to 1.2 km across, round a point about 1.6 km from the start, at 7 to 9 m/s, 120 m above the ground, never nearer the surface than 60 m. For this seed the loop is centred at about (-390, 1550) m.
+- **Pings draw it.** It hears a ping from up to 2.2 km. Over the next two and a half minutes it comes to circle where the ping came from, about 450 m out and a little below, and after five minutes or so it loses interest and goes back to its round. Pings close together hold its interest. Its lights flare when a ping's wave passes over it.
+- **On the chart** it's a long chain of contacts, one from each part of its body: the design document's "multiple apparently separate sonar returns from one body".
+- **How its body moves:** the head's path is a function of time like everything else; each piece of the body is placed along the path the head has taken, sampled every half second and cached, with a slow wave running back along it. So the body follows the head through every turn, and every machine draws it the same.
+- **It passes through the ship.** It doesn't avoid it yet: keeping clear would need the ship's position, which each machine sees a little differently. Its round keeps it at least several hundred metres from the start, and when it comes to a ping it circles 450 m out.
 
 ## How it stays the same for everyone
 
-Nothing is sent over the network for it, like the seabed and the rocks:
+Nothing is sent over the network but the pings:
 
 - where each school lives, and who is in it, follows from the seed and its cell (`UThalassaOceanFauna::MakeSchool`);
-- where a school is at any moment follows from the server's clock, which every machine shares (`SchoolAt`, a pure function);
-- how it reacts follows from the replicated ping (each machine keeps the last six pings it has seen).
+- where a school is at any moment follows from the server's clock, which every machine shares (`SchoolAt`, a pure function), and the same for the leviathan (`LeviathanHeadAt`);
+- how they react follows from the sonar's replicated list of the last ten minutes of pings (`UThalassaSonarComponent::GetRecentPulses`), so a player who joins late sees them where everyone else does.
 
-So every player sees the same animals in the same places, doing the same thing. Contacts are worked out on each machine from the same inputs (`UThalassaSonarComponent::UpdateContacts`). Each machine logs a fingerprint of a ping's contacts, to the metre, so tests can compare them. Two small things can differ: a player who joins late doesn't know about pings sent before, and the room a school gives the ship uses each machine's own view of where the ship is.
+Contacts are worked out on each machine from the same inputs (`UThalassaSonarComponent::UpdateContacts`), with the ship taken to be where the ping went out. Each machine logs a fingerprint of a ping's contacts, to the metre, so tests can compare them. One small thing can differ: the room a school gives the ship on screen uses each machine's own view of where the ship is.
 
 ## How it's drawn
 
-- One instanced mesh component for all gliders (`Gliders`, on the ocean), with every school within 700 m of the camera, no collision and no shadows. The positions are set every frame on the CPU. The wingbeats are in the material, as a world position offset, so a school costs only its positions.
-- **`M_Creature`** reads what each mesh carries (see the top of `make_creatures.py`): the skin from the vertex colours; UV channel 1 where a vertex is on the moving part (out along a wing); channel 2 the animal's size; channel 3 how it moves (0 a body swaying side to side, ready for fish; 1 wings flapping); channel 4 the glow. Per instance, three numbers: phase, wingbeat rate and flash. The beat is about 4 s for a 5 m animal, the tips lagging and travelling furthest.
-- **Two things that went wrong, for the record:** vertex alpha doesn't survive the FBX export (every vertex came through as fully glowing, so the glow is in UV channel 4), and FBX colours are read as they are, so they're exported linear, or the dark backs came out pale.
+- One instanced mesh component per mesh (13: ten kinds and the leviathan's head, body segment and tail), on the ocean, with no collision and no shadows. The positions are set every frame on the CPU; the motion is in the materials (world position offset).
+- **The meshes** are placeholders made by rules: `Scripts/blender/make_creatures.py` makes them, `Scripts/unreal/import_creatures.py` imports them into `Content/Creatures` and builds the materials. **`M_Creature`** (lit) draws fish, gliders and the leviathan; **`M_Jelly`** (see-through, unlit, brighter and more solid at the edges) the jellyfish. Both read what each mesh carries (see the top of `make_creatures.py`): skin from the vertex colours; UV channel 1 where a vertex is on the moving part; channel 2 its size; channel 3 how it moves (body, wings, jellyfish, or not at all); channel 4 its glow. A bright skin glows its own colour (the leviathan's amber eyes), a dark one cold blue-green. Per instance: phase, stroke rate and flash.
+- **Two things that went wrong, for the record:** vertex alpha doesn't survive the FBX export (every vertex came through fully glowing, so the glow is in UV channel 4), and FBX colours are read as they are, so they're exported linear, or the dark backs came out pale.
 
 ## Switches
 
 - `-ThalassaNoFauna`: no animals, for comparisons.
-- `-ThalassaGlidersAt=X,Y` (world centimetres): the start's school lives there, barely roaming. For screenshots: `capture_screenshots.py <folder> /Game/Maps/L_Ocean "close=0/-40@16000,0,-1500" -ThalassaShipAboveGround=40 -ThalassaGlidersAt=17500,0`.
-- `-ThalassaPerf` times the fauna's work as "fauna".
+- `-ThalassaFaunaAt=X,Y` (world centimetres): every kind's school from the start gathers round there, barely roaming. For screenshots: `capture_screenshots.py <folder> /Game/Maps/L_Ocean "among=137/-15@16000,0,-7400" -ThalassaShipAboveGround=40 -ThalassaFaunaAt=16000,0` (the ground there is about 55 m below the ship's start).
+- `-ThalassaGlidersAt=X,Y`: the same for the gliders alone.
+- `-ThalassaLeviathanAt=X,Y`: the leviathan's round is a small loop (250 m) round there.
+- `-ThalassaPerf` times the fauna's work as "fauna". Every 20 s the log has a `LEVIATHAN` line: time, head position, and distance from the ship.
 
 ## Tested (2026-11-09)
 
-- **Two players on the open ocean** (helm tour, sonar on, a ping every 10 s, about 15 ms): 0 corrections, no frames over 50 ms, the ship in step within 3.7 cm, sonar charts 2,370 and 2,371 cells (one in flight). Host and client found identical contacts, by fingerprint, for pings 6 to 19. Pings 2 to 5 differed: the client joined after ping 1 and never saw it, so schools still fleeing from it were elsewhere on its screen until it was 45 s old. That's the late-joiner limit above.
-- **Cost:** the fauna's work is at most about 0.5 ms a frame with schools in view and pinged (`-ThalassaPerf`). One instanced component, about 25 cells looked at per frame.
-- **Frames:** a school seen from 40 m (dark backs, glowing wingtips), the same school 4 s after a ping (scattered, fled), and the chart with contacts around the ship.
+- **Two players on the open ocean, gliders only** (the first version; helm tour, sonar on, a ping every 10 s, about 15 ms): 0 corrections, no frames over 50 ms. Host and client found identical contacts for pings 6 to 19; pings 2 to 5 differed, because the client joined after ping 1 and didn't know about it. That's why the recent pings are now replicated.
+- **Two players, all ten kinds and the leviathan** (the same run): 0 corrections, no frames over 50 ms, the ship in step within 2.9 cm, sonar charts 2,370 and 2,371 cells (one in flight). The client joined after pings 1 and 2, and its contacts still matched the host's, by fingerprint, for every ping both saw (3 to 19), including those in the 45 s after the pings it missed. 80 to 110 contacts a ping. The leviathan heard the first pings from 2.2 km and came in: 2,174 m from the ship at 20 s, 1,065 m at 80 s, about 700 m from 120 s while the ship toured away from where it had pinged. This run had the leviathan at its first size (about 155 m); it was scaled to 400 m afterwards, which changes where its pieces are drawn but not how it moves.
+- **Cost:** the fauna's work is at most about 0.85 ms a frame with all the kinds near the start in view, and 0.75 ms with the leviathan in view (`-ThalassaPerf`). The leviathan's path is cached, so it costs one new sample every half second.
+- **Frames:** each kind gathered round one spot (`-ThalassaFaunaAt`); the leviathan at 500 m (a line of lights in the dark) and at 300 m (its head rising, eye, spine ridge, rows of lights); the chart, with the leviathan as a curved chain of contacts.
 
 ## Also fixed: the rocks in a packaged build
 
@@ -44,9 +71,10 @@ The game log showed that every scanned rock material lacked the usage flags for 
 
 ## Not done yet
 
-- **More life:** the owner's "clutter fish": many kinds of small, medium and big fish, giant jellyfish (some glowing), and a leviathan prototype bigger than the ship. `M_Creature` already has the swaying body motion for fish.
-- **The territorial creature and the distant signal** from Phase 2.
-- **Sound.** The animals are silent, and the hydrophone station doesn't exist yet.
+- **Visibility.** Small fish are true to size, and in the murk they're dark specks beyond 20 or 30 m. Near the floodlights they read; further out, only the glowing kinds do. That may be right for the deep, but the sunlit and twilight water from Phase 2 will show them better.
+- **The territorial creature and the distant signal** from Phase 2. The leviathan is curious, not territorial.
+- **Sound.** The animals are silent, and the hydrophone station doesn't exist yet. The leviathan should be heard long before it's seen.
+- **The leviathan and the ship:** it doesn't avoid the ship, and doesn't come to the windows. A pass by the observation window, with the eye, needs it to know where the ship is.
 - **Contacts on the holotable,** and classifying them (it's all "something alive" for now).
-- **Real art.** The glider is a placeholder of rules, like the grey deck.
-- **Creatures that come to look:** at the floodlights, at the ship. These gliders only avoid it.
+- **Real art.** Every creature is a placeholder of rules, like the grey deck.
+- **Creatures that come to look** at the floodlights or the ship. Schools only avoid it.

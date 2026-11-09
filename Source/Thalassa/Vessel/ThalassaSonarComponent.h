@@ -145,6 +145,14 @@ public:
 	const FSonarPulse& GetLastPulse() const { return Pulse; }
 
 	/**
+	 * The pings of the last ten minutes, oldest first, for the creatures: a startled school takes most of a minute to
+	 * settle, and the leviathan comes to look for several. Replicated, so a player who joins later sees the
+	 * creatures where everyone else does.
+	 */
+	const TArray<FSonarPulse>& GetRecentPulses() const { return RecentPulses; }
+	static constexpr double RecentPulseSeconds = 600.0;
+
+	/**
 	 * Contacts from the last ping: everything alive its wave reached. Worked out on each machine from the
 	 * replicated ping and the creatures, which every machine places the same way, so nothing more is sent.
 	 * A contact shows from when the wave reaches it; the chart fades it out over ContactFadeSeconds.
@@ -232,6 +240,9 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_Pulse)
 	FSonarPulse Pulse;
+
+	UPROPERTY(Replicated)
+	TArray<FSonarPulse> RecentPulses;
 
 	/** Server: (layer, cell index) to position in Chart.Items, so a cell is updated, never duplicated. */
 	TMap<uint64, int32> CellLookup;
