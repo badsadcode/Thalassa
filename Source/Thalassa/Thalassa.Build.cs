@@ -19,5 +19,11 @@ public class Thalassa : ModuleRules
 
 		// The open ocean's seabed is built at runtime, tile by tile.
 		PrivateDependencyModuleNames.Add("ProceduralMeshComponent");
+
+		// Editor only: packing rooms built as levels into the ship's art (Tools/ThalassaArtTools).
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
 	}
 }

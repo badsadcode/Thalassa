@@ -1,8 +1,9 @@
 """Dresses the aft corridor with the Hallway_sci_fi kit: a worked example of the ship's art over its grey box.
 
-Makes /Game/Ship/Art/BP_Art_AftCorridor, a Blueprint holding the room's pieces (one instanced mesh per kind of
-piece: walls, columns, door frames, floor, ceiling, trim, lamps, and a few lights), placed in ship coordinates
-over the grey room, and adds it to BP_Thalassa as a Child Actor component called Art_AftCorridor.
+Makes the room as an ordinary level, /Game/Ship/Art/L_Art_AftCorridor, in ship coordinates: every piece an actor
+(walls, columns, door frames, floor, ceiling, trim, pipes, lamps) in a folder by kind, and eight point lights.
+Then packs it (UThalassaArtTools::PackRoom) into /Game/Ship/Art/BPP_AftCorridor and puts that on BP_Thalassa as
+the Child Actor component Art_AftCorridor.
 
 The room (ThalassaMainDeckLayout.cpp, "Aft: spine"): X -8500 to -6000, between the walls at Y -800 and Y 500,
 floor at 0, ceiling at 350 (the kit's own height). Doors: to the stores (south, X -7000, 2 m), to the EVA room
@@ -11,8 +12,8 @@ and airlock (north, X -7000, 4 m), to engineering (aft, Y -300, 4 m) and forward
 Art is scenery: the ship turns its collision off (docs/SHIP_ART.md). What you walk on and bump into is still
 the grey layout's, so the art keeps to its walls.
 
-Safe to run again: it rebuilds the room Blueprint and adds the Child Actor only if it isn't there yet.
-Open BP_Art_AftCorridor afterwards to move pieces by hand; running this again replaces that work.
+Safe to run again: if the level exists it is left alone (it may have hand work in it); it's only packed again.
+To edit the room, open the level, change it, save, and run the console command Thalassa.PackRooms.
 
 Run with: UnrealEditor-Cmd.exe Thalassa.uproject -ExecutePythonScript=<this file> -unattended -nullrhi
 """
@@ -20,7 +21,8 @@ import math
 import unreal
 
 KIT = "/Game/Hallway_sci_fi/mesh/"
-ROOM_BP = "/Game/Ship/Art/BP_Art_AftCorridor"
+LEVEL = "/Game/Ship/Art/L_Art_AftCorridor"         # The room, edited like any level.
+OLD_ROOM_BP = "/Game/Ship/Art/BP_Art_AftCorridor"  # This room's first version, now replaced.
 SHIP_BP = "/Game/Ship/BP_Thalassa"
 CHILD_NAME = "Art_AftCorridor"
 
@@ -179,56 +181,43 @@ for i, x in enumerate([-8150.0, -7550.0, -6950.0, -6350.0]):
         lights.append((x, y))
 
 
-# ---------------------------------------------------------------- The Blueprint.
-if eal.does_asset_exist(ROOM_BP):
-    # The ship refers to it, so it can't be deleted: empty it instead.
-    room = unreal.load_asset(ROOM_BP)
-    handles = sds.k2_gather_subobject_data_for_blueprint(room)
-    root = handles[0]
-    old = [h for h in handles[1:] if lib.is_handle_valid(h)]
-    if old:
-        sds.delete_subobjects(root, old, room)
+# ---------------------------------------------------------------- The level.
+les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+if eal.does_asset_exist(LEVEL):
+    # Never over the top of hand work: the level is the room now. Only packing happens again.
+    unreal.log("THALASSA: %s already exists; left as it is" % LEVEL)
 else:
-    factory = unreal.BlueprintFactory()
-    factory.set_editor_property("parent_class", unreal.Actor)
-    room = unreal.AssetToolsHelpers.get_asset_tools().create_asset("BP_Art_AftCorridor", "/Game/Ship/Art", unreal.Blueprint, factory)
-    root = sds.k2_gather_subobject_data_for_blueprint(room)[0]
+    les.new_level(LEVEL)
+    total = 0
+    for name, transforms in placed.items():
+        for index, t in enumerate(transforms):
+            actor = eas.spawn_actor_from_object(MESHES[name], t.translation, t.rotation.rotator())
+            actor.set_actor_scale3d(t.scale3d)
+            actor.set_actor_label("%s_%02d" % (name, index + 1))
+            actor.set_folder_path(name)
+            actor.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+            total += 1
+    for index, (x, y) in enumerate(lights):
+        light = eas.spawn_actor_from_class(unreal.PointLight, unreal.Vector(x, y, CEILING - 30.0))
+        light.set_actor_label("Light_%02d" % (index + 1))
+        light.set_folder_path("Lights")
+        c = light.point_light_component
+        c.set_mobility(unreal.ComponentMobility.MOVABLE)
+        c.set_editor_property("intensity_units", unreal.LightUnits.CANDELAS)
+        c.set_editor_property("intensity", 14.0)
+        c.set_editor_property("attenuation_radius", 900.0)
+        c.set_editor_property("light_color", unreal.Color(255, 222, 190, 255))
+        c.set_editor_property("source_length", 180.0)
+    les.save_current_level()
+    unreal.log("THALASSA: %s built, %d pieces, %d lights" % (LEVEL, total, len(lights)))
+    # Packing reads the level as a level instance: not while it's the open one.
+    les.new_level("/Temp/Untitled_Packing")
 
-
-def add(cls, name, parent=root):
-    handle, fail = sds.add_new_subobject(unreal.AddNewSubobjectParams(parent_handle=parent, new_class=cls, blueprint_context=room))
-    if not lib.is_handle_valid(handle):
-        raise RuntimeError("THALASSA: could not add %s: %s" % (name, fail))
-    sds.rename_subobject(handle, unreal.Text(name))
-    return lib.get_object(lib.get_data(handle))
-
-
-total = 0
-for name, transforms in placed.items():
-    if not transforms:
-        continue
-    ism = add(unreal.InstancedStaticMeshComponent, name)
-    ism.set_editor_property("static_mesh", MESHES[name])
-    ism.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
-    for t in transforms:
-        ism.add_instance(t)
-    total += len(transforms)
-    unreal.log("THALASSA: %s x%d" % (name, len(transforms)))
-
-for index, (x, y) in enumerate(lights):
-    light = add(unreal.PointLightComponent, "Light%02d" % index)
-    light.set_editor_property("relative_location", unreal.Vector(x, y, CEILING - 30.0))
-    light.set_editor_property("intensity_units", unreal.LightUnits.CANDELAS)
-    light.set_editor_property("intensity", 14.0)
-    light.set_editor_property("attenuation_radius", 900.0)
-    light.set_editor_property("light_color", unreal.Color(255, 222, 190, 255))
-    light.set_editor_property("source_length", 180.0)
-
-unreal.BlueprintEditorLibrary.compile_blueprint(room)
-eal.save_asset(ROOM_BP)
-unreal.log("THALASSA: %s built, %d pieces, %d lights" % (ROOM_BP, total, len(lights)))
-
-# ---------------------------------------------------------------- On the ship.
+# ---------------------------------------------------------------- Packed, and on the ship.
+packed = unreal.ThalassaArtTools.pack_room(LEVEL)
+if not packed:
+    raise RuntimeError("THALASSA: packing failed")
 ship = unreal.load_asset(SHIP_BP)
 ship_handles = sds.k2_gather_subobject_data_for_blueprint(ship)
 names = {}
@@ -237,7 +226,7 @@ for h in ship_handles:
     if obj:
         names[obj.get_name().replace("_GEN_VARIABLE", "")] = h
 if CHILD_NAME in names:
-    unreal.log("THALASSA: BP_Thalassa already has " + CHILD_NAME)
+    child = lib.get_object(lib.get_data(names[CHILD_NAME]))
 else:
     parent = names.get("ShipRoot", ship_handles[0])
     handle, fail = sds.add_new_subobject(unreal.AddNewSubobjectParams(parent_handle=parent, new_class=unreal.ChildActorComponent, blueprint_context=ship))
@@ -245,7 +234,13 @@ else:
         raise RuntimeError("THALASSA: could not add the room to the ship: %s" % fail)
     sds.rename_subobject(handle, unreal.Text(CHILD_NAME))
     child = lib.get_object(lib.get_data(handle))
-    child.set_editor_property("child_actor_class", unreal.EditorAssetLibrary.load_blueprint_class(ROOM_BP))
-    unreal.log("THALASSA: added %s to BP_Thalassa" % CHILD_NAME)
+# Cleared first: the ship keeps a saved copy of the room, and setting the same class again wouldn't renew it.
+child.set_editor_property("child_actor_class", None)
+child.set_editor_property("child_actor_class", eal.load_blueprint_class(packed))
 unreal.BlueprintEditorLibrary.compile_blueprint(ship)
 eal.save_asset(SHIP_BP)
+unreal.log("THALASSA: BP_Thalassa's %s now holds %s" % (CHILD_NAME, packed))
+
+# The first version of this room, an instanced Blueprint, is replaced.
+if eal.does_asset_exist(OLD_ROOM_BP):
+    eal.delete_asset(OLD_ROOM_BP)

@@ -17,7 +17,7 @@ Until now, the inside of the ship has been coloured grey boxes. They're good for
 
 The ship isn't rebuilt to do this. The grey layout stays as the skeleton. It decides where you can walk, where there's air and where the stations are, and it's what the multiplayer is tested on. The art goes on top, as scenery that you see but never bump into. Walls you actually hit are still the grey ones, so the art just has to sit on their faces.
 
-I bought a sci-fi hallway kit on Fab. Luckily, its walls are exactly as tall as our deck, 3.5 metres. The aft corridor is now dressed with it: wall panels in three rows, trim along the top, columns, corners, door frames round each doorway, floor plates, ceiling beams, pipes and warm strip lamps. That's 284 pieces and eight lights, all in one Blueprint attached to the ship. I can open it and move any piece by hand.
+I bought a sci-fi hallway kit on Fab. Luckily, its walls are exactly as tall as our deck, 3.5 metres. The aft corridor is now dressed with it: wall panels in three rows, trim along the top, columns, corners, door frames round each doorway, floor plates, ceiling beams, pipes and warm strip lamps. That's 284 pieces and eight lights. The room is an ordinary level that I can edit like any map. One command packs it into a single Blueprint the ship carries, and makes sure everything in it moves with the ship and never gets in a player's way.
 
 ![The doorway to the EVA room and airlock.](/Thalassa/images/devlog/0033-airlock-door.jpg)
 
@@ -31,6 +31,8 @@ The bridge window was a letterbox. Now it runs almost from floor to ceiling and 
 
 ## What this does not prove
 
-It's one room. The rest of the ship is still grey, and you can see the grey door jambs in the doorways. The lighting is a first guess. I haven't yet run a walking test through the dressed corridor, though the same scenery rules have held up in earlier tests.
+It's one room. The rest of the ship is still grey, and you can see the grey door jambs in the doorways. The lighting is a first guess.
+
+One thing did go wrong, and the walking test caught it. On the second player's machine, the room arrived solid, so that player walked on the art floor, 6 cm above the real one. The host kept pulling them back down: 187 corrections on a walk that normally has one. The ship now switches art collision off wherever and whenever it shows up. The same walk is back to 1 correction.
 
 *Beep. Bloop.*

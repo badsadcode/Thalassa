@@ -819,6 +819,34 @@ void AThalassaVessel::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	// Art never collides with players, on every machine, however it got here: a packed room on a joining
+	// player's machine came back solid after BeginPlay made it scenery, and the walkers stood on its floor
+	// there but not on the host. Instanced art (packed rooms) gets no collision at all.
+	{
+		TArray<AActor*> Attached;
+		GetAttachedActors(Attached, false, true);
+		for (AActor* Actor : Attached)
+		{
+			if (!Actor || Actor->IsA<APawn>())
+			{
+				continue;
+			}
+			TInlineComponentArray<UInstancedStaticMeshComponent*> Instanced(Actor);
+			for (UInstancedStaticMeshComponent* Mesh : Instanced)
+			{
+				if (Mesh->GetCollisionEnabled() != ECollisionEnabled::NoCollision)
+				{
+					UE_LOG(LogTemp, Display, TEXT("ART: %s.%s was solid; collision off"), *GetNameSafe(Actor), *Mesh->GetName());
+					Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				}
+			}
+			if (!ArtActors.Contains(Actor))
+			{
+				MakeArtVisualOnly();
+			}
+		}
+	}
+
 	if (HasAuthority())
 	{
 		TickServer(DeltaSeconds);
@@ -932,6 +960,13 @@ namespace
 		Primitive->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 		Primitive->CanCharacterStepUpOn = ECB_No;
 		Primitive->SetCanEverAffectNavigation(false);
+		// Instanced meshes (packed rooms) keep a physics body per instance, and changing what they block doesn't
+		// reach those bodies: on a joining player's machine the walkers still stood on a packed floor. They get
+		// no collision at all instead.
+		if (Primitive->IsA<UInstancedStaticMeshComponent>())
+		{
+			Primitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
 	}
 }
 

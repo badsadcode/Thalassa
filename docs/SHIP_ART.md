@@ -43,12 +43,32 @@ Lights must move with the ship: set them to **Movable**.
 
 ### The worked example: the aft corridor
 
-The aft corridor (between engineering and the mess, with the airlock off it) is dressed with the `Hallway_sci_fi` kit from Fab. It's in **`Content/Ship/Art/BP_Art_AftCorridor`**, added to `BP_Thalassa` as the Child Actor component **`Art_AftCorridor`**.
+The aft corridor (between engineering and the mess, with the airlock off it) is dressed with the `Hallway_sci_fi` kit from Fab. It's built the comfortable way above, with the packing step done by a tool:
 
-- **What's in it:** one instanced mesh component for each kind of piece: wall panels in three rows, trim, columns, corners, door frames, floor and ceiling tiles, pipes and strip lamps. There are also eight warm point lights.
-- **Where things are:** the pieces are placed in ship coordinates, over the grey walls. The kit is 350 cm tall, the same as the deck. Its wall pieces stand with their back at local Y 0 and face +Y, which is the rule the script uses to turn them into the room.
-- **Changing it by hand:** open `BP_Art_AftCorridor`, pick a component (say `WallBottom`), and select or move single instances in the viewport.
-- **Rebuilding it:** `Scripts/unreal/build_aft_corridor_art.py` makes it all from scratch. It's also the template for dressing another room: change the room's walls and doors at the top, and the Blueprint's name. Running it again replaces any hand changes in that Blueprint.
+- **The room:** **`Content/Ship/Art/L_Art_AftCorridor`**, an ordinary level in ship coordinates. Every piece is its own actor, in folders by kind (`WallBottom`, `Floor`, `Lights` and so on). The kit is 350 cm tall, the same as the deck.
+- **Packed:** **`Content/Ship/Art/BPP_AftCorridor`**, made from the level. Don't edit this one; it's rebuilt each time.
+- **On the ship:** `BP_Thalassa` holds it as the Child Actor component **`Art_AftCorridor`**.
+
+**To change a room:**
+
+1. Open its `L_Art_` level and edit it like any level:
+   - drag meshes in from the Content Browser
+   - click to select, Ctrl+click for more
+   - W, E and R to move, rotate and scale
+   - Alt+drag to copy
+   - End to drop onto the floor
+   - add lights with the **+** button (Light > Point Light)
+2. Save it.
+3. In the **Cmd** box at the bottom of the editor, type `Thalassa.PackRooms` and press Enter. Every `L_Art_` level is packed into its `BPP_` Blueprint, and the log says `ART: packed ...`.
+4. Press Play.
+
+**The packing tool** (`Source/Thalassa/Tools/ThalassaArtTools`) fixes what Unreal's own packing would get wrong for a moving ship:
+
+- Everything is made **Movable**, so it moves with the ship. Pieces dropped into a level start out Static.
+- Every piece is made **scenery** with no collision at all. Players never stand on it (on a joining player's machine, only ignoring players wasn't enough), and line traces pass through it too.
+- **Lights** are copied in. Packing on its own leaves them out, and its message log warns about every light. Those warnings are expected.
+
+**A new room:** make a level named `L_Art_<Room>` in `Content/Ship/Art`, build it where the room is in ship coordinates (switch on Show Greybox in a play session to see where the walls are), run `Thalassa.PackRooms`, and add `BPP_<Room>` to `BP_Thalassa` as a Child Actor component. `Scripts/unreal/build_aft_corridor_art.py` made the aft corridor's first layout. It never overwrites an existing level, so it can be copied as a starting point for another room.
 
 ## Moving gameplay spots
 
