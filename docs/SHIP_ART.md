@@ -41,6 +41,15 @@ Small things, like a single prop or light, can go straight into `BP_Thalassa` as
 
 Lights must move with the ship: set them to **Movable**.
 
+### The worked example: the aft corridor
+
+The aft corridor (between engineering and the mess, with the airlock off it) is dressed with the `Hallway_sci_fi` kit from Fab. It's in **`Content/Ship/Art/BP_Art_AftCorridor`**, added to `BP_Thalassa` as the Child Actor component **`Art_AftCorridor`**.
+
+- **What's in it:** one instanced mesh component for each kind of piece: wall panels in three rows, trim, columns, corners, door frames, floor and ceiling tiles, pipes and strip lamps. There are also eight warm point lights.
+- **Where things are:** the pieces are placed in ship coordinates, over the grey walls. The kit is 350 cm tall, the same as the deck. Its wall pieces stand with their back at local Y 0 and face +Y, which is the rule the script uses to turn them into the room.
+- **Changing it by hand:** open `BP_Art_AftCorridor`, pick a component (say `WallBottom`), and select or move single instances in the viewport.
+- **Rebuilding it:** `Scripts/unreal/build_aft_corridor_art.py` makes it all from scratch. It's also the template for dressing another room: change the room's walls and doors at the top, and the Blueprint's name. Running it again replaces any hand changes in that Blueprint.
+
 ## Moving gameplay spots
 
 The places the game cares about are components in `BP_Thalassa`, under **Thalassa | Spots** in its Details panel and in the component list. Select one and move it, and the game follows. You never see them in play, and they never collide.
